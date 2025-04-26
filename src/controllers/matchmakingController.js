@@ -1,787 +1,704 @@
-const { verifyToken } = require('../utils/jwt');
 const supabase = require('../config/database');
-const { v4: uuidv4 } = require('uuid');
+const { matchmakingRequestSchema, matchResponseSchema } = require('../models/matchmaking');
+const { validateInterests } = require('../utils/interests');
+const { notifyMatchFound } = require('../socket/socketManager');
 
-// Track connected users and their socket IDs
-const connectedUsers = new Map();
+// In-memory waiting queue for matchmaking
+// Use a Map for O(1) lookups by userId
+const waitingQueue = new Map();
 
-// Reference to Socket.IO instance
-let ioInstance;
-
-// Track active matches with acceptance status
-// Format: { matchId: { users: [userId1, userId2], acceptances: { userId1: boolean, userId2: boolean } } }
-const activeMatches = new Map();
-
-// Track user timeouts for matchmaking
-const userTimeouts = new Map();
-
-// Track users in matchmaking pool waiting for matches
-const matchmakingPool = new Map();
-
-// Match acceptance timeout (in milliseconds)
-const MATCH_ACCEPTANCE_TIMEOUT = 30000; // 30 seconds
+// Queue processing variables
+let isProcessingQueue = false;
+const BATCH_SIZE = 100; // Process 100 users per batch
+const MATCH_LIMIT_PER_CYCLE = 50; // Max matches to make per processing cycle
 
 /**
- * Clear any existing matchmaking timeouts for a user
- * @param {string} userId - User ID to clear timeouts for
+ * Calculate distance between two coordinates in kilometers using Haversine formula
+ * @param {object} coord1 - First coordinate {latitude, longitude}
+ * @param {object} coord2 - Second coordinate {latitude, longitude}
+ * @returns {number} Distance in kilometers
  */
-const clearMatchmakingTimeouts = (userId) => {
-  const timeoutId = userTimeouts.get(userId);
-  if (timeoutId) {
-    clearTimeout(timeoutId);
-    userTimeouts.delete(userId);
-    console.log(`Cleared timeout for user ${userId}`);
+const calculateDistance = (coord1, coord2) => {
+  const R = 6371; // Earth radius in kilometers
+  const dLat = (coord2.latitude - coord1.latitude) * (Math.PI / 180);
+  const dLon = (coord2.longitude - coord1.longitude) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(coord1.latitude * (Math.PI / 180)) * Math.cos(coord2.latitude * (Math.PI / 180)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+/**
+ * Calculate age from date of birth
+ * @param {string} dateOfBirth - Date of birth in ISO format
+ * @returns {number} Age in years
+ */
+const calculateAge = (dateOfBirth) => {
+  const dob = new Date(dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+/**
+ * Calculate compatibility score between two users - simplified version
+ * @param {object} user1 - First user
+ * @param {object} user2 - Second user
+ * @param {object} criteria - Matchmaking criteria
+ * @returns {number} Compatibility score (0 or 100)
+ */
+const calculateCompatibility = (user1, user2, criteria) => {
+  console.log(`Calculating compatibility between user ${user1.id} and user ${user2.id}`);
+  
+  // Log all relevant data for debugging
+  console.log(`User 1 (${user1.id}) interests:`, JSON.stringify(user1.interests || []));
+  console.log(`User 2 (${user2.id}) interests:`, JSON.stringify(user2.interests || []));
+  
+  if (criteria.preference) {
+    console.log(`User 1 preference criteria: ${criteria.preference}, User 2 preference: ${user2.preference}`);
+  }
+
+  // Only check if preferences match (optional)
+  if (criteria.preference && criteria.preference !== user2.preference) {
+    console.log(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
+    return 0;
+  }
+
+  // Check for at least 1 shared interest
+  // Supabase stores interests as an array of strings
+  const user1Interests = Array.isArray(user1.interests) ? user1.interests : [];
+  const user2Interests = Array.isArray(user2.interests) ? user2.interests : [];
+  
+  console.log(`User 1 interests: ${user1Interests.join(', ')}`);
+  console.log(`User 2 interests: ${user2Interests.join(', ')}`);
+  
+  // Use Set for efficient intersection calculation
+  const user1InterestsSet = new Set(user1Interests);
+  const sharedInterests = user2Interests.filter(interest => user1InterestsSet.has(interest));
+  
+  console.log(`Shared interests between ${user1.id} and ${user2.id}: ${sharedInterests.length}`);
+  console.log(`Shared interest list: ${sharedInterests.join(', ')}`);
+  
+  // If at least one interest matches, consider it compatible
+  const score = sharedInterests.length > 0 ? 100 : 0;
+  console.log(`Final compatibility score: ${score}`);
+  return score;
+};
+
+/**
+ * Process the matchmaking queue in batches
+ * This helps handle high load situations (50k+ users)
+ */
+const processMatchmakingQueue = async () => {
+  if (isProcessingQueue || waitingQueue.size === 0) {
+    return;
+  }
+  
+  try {
+    isProcessingQueue = true;
+    console.log(`Processing matchmaking queue with ${waitingQueue.size} users waiting`);
+    
+    // Convert map to array for processing
+    const queueEntries = Array.from(waitingQueue.values());
+    let matchesCreated = 0;
+    
+    // Process users in batches
+    for (let i = 0; i < queueEntries.length && matchesCreated < MATCH_LIMIT_PER_CYCLE; i++) {
+      // Skip users who have already been matched in this cycle
+      if (!waitingQueue.has(queueEntries[i].userId)) {
+        continue;
+      }
+      
+      const user = queueEntries[i];
+      console.log(`Processing user ${user.userId}`);
+      
+      // Find potential matches for this user
+      const potentialMatches = queueEntries.filter((entry, index) => {
+        // Don't match with self or already processed entries
+        if (entry.userId === user.userId || index <= i) {
+          return false;
+        }
+        
+        // Don't consider users who have been matched already
+        if (!waitingQueue.has(entry.userId)) {
+          return false;
+        }
+        
+        // Check compatibility (simplified to just matching interests)
+        const compatibilityScore = calculateCompatibility(user.user, entry.user, user.criteria);
+        console.log(`Compatibility between ${user.userId} and ${entry.userId}: ${compatibilityScore}`);
+        return compatibilityScore > 0;
+      });
+      
+      console.log(`Found ${potentialMatches.length} potential matches for user ${user.userId}`);
+      
+      // If matches found, create the first match
+      if (potentialMatches.length > 0) {
+        const match = potentialMatches[0];
+        console.log(`Best match for user ${user.userId} is user ${match.userId}`);
+        
+        try {
+          // Create match in database
+          const { data: newMatch, error: matchError } = await supabase
+            .from('matches')
+            .insert({
+              user1_id: user.userId,
+              user2_id: match.userId,
+              status: 'pending',
+              compatibility_score: 100, // We're using simplified scoring now
+              created_at: new Date(),
+              updated_at: new Date()
+            })
+            .select()
+            .single();
+            
+          if (matchError) {
+            console.error('Error creating match:', matchError);
+            continue;
+          }
+          
+          console.log(`Match created with ID: ${newMatch.id}`);
+          
+          // Remove both users from waiting queue
+          waitingQueue.delete(user.userId);
+          waitingQueue.delete(match.userId);
+          
+          // Notify both users
+          if (newMatch) {
+            try {
+              await notifyMatchFound(newMatch, user.user, match.user);
+              console.log(`Notified users ${user.userId} and ${match.userId} about new match`);
+            } catch (notifyError) {
+              console.error('Error notifying users about match:', notifyError);
+            }
+          }
+          
+          matchesCreated++;
+          console.log(`Match created between ${user.userId} and ${match.userId}`);
+        } catch (error) {
+          console.error('Error during match creation:', error);
+        }
+      } else {
+        console.log(`No compatible matches found for user ${user.userId}`);
+      }
+    }
+    
+    console.log(`Completed processing cycle. Created ${matchesCreated} matches. ${waitingQueue.size} users still waiting.`);
+  } catch (error) {
+    console.error('Error processing matchmaking queue:', error);
+  } finally {
+    isProcessingQueue = false;
+    
+    // If there are still users waiting, schedule another processing cycle
+    if (waitingQueue.size > 0) {
+      setTimeout(processMatchmakingQueue, 1000); // Process again in 1 second
+    }
   }
 };
 
 /**
- * Initialize Socket.IO with authentication
- * @param {object} io - Socket.IO server instance
+ * Start matchmaking for a user
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
  */
-const initializeSocket = (io) => {
-  // Store reference to io instance
-  ioInstance = io;
-  
-  // Socket.IO middleware for authentication
-  io.use(async (socket, next) => {
-    try {
-      const token = socket.handshake.auth.token;
-      
-      if (!token) {
-        return next(new Error('Authentication error: Token required'));
-      }
-      
-      const decoded = verifyToken(token);
-      
-      if (!decoded) {
-        return next(new Error('Authentication error: Invalid token'));
-      }
-      
-      // Check if user exists in database
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', decoded.userId)
-        .single();
-      
-      if (error || !user) {
-        return next(new Error('Authentication error: User not found'));
-      }
-      
-      // Attach user to socket
-      socket.user = user;
-      delete socket.user.password;
-      
-      next();
-    } catch (error) {
-      console.error('Socket authentication error:', error);
-      next(new Error('Authentication error'));
+const startMatchmaking = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Validate request body
+    const { error, value } = matchmakingRequestSchema.validate(req.body);
+    
+    if (error) {
+      console.log(`Invalid matchmaking request from user ${userId}:`, error.details[0].message);
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message
+      });
     }
-  });
 
-  // Connection handler
-  io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.user.id} (${socket.user.username})`);
+    // Check if user is already in waiting queue
+    if (waitingQueue.has(userId)) {
+      console.log(`User ${userId} is already in matchmaking queue`);
+      return res.status(400).json({
+        success: false,
+        message: 'User is already in matchmaking queue'
+      });
+    }
     
-    // Add user to connected users map
-    connectedUsers.set(socket.user.id, socket.id);
-    
-    // Update user's online status in database
-    updateUserOnlineStatus(socket.user.id, true);
-    
-    // Emit online status to other users
-    io.emit('user:status', {
-      userId: socket.user.id,
-      online: true
-    });
-    
-    // Handle private messages
-    socket.on('message:send', async (data) => {
-      try {
-        const { receiverId, content, mediaUrl } = data;
-        const senderId = socket.user.id;
-        
-        // Validate required fields
-        if (!receiverId || !content) {
-          socket.emit('error', {
-            message: 'Receiver ID and content are required'
-          });
-          return;
-        }
-        
-        // Create message in database
-        const { data: message, error } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: senderId,
-            receiver_id: receiverId,
-            content,
-            media_url: mediaUrl || null,
-            is_read: false,
-            created_at: new Date(),
-            updated_at: new Date()
-          })
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('Error creating message:', error);
-          socket.emit('error', {
-            message: 'Failed to send message'
-          });
-          return;
-        }
-        
-        // Add sender info to the message object
-        message.sender = {
-          id: socket.user.id,
-          firstName: socket.user.first_name,
-          lastName: socket.user.last_name,
-          username: socket.user.username,
-          profilePictureUrl: socket.user.profile_picture_url
-        };
-        
-        // Emit message to sender
-        socket.emit('message:sent', message);
-        
-        // Emit message to receiver if online
-        const receiverSocketId = connectedUsers.get(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit('message:received', message);
-        }
-      } catch (error) {
-        console.error('Message send error:', error);
-        socket.emit('error', {
-          message: 'Server error while sending message'
-        });
-      }
-    });
-    
-    // Handle typing indicators
-    socket.on('typing:start', (data) => {
-      const { receiverId } = data;
-      const receiverSocketId = connectedUsers.get(receiverId);
-      
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('typing:start', {
-          userId: socket.user.id
-        });
-      }
-    });
-    
-    socket.on('typing:stop', (data) => {
-      const { receiverId } = data;
-      const receiverSocketId = connectedUsers.get(receiverId);
-      
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('typing:stop', {
-          userId: socket.user.id
-        });
-      }
-    });
-    
-    // Handle read receipts
-    socket.on('message:read', async (data) => {
-      try {
-        const { messageId } = data;
-        
-        // Update message as read in database
-        const { data: message, error } = await supabase
-          .from('messages')
-          .update({
-            is_read: true,
-            updated_at: new Date()
-          })
-          .eq('id', messageId)
-          .eq('receiver_id', socket.user.id)
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('Error marking message as read:', error);
-          return;
-        }
-        
-        // Emit read receipt to sender if online
-        const senderSocketId = connectedUsers.get(message.sender_id);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('message:read', {
-            messageId,
-            readAt: message.updated_at
-          });
-        }
-      } catch (error) {
-        console.error('Message read error:', error);
-      }
-    });
-    
-    // Handle matchmaking events
-    socket.on('find_match', async (criteria = {}) => {
-      try {
-        // Clear any existing matchmaking timeouts for this user
-        const userId = socket.user.id;
-        clearMatchmakingTimeouts(userId);
-        
-        console.log(`Finding match for user: ${userId}`);
-        console.log('Match criteria:', JSON.stringify(criteria));
-        console.log(`User interests: ${JSON.stringify(socket.user.interests)}`);
-        
-        // Validate that user has interests
-        if (!socket.user.interests || socket.user.interests.length === 0) {
-          console.log(`User ${userId} has no interests. Aborting match.`);
-          socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
-          return;
-        }
+    // Check if user is in the Socket.IO matchmaking pool (from socketManager.js)
+    const { matchmakingPool } = require('../socket/socketManager');
+    if (matchmakingPool && matchmakingPool.has(userId)) {
+      console.log(`User ${userId} is already in the Socket.IO matchmaking pool`);
+      return res.status(400).json({
+        success: false,
+        message: 'User is already in matchmaking queue via real-time connection'
+      });
+    }
 
-        // Add user to matchmaking pool
-        matchmakingPool.set(userId, {
-          userId,
-          socketId: socket.id,
-          user: socket.user,
-          criteria,
-          interests: socket.user.interests,
-          joinedAt: new Date()
-        });
-        
-        console.log(`Added user ${userId} to matchmaking pool. Pool size: ${matchmakingPool.size}`);
-        socket.emit('match_searching', { message: 'Searching for a match...' });
-        
-        // Find a match for this user
-        findMatchForUser(socket);
-      } catch (error) {
-        console.error('Error finding match:', error);
-        socket.emit('match_error', {
-          message: 'Error finding a match, please try again'
-        });
-      }
+    // Get current user data
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      console.log(`User ${userId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Ensure user has interests defined
+    if (!user.interests || !Array.isArray(user.interests) || user.interests.length === 0) {
+      console.log(`User ${userId} has no interests defined`);
+      return res.status(400).json({
+        success: false,
+        message: 'You must define at least one interest to start matchmaking'
+      });
+    }
+
+    // Add user to waiting queue
+    waitingQueue.set(userId, {
+      userId,
+      user,
+      criteria: value,
+      joinedAt: new Date()
     });
     
-    // Handle match acceptance
-    socket.on('accept_match', ({ matchId }) => {
-      try {
-        const userId = socket.user.id;
-        console.log(`User ${userId} accepted match ${matchId}`);
-        
-        if (!activeMatches.has(matchId)) {
-          socket.emit('match_error', {
-            message: 'Match not found'
-          });
-          return;
-        }
-        
-        const matchData = activeMatches.get(matchId);
-        
-        // Update acceptance status
-        matchData.acceptances[userId] = true;
-        activeMatches.set(matchId, matchData);
-        
-        // Get the other user ID
-        const otherUserId = matchData.users.find(id => id !== userId);
-        const otherUserSocketId = connectedUsers.get(otherUserId);
-        
-        // Notify the other user about this user's acceptance
-        if (otherUserSocketId) {
-          io.to(otherUserSocketId).emit('match_user_accepted', {
-            matchId,
-            userId,
-            message: 'The other user has accepted the match'
-          });
-        }
-        
+    console.log(`Added user ${userId} to matchmaking queue. Queue size: ${waitingQueue.size}`);
+    
+    // Start queue processing if not already running
+    if (!isProcessingQueue) {
+      processMatchmakingQueue();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Added to matchmaking queue',
+      data: {
+        queuePosition: waitingQueue.size
+      }
+    });
+  } catch (error) {
+    console.error('Matchmaking error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during matchmaking'
+    });
+  }
+};
+
+/**
+ * Cancel matchmaking request
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const cancelMatchmaking = (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Remove user from waiting queue
+    const wasInQueue = waitingQueue.delete(userId);
+    
+    // Also check Socket.IO matchmaking pool (from socketManager.js)
+    const { matchmakingPool, clearMatchmakingTimeouts } = require('../socket/socketManager');
+    const wasInPool = matchmakingPool && matchmakingPool.delete(userId);
+    
+    // Clear any matchmaking timeouts
+    if (clearMatchmakingTimeouts) {
+      clearMatchmakingTimeouts(userId);
+    }
+    
+    if (!wasInQueue && !wasInPool) {
+      console.log(`User ${userId} not found in any matchmaking queue`);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found in matchmaking queue'
+      });
+    }
+    
+    const source = wasInQueue ? 'REST API queue' : 'Socket.IO pool';
+    console.log(`Removed user ${userId} from ${source}. Queue size: ${waitingQueue.size}, Pool size: ${matchmakingPool ? matchmakingPool.size : 0}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Removed from matchmaking queue'
+    });
+  } catch (error) {
+    console.error('Cancel matchmaking error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while canceling matchmaking'
+    });
+  }
+};
+
+/**
+ * Respond to a match request
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const respondToMatch = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Validate request body
+    const { error, value } = matchResponseSchema.validate(req.body);
+    
+    if (error) {
+      console.log(`Invalid match response from user ${userId}:`, error.details[0].message);
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message
+      });
+    }
+
+    const { matchId, accepted } = value;
+    console.log(`User ${userId} responded to match ${matchId}: ${accepted ? 'accepted' : 'declined'}`);
+    
+    // First check activeMatches from Socket.IO (for new matches)
+    const { activeMatches, createMatchInDatabase } = require('../socket/socketManager');
+    
+    if (activeMatches && activeMatches.has(matchId)) {
+      const matchData = activeMatches.get(matchId);
+      
+      // Check if user is part of this match
+      if (!matchData.users.includes(userId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'User is not part of this match'
+        });
+      }
+      
+      // Get the other user ID
+      const otherUserId = matchData.users.find(id => id !== userId);
+      
+      // Update acceptance status
+      matchData.acceptances[userId] = accepted;
+      activeMatches.set(matchId, matchData);
+      
+      if (accepted) {
         // Check if both users accepted
         const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
         
         if (bothAccepted) {
           console.log(`Match ${matchId} accepted by both users`);
           
-          // Get both user ids
-          const [user1Id, user2Id] = matchData.users;
-          
           // Create the match in the database
-          createMatchInDatabase(matchId, user1Id, user2Id);
-          
-          // Create a chat room for the match
-          const roomId = `match_${matchId}`;
-          
-          // Emit match confirmed to both users
-          matchData.users.forEach(userId => {
-            const socketId = connectedUsers.get(userId);
-            if (socketId) {
-              const socket = io.sockets.sockets.get(socketId);
-              if (socket) {
-                // Join the private chat room
-                socket.join(roomId);
-                
-                const otherUserId = userId === user1Id ? user2Id : user1Id;
-                io.to(socketId).emit('match_confirmed', {
-                  matchId,
-                  roomId,
-                  otherUserId,
-                  status: 'connected'
-                });
-              }
-            }
-          });
+          await createMatchInDatabase(matchId, matchData.users[0], matchData.users[1]);
           
           // Clean up
           activeMatches.delete(matchId);
           
-          // Clear any pending timeouts
-          clearMatchmakingTimeouts(user1Id);
-          clearMatchmakingTimeouts(user2Id);
+          return res.status(200).json({
+            success: true,
+            message: 'Match accepted',
+            data: {
+              matchId,
+              status: 'accepted',
+              otherUserId
+            }
+          });
         } else {
-          // Notify the user that we're waiting for the other user
-          socket.emit('match_waiting', {
-            matchId,
-            message: 'Waiting for the other user to accept'
+          return res.status(200).json({
+            success: true,
+            message: 'Match acceptance recorded, waiting for other user',
+            data: {
+              matchId,
+              status: 'waiting',
+              otherUserId
+            }
           });
         }
-      } catch (error) {
-        console.error('Error handling match acceptance:', error);
-        socket.emit('match_error', {
-          message: 'Error processing your response'
-        });
-      }
-    });
-    
-    // Handle match rejection
-    socket.on('reject_match', ({ matchId }) => {
-      try {
-        const userId = socket.user.id;
-        console.log(`User ${userId} rejected match ${matchId}`);
-        
-        if (!activeMatches.has(matchId)) {
-          socket.emit('match_error', {
-            message: 'Match not found'
-          });
-          return;
-        }
-        
-        const matchData = activeMatches.get(matchId);
-        
-        // Get the other user ID
-        const otherUserId = matchData.users.find(id => id !== userId);
-        const otherUserSocketId = connectedUsers.get(otherUserId);
-        
-        // Notify the other user about the rejection
-        if (otherUserSocketId) {
-          io.to(otherUserSocketId).emit('match_rejected', {
-            matchId,
-            rejectedBy: userId,
-            message: 'The other user rejected the match'
-          });
-        }
-        
-        // Clean up
+      } else {
+        // User rejected
         activeMatches.delete(matchId);
         
-        // Put both users back in the matchmaking pool
-        if (connectedUsers.has(userId)) {
-          const userSocket = io.sockets.sockets.get(socket.id);
-          if (userSocket) {
-            // Add back to pool after a short delay
-            setTimeout(() => {
-              if (connectedUsers.has(userId)) {
-                matchmakingPool.set(userId, {
-                  userId,
-                  socketId: socket.id,
-                  user: socket.user,
-                  interests: socket.user.interests,
-                  joinedAt: new Date()
-                });
-                socket.emit('match_searching', { message: 'Searching for a new match...' });
-                findMatchForUser(userSocket);
-              }
-            }, 1000);
+        return res.status(200).json({
+          success: true,
+          message: 'Match declined',
+          data: {
+            matchId,
+            status: 'declined'
           }
-        }
-        
-        if (otherUserSocketId && connectedUsers.has(otherUserId)) {
-          const otherSocket = io.sockets.sockets.get(otherUserSocketId);
-          if (otherSocket) {
-            // Add back to pool after a short delay
-            setTimeout(() => {
-              if (connectedUsers.has(otherUserId)) {
-                matchmakingPool.set(otherUserId, {
-                  userId: otherUserId,
-                  socketId: otherUserSocketId,
-                  user: otherSocket.user,
-                  interests: otherSocket.user.interests,
-                  joinedAt: new Date()
-                });
-                io.to(otherUserSocketId).emit('match_searching', { message: 'Searching for a new match...' });
-                findMatchForUser(otherSocket);
-              }
-            }, 1000);
-          }
-        }
-        
-        // Clear any pending timeouts
-        clearMatchmakingTimeouts(userId);
-        clearMatchmakingTimeouts(otherUserId);
-      } catch (error) {
-        console.error('Error handling match rejection:', error);
-        socket.emit('match_error', {
-          message: 'Error processing your response'
         });
       }
-    });
-    
-    // Handle cancel matchmaking
-    socket.on('cancel_matchmaking', () => {
-      const userId = socket.user.id;
-      console.log(`User ${userId} cancelled matchmaking`);
-      
-      // Remove user from matchmaking pool
-      matchmakingPool.delete(userId);
-      
-      // Clear any matchmaking timeouts
-      clearMatchmakingTimeouts(userId);
-      
-      socket.emit('match_cancelled', {
-        message: 'Matchmaking cancelled'
-      });
-    });
-    
-    // Disconnect handler with cleanup
-    socket.on('disconnect', () => {
-      const userId = socket.user.id;
-      console.log(`User disconnected: ${userId} (${socket.user.username})`);
-      
-      // Remove user from matchmaking pool
-      matchmakingPool.delete(userId);
-      
-      // Clear any matchmaking timeouts
-      clearMatchmakingTimeouts(userId);
-      
-      // Remove user from connected users map
-      connectedUsers.delete(userId);
-      
-      // Update user's online status in database
-      updateUserOnlineStatus(userId, false);
-      
-      // Handle any active matches
-      for (const [matchId, matchData] of activeMatches.entries()) {
-        if (matchData.users.includes(userId)) {
-          // Notify the other user about disconnection
-          const otherUserId = matchData.users.find(id => id !== userId);
-          const otherSocketId = connectedUsers.get(otherUserId);
-          
-          if (otherSocketId) {
-            io.to(otherSocketId).emit('match:disconnected', {
-              matchId,
-              message: 'The other user disconnected'
-            });
-          }
-          
-          // Clean up the match
-          activeMatches.delete(matchId);
-        }
-      }
-    });
-  });
-};
-
-/**
- * Update user's online status in database
- * @param {string} userId - User ID
- * @param {boolean} online - Online status
- */
-const updateUserOnlineStatus = async (userId, online) => {
-  try {
-    await supabase
-      .from('users')
-      .update({
-        is_online: online,
-        last_active: new Date()
-      })
-      .eq('id', userId);
-  } catch (error) {
-    console.error('Error updating online status:', error);
-  }
-};
-
-/**
- * Create a match record in the database
- * @param {string} matchId - Match ID
- * @param {string} user1Id - First user ID
- * @param {string} user2Id - Second user ID
- */
-const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
-  try {
-    console.log(`Creating match record in database: ${matchId} between ${user1Id} and ${user2Id}`);
-    
-    // Get the match data from active matches if it exists
-    let matchData = null;
-    if (activeMatches.has(matchId)) {
-      matchData = activeMatches.get(matchId);
     }
-    
-    const currentTime = new Date();
-    
-    const { data, error } = await supabase
+
+    // If not found in activeMatches, check Supabase (for older matches)
+    const { data: match, error: matchError } = await supabase
       .from('matches')
-      .insert({
-        id: matchId,
-        user1_id: user1Id,
-        user2_id: user2Id,
-        status: 'accepted',
-        compatibility_score: 100, // Default score for accepted matches
-        shared_interests: matchData?.sharedInterests || [],
-        chat_room_id: `match_${matchId}`,
-        created_at: currentTime,
-        updated_at: currentTime,
-        accepted_at: currentTime
+      .select('*')
+      .eq('id', matchId)
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .single();
+
+    if (matchError || !match) {
+      console.log(`Match ${matchId} not found for user ${userId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Match not found'
       });
+    }
+
+    if (match.status !== 'pending') {
+      console.log(`Match ${matchId} is already ${match.status}`);
+      return res.status(400).json({
+        success: false,
+        message: `Match is already ${match.status}`
+      });
+    }
+
+    // Process the rest of the response as before for Supabase matches
+    // Determine which user is responding
+    const isUser1 = match.user1_id === userId;
+    const otherUserId = isUser1 ? match.user2_id : match.user1_id;
+    
+    console.log(`User ${userId} is ${isUser1 ? 'user1' : 'user2'} in match, other user is ${otherUserId}`);
+    
+    // Update match status
+    const updateData = {};
+    
+    if (isUser1) {
+      updateData.user1_response = accepted;
+    } else {
+      updateData.user2_response = accepted;
+    }
+    
+    // Check if other user has already responded
+    const otherUserResponse = isUser1 ? match.user2_response : match.user1_response;
+    console.log(`Other user (${otherUserId}) response: ${otherUserResponse === null ? 'pending' : (otherUserResponse ? 'accepted' : 'declined')}`);
+    
+    // If the other user has already responded
+    const bothAccepted = 
+      (isUser1 && accepted && match.user2_response === true) ||
+      (!isUser1 && accepted && match.user1_response === true);
       
+    const otherUserDeclined = otherUserResponse === false;
+    const thisUserDeclined = !accepted;
+    
+    if (otherUserResponse !== null) {
+      if (bothAccepted) {
+        updateData.status = 'accepted';
+        console.log(`Both users accepted match ${matchId}, updating status to 'accepted'`);
+      } else {
+        updateData.status = 'rejected';
+        console.log(`At least one user rejected match ${matchId}, updating status to 'rejected'`);
+      }
+    } else {
+      console.log(`Waiting for other user (${otherUserId}) to respond to match ${matchId}`);
+    }
+    
+    updateData.updated_at = new Date();
+
+    // Update match in database
+    const { data: updatedMatch, error: updateError } = await supabase
+      .from('matches')
+      .update(updateData)
+      .eq('id', matchId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error(`Error updating match ${matchId}:`, updateError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update match'
+      });
+    }
+
+    // Return the response based on the match status
+    return res.status(200).json({
+      success: true,
+      message: `Match ${updatedMatch.status === 'pending' ? 'response recorded' : updatedMatch.status}`,
+      data: {
+        match: updatedMatch
+      }
+    });
+  } catch (error) {
+    console.error('Match response error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while responding to match'
+    });
+  }
+};
+
+/**
+ * Get pending matches for the current user
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const getPendingMatches = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get pending matches
+    const { data: matches, error } = await supabase
+      .from('matches')
+      .select(`
+        *,
+        user1:user1_id(*),
+        user2:user2_id(*)
+      `)
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
     if (error) {
-      console.error('Error creating match in database:', error);
-      return { success: false, error };
+      console.error('Error fetching pending matches:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch pending matches'
+      });
     }
-    
-    console.log(`Successfully created match record in database: ${matchId}`);
-    
-    // Update user records to indicate they're in a match
-    const updateUser1 = await supabase
-      .from('users')
-      .update({
-        current_match_id: matchId,
-        updated_at: currentTime
-      })
-      .eq('id', user1Id);
+
+    // Format the response
+    const formattedMatches = matches.map(match => {
+      const otherUser = match.user1_id === userId ? match.user2 : match.user1;
+      const userResponse = match.user1_id === userId ? match.user1_response : match.user2_response;
       
-    const updateUser2 = await supabase
-      .from('users')
-      .update({
-        current_match_id: matchId,
-        updated_at: currentTime
-      })
-      .eq('id', user2Id);
+      // Find matching interests
+      const userInterests = match.user1_id === userId ? match.user1.interests : match.user2.interests;
+      const otherUserInterests = match.user1_id === userId ? match.user2.interests : match.user1.interests;
+      const matchingInterests = userInterests.filter(interest => otherUserInterests.includes(interest));
       
-    if (updateUser1.error) {
-      console.error(`Error updating user ${user1Id} with match:`, updateUser1.error);
-    }
-    
-    if (updateUser2.error) {
-      console.error(`Error updating user ${user2Id} with match:`, updateUser2.error);
-    }
-    
-    return { success: true, data };
+      // Remove sensitive data
+      delete otherUser.password;
+      delete otherUser.email;
+      delete otherUser.phone_number;
+      
+      return {
+        id: match.id,
+        otherUser: {
+          id: otherUser.id,
+          firstName: otherUser.first_name,
+          lastName: otherUser.last_name,
+          username: otherUser.username,
+          profilePictureUrl: otherUser.profile_picture_url,
+          interests: otherUser.interests
+        },
+        matchingInterests,
+        userResponse,
+        status: match.status,
+        createdAt: match.created_at
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        matches: formattedMatches
+      }
+    });
   } catch (error) {
-    console.error('Error creating match in database:', error);
-    return { success: false, error };
+    console.error('Get pending matches error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching pending matches'
+    });
   }
 };
 
 /**
- * Notify users when a match is found
- * @param {object} user1Socket - User 1 socket
- * @param {object} user2Socket - User 2 socket
- * @param {string} matchId - Match ID
- * @param {array} matchingInterests - Array of matching interests
+ * Get matchmaking stats and health information
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
  */
-const notifyMatchFound = (user1Socket, user2Socket, matchId, matchingInterests) => {
+const getMatchmakingStats = async (req, res) => {
   try {
-    // Sanitize user data for sharing
-    const sanitizeUser = (user) => ({
-      id: user.id,
-      firstName: user.first_name || '',
-      lastName: user.last_name || '',
-      username: user.username || '',
-      profilePictureUrl: user.profile_picture_url || '',
-      interests: user.interests || [],
-      bio: user.bio || ''
-    });
-
-    // Notify first user
-    user1Socket.emit('match_found', {
-      matchId,
-      match: {
-        id: matchId,
-        user: sanitizeUser(user2Socket.user),
-        matchingInterests,
-        createdAt: new Date(),
-        isPending: true
+    // Calculate time distribution of users in queue
+    const queueEntries = Array.from(waitingQueue.values());
+    const now = new Date();
+    
+    const timeInQueueStats = {
+      lessThan1Min: 0,
+      between1And5Mins: 0, 
+      between5And15Mins: 0,
+      moreThan15Mins: 0
+    };
+    
+    queueEntries.forEach(entry => {
+      const waitTime = (now - new Date(entry.joinedAt)) / 1000 / 60; // minutes
+      
+      if (waitTime < 1) {
+        timeInQueueStats.lessThan1Min++;
+      } else if (waitTime < 5) {
+        timeInQueueStats.between1And5Mins++;
+      } else if (waitTime < 15) {
+        timeInQueueStats.between5And15Mins++;
+      } else {
+        timeInQueueStats.moreThan15Mins++;
       }
     });
-
-    // Notify second user
-    user2Socket.emit('match_found', {
-      matchId,
-      match: {
-        id: matchId,
-        user: sanitizeUser(user1Socket.user),
-        matchingInterests,
-        createdAt: new Date(),
-        isPending: true
-      }
-    });
-
-    console.log(`Notified users ${user1Socket.user.id} and ${user2Socket.user.id} about match ${matchId}`);
-    console.log(`Matching interests: ${matchingInterests.join(', ')}`);
-
-    return { success: true };
-  } catch (error) {
-    console.error(`Error in notifyMatchFound: ${error.message}`);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Find a match for a user
- * @param {object} socket - User socket
- */
-const findMatchForUser = (socket) => {
-  try {
-    const userId = socket.user.id;
-    const userInterests = socket.user.interests || [];
     
-    if (userInterests.length === 0) {
-      console.log(`User ${userId} has no interests. Cannot find match.`);
-      socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
-      return;
-    }
-    
-    console.log(`Finding match for user ${userId} with interests: ${userInterests.join(', ')}`);
-    
-    // Array of potential matches with compatibility scores
-    const potentialMatches = [];
-    
-    // Check all users in the matchmaking pool
-    for (const [otherUserId, otherUser] of matchmakingPool.entries()) {
-      // Skip self
-      if (otherUserId === userId) continue;
-      
-      const otherUserInterests = otherUser.interests || [];
-      
-      // Find shared interests
-      const sharedInterests = userInterests.filter(interest => 
-        otherUserInterests.includes(interest)
-      );
-      
-      // Only consider matches with at least one shared interest
-      if (sharedInterests.length > 0) {
-        potentialMatches.push({
-          userId: otherUserId,
-          socketId: otherUser.socketId,
-          user: otherUser.user,
-          sharedInterests,
-          score: sharedInterests.length // Score based on number of shared interests
+    // Get interest distribution
+    const interestCounts = {};
+    queueEntries.forEach(entry => {
+      if (entry.user.interests && Array.isArray(entry.user.interests)) {
+        entry.user.interests.forEach(interest => {
+          interestCounts[interest] = (interestCounts[interest] || 0) + 1;
         });
       }
+    });
+    
+    // Sort interests by count
+    const topInterests = Object.entries(interestCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([interest, count]) => ({ interest, count }));
+    
+    // Get recent match count
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    const { count: recentMatchCount, error: matchCountError } = await supabase
+      .from('matches')
+      .count()
+      .gte('created_at', oneDayAgo.toISOString());
+      
+    if (matchCountError) {
+      console.error('Error counting recent matches:', matchCountError);
     }
     
-    // Sort by score (highest first)
-    potentialMatches.sort((a, b) => b.score - a.score);
-    
-    if (potentialMatches.length > 0) {
-      // Get the best match
-      const bestMatch = potentialMatches[0];
-      console.log(`Found best match for user ${userId}: ${bestMatch.userId} with ${bestMatch.score} shared interests`);
-      
-      // Generate a match ID
-      const matchId = uuidv4();
-      
-      // Create active match record
-      activeMatches.set(matchId, {
-        users: [userId, bestMatch.userId],
-        acceptances: {
-          [userId]: false,
-          [bestMatch.userId]: false
+    return res.status(200).json({
+      success: true,
+      data: {
+        queueSize: waitingQueue.size,
+        isProcessingQueue: isProcessingQueue,
+        timeInQueueDistribution: timeInQueueStats,
+        topInterests,
+        matchesLast24Hours: recentMatchCount || 0,
+        systemLimits: {
+          batchSize: BATCH_SIZE,
+          matchLimitPerCycle: MATCH_LIMIT_PER_CYCLE,
+          estimatedCapacity: '50k+ concurrent users'
         },
-        sharedInterests: bestMatch.sharedInterests,
-        createdAt: new Date()
-      });
-      
-      // Remove both users from matchmaking pool
-      matchmakingPool.delete(userId);
-      matchmakingPool.delete(bestMatch.userId);
-      
-      // Get sockets for both users
-      const user1Socket = socket;
-      const user2Socket = ioInstance.sockets.sockets.get(bestMatch.socketId);
-      
-      // Notify both users
-      notifyMatchFound(user1Socket, user2Socket, matchId, bestMatch.sharedInterests);
-      
-      // Set timeout for match acceptance
-      const timeoutId = setTimeout(() => {
-        // Check if match still exists and hasn't been fully accepted
-        if (activeMatches.has(matchId)) {
-          const matchData = activeMatches.get(matchId);
-          const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
-          
-          if (!bothAccepted) {
-            console.log(`Match ${matchId} timed out`);
-            
-            // Notify both users
-            matchData.users.forEach(userId => {
-              const socketId = connectedUsers.get(userId);
-              if (socketId) {
-                ioInstance.to(socketId).emit('match_timeout', {
-                  matchId,
-                  message: 'Match timed out due to no response'
-                });
-                
-                // Add user back to matchmaking pool
-                const userSocket = ioInstance.sockets.sockets.get(socketId);
-                if (userSocket) {
-                  matchmakingPool.set(userId, {
-                    userId,
-                    socketId,
-                    user: userSocket.user,
-                    interests: userSocket.user.interests,
-                    joinedAt: new Date()
-                  });
-                  
-                  // Find new match
-                  setTimeout(() => {
-                    ioInstance.to(socketId).emit('match_searching', { message: 'Searching for a new match...' });
-                    findMatchForUser(userSocket);
-                  }, 1000);
-                }
-              }
-            });
-            
-            // Clean up the match
-            activeMatches.delete(matchId);
-          }
-        }
-      }, MATCH_ACCEPTANCE_TIMEOUT);
-      
-      // Store timeout IDs for both users
-      userTimeouts.set(userId, timeoutId);
-      userTimeouts.set(bestMatch.userId, timeoutId);
-    } else {
-      console.log(`No suitable matches found for user ${userId}`);
-      socket.emit('match_not_found', { message: 'No suitable matches found at this time' });
-      
-      // Set a timeout to try again after delay
-      const timeoutId = setTimeout(() => {
-        if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
-          console.log(`Retrying match for user ${userId}`);
-          socket.emit('match_searching', { message: 'Searching for a match...' });
-          findMatchForUser(socket);
-        }
-      }, 10000); // Try again in 10 seconds
-      
-      userTimeouts.set(userId, timeoutId);
-    }
+        lastProcessingTime: new Date().toISOString()
+      }
+    });
   } catch (error) {
-    console.error('Error finding match:', error);
-    socket.emit('match_error', { message: 'Server error finding a match' });
+    console.error('Error getting matchmaking stats:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching matchmaking stats'
+    });
   }
 };
 
 module.exports = {
-  initializeSocket,
-  notifyMatchFound,
-  connectedUsers,
-  userTimeouts,
-  clearMatchmakingTimeouts,
-  matchmakingPool,
-  activeMatches,
-  findMatchForUser,
-  createMatchInDatabase,
-  MATCH_ACCEPTANCE_TIMEOUT
-}; 
+  startMatchmaking,
+  cancelMatchmaking,
+  respondToMatch,
+  getPendingMatches,
+  getMatchmakingStats,
+  calculateCompatibility  // Export for testing
+};

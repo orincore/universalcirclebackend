@@ -15,6 +15,12 @@ const activeMatches = new Map();
 // Track user timeouts for matchmaking
 const userTimeouts = new Map();
 
+// Track users in matchmaking pool waiting for matches
+const matchmakingPool = new Map();
+
+// Match acceptance timeout (in milliseconds)
+const MATCH_ACCEPTANCE_TIMEOUT = 30000; // 30 seconds
+
 /**
  * Clear any existing matchmaking timeouts for a user
  * @param {string} userId - User ID to clear timeouts for
@@ -210,204 +216,142 @@ const initializeSocket = (io) => {
     });
     
     // Handle matchmaking events
-    socket.on('findRandomMatch', async (criteria) => {
+    socket.on('find_match', async (criteria = {}) => {
       try {
         // Clear any existing matchmaking timeouts for this user
         const userId = socket.user.id;
         clearMatchmakingTimeouts(userId);
         
-        console.log(`Finding random match for user: ${userId}`);
+        console.log(`Finding match for user: ${userId}`);
         console.log('Match criteria:', JSON.stringify(criteria));
         console.log(`User interests: ${JSON.stringify(socket.user.interests)}`);
         
         // Validate that user has interests
         if (!socket.user.interests || socket.user.interests.length === 0) {
           console.log(`User ${userId} has no interests. Aborting match.`);
-          socket.emit('match:error', { message: 'You need to add interests to your profile before matchmaking' });
+          socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
           return;
         }
 
-        // Get interests from criteria and filter out empty or undefined values
-        const userInterests = [...(criteria.interests || []), ...(socket.user.interests || [])].filter(Boolean);
-        
-        if (userInterests.length === 0) {
-          console.log(`User ${userId} has no interests after filtering. Aborting match.`);
-          socket.emit('match:error', { message: 'You need to add interests to your profile before matchmaking' });
-          return;
-        }
-
-        // Log user connection status
-        console.log(`User connection status: ${connectedUsers.has(userId) ? 'connected' : 'not connected'}`);
-        console.log(`Total connected users: ${connectedUsers.size}`);
-        
-        // Array of matching users
-        const matchCandidates = [];
-
-        // Get all online users except the current user
-        connectedUsers.forEach((socketId, otherUserId) => {
-          // Skip if it's the same user
-          if (otherUserId === userId) {
-            console.log(`Skipping current user: ${otherUserId}`);
-            return;
-          }
-
-          console.log(`Checking match with user: ${otherUserId}`);
-          
-          // Get the socket for the other user
-          const otherUserSocket = io.sockets.sockets.get(socketId);
-          
-          if (!otherUserSocket) {
-            console.log(`Socket not found for user: ${otherUserId}`);
-            return;
-          }
-          
-          // Skip if user is already in a match
-          if (otherUserSocket.inMatch) {
-            console.log(`User ${otherUserId} is already in a match. Skipping.`);
-            return;
-          }
-          
-          // Skip if user has no interests
-          if (!otherUserSocket.user.interests || otherUserSocket.user.interests.length === 0) {
-            console.log(`User ${otherUserId} has no interests. Skipping.`);
-            return;
-          }
-          
-          // Find matching interests
-          const otherUserInterests = [...(otherUserSocket.user.interests || [])].filter(Boolean);
-          
-          if (otherUserInterests.length === 0) {
-            console.log(`User ${otherUserId} has no interests after filtering. Skipping.`);
-            return;
-          }
-          
-          // Find the matching interests between the two users
-          const matchingInterests = userInterests.filter(interest => 
-            otherUserInterests.includes(interest)
-          );
-          
-          // Log match details for debugging
-          console.log(`Matching interests with ${otherUserId}: ${JSON.stringify(matchingInterests)}`);
-          console.log(`Number of matching interests: ${matchingInterests.length}`);
-          
-          if (matchingInterests.length > 0) {
-            matchCandidates.push({
-              userId: otherUserId,
-              socketId: socketId,
-              matchingInterests: matchingInterests,
-              interestCount: matchingInterests.length
-            });
-          }
+        // Add user to matchmaking pool
+        matchmakingPool.set(userId, {
+          userId,
+          socketId: socket.id,
+          user: socket.user,
+          criteria,
+          interests: socket.user.interests,
+          joinedAt: new Date()
         });
         
-        console.log(`Found ${matchCandidates.length} potential matches for user ${userId}`);
+        console.log(`Added user ${userId} to matchmaking pool. Pool size: ${matchmakingPool.size}`);
+        socket.emit('match_searching', { message: 'Searching for a match...' });
         
-        // Sort candidates by number of matching interests (highest first)
-        matchCandidates.sort((a, b) => b.interestCount - a.interestCount);
-        
-        if (matchCandidates.length > 0) {
-          // Select the best match (most matching interests)
-          const bestMatch = matchCandidates[0];
-          console.log(`Selected best match: ${bestMatch.userId} with ${bestMatch.interestCount} matching interests`);
-          
-          // Generate a unique match ID
-          const matchId = uuidv4();
-          
-          // Set both users as in a match
-          socket.inMatch = { matchId, otherUserId: bestMatch.userId };
-          
-          const otherUserSocket = io.sockets.sockets.get(bestMatch.socketId);
-          otherUserSocket.inMatch = { matchId, otherUserId: userId };
-          
-          console.log(`Created match ${matchId} between ${userId} and ${bestMatch.userId}`);
-          
-          // Notify both users
-          try {
-            const result = notifyMatchFound(socket, otherUserSocket, matchId, bestMatch.matchingInterests);
-            console.log(`Match notification result: ${JSON.stringify(result)}`);
-          } catch (error) {
-            console.error(`Error notifying match: ${error.message}`);
-            // Don't abort - continue execution
-          }
-        } else {
-          console.log(`No matches found for user ${userId}. Will retry after timeout.`);
-          socket.emit('match:searching', { message: 'Searching for a match...' });
-          
-          // Set a timeout to retry matchmaking after a delay
-          const timeoutId = setTimeout(() => {
-            if (connectedUsers.has(userId)) {
-              console.log(`Auto-restarting matchmaking for ${userId} after timeout`);
-              socket.emit('match:not-found', { message: 'No match found. Trying again...' });
-              
-              // Wait a bit before restarting
-              setTimeout(() => {
-                socket.emit('findRandomMatch', criteria);
-              }, 1000);
-            }
-          }, 10000);
-          
-          // Store the timeout for cleanup
-          userTimeouts.set(userId, timeoutId);
-        }
+        // Find a match for this user
+        findMatchForUser(socket);
       } catch (error) {
-        console.error('Error finding random match:', error);
-        
-        // Log detailed error for debugging
-        if (error.stack) {
-          console.error('Stack trace:', error.stack);
-        }
-        
-        // Inform the user
-        socket.emit('error', {
-          source: 'findRandomMatch',
+        console.error('Error finding match:', error);
+        socket.emit('match_error', {
           message: 'Error finding a match, please try again'
         });
-        
-        // Try one more time with reduced criteria after a delay
-        const userId = socket.user.id;
-        console.log(`Will retry matchmaking for ${userId} with reduced criteria due to error`);
-        
-        const timeoutId = setTimeout(() => {
-          if (connectedUsers.has(userId)) {
-            console.log(`Auto-retrying matchmaking for ${userId} after error`);
-            
-            // Simplify criteria to just the first interest if there are multiple
-            let retryCriteria = { ...criteria };
-            if (socket.user.interests && socket.user.interests.length > 1) {
-              retryCriteria.interests = [socket.user.interests[0]];
-            }
-            
-            socket.emit('findRandomMatch', retryCriteria);
-          }
-        }, 3000);
-        
-        // Store the timeout for cleanup
-        userTimeouts.set(userId, timeoutId);
       }
     });
     
-    // Handle cancel matching request
-    socket.on('cancelRandomMatch', () => {
-      const userId = socket.user.id;
-      console.log(`User ${userId} cancelled matchmaking`);
-      
-      // Clear any matchmaking timeouts
-      clearMatchmakingTimeouts(userId);
-      
-      socket.emit('match:cancelled', {
-        message: 'Matchmaking cancelled'
-      });
-    });
-    
-    // Handle match acceptance or rejection
-    socket.on('match:accepted', ({ matchId, accepted }) => {
+    // Handle match acceptance
+    socket.on('accept_match', ({ matchId }) => {
       try {
         const userId = socket.user.id;
-        console.log(`User ${userId} ${accepted ? 'accepted' : 'rejected'} match ${matchId}`);
+        console.log(`User ${userId} accepted match ${matchId}`);
         
         if (!activeMatches.has(matchId)) {
-          socket.emit('error', {
-            source: 'match:accepted',
+          socket.emit('match_error', {
+            message: 'Match not found'
+          });
+          return;
+        }
+        
+        const matchData = activeMatches.get(matchId);
+        
+        // Update acceptance status
+        matchData.acceptances[userId] = true;
+        activeMatches.set(matchId, matchData);
+        
+        // Get the other user ID
+        const otherUserId = matchData.users.find(id => id !== userId);
+        const otherUserSocketId = connectedUsers.get(otherUserId);
+        
+        // Notify the other user about this user's acceptance
+        if (otherUserSocketId) {
+          io.to(otherUserSocketId).emit('match_user_accepted', {
+            matchId,
+            userId,
+            message: 'The other user has accepted the match'
+          });
+        }
+        
+        // Check if both users accepted
+        const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
+        
+        if (bothAccepted) {
+          console.log(`Match ${matchId} accepted by both users`);
+          
+          // Get both user ids
+          const [user1Id, user2Id] = matchData.users;
+          
+          // Create the match in the database
+          createMatchInDatabase(matchId, user1Id, user2Id);
+          
+          // Create a chat room for the match
+          const roomId = `match_${matchId}`;
+          
+          // Emit match confirmed to both users
+          matchData.users.forEach(userId => {
+            const socketId = connectedUsers.get(userId);
+            if (socketId) {
+              const socket = io.sockets.sockets.get(socketId);
+              if (socket) {
+                // Join the private chat room
+                socket.join(roomId);
+                
+                const otherUserId = userId === user1Id ? user2Id : user1Id;
+                io.to(socketId).emit('match_confirmed', {
+                  matchId,
+                  roomId,
+                  otherUserId,
+                  status: 'connected'
+                });
+              }
+            }
+          });
+          
+          // Clean up
+          activeMatches.delete(matchId);
+          
+          // Clear any pending timeouts
+          clearMatchmakingTimeouts(user1Id);
+          clearMatchmakingTimeouts(user2Id);
+        } else {
+          // Notify the user that we're waiting for the other user
+          socket.emit('match_waiting', {
+            matchId,
+            message: 'Waiting for the other user to accept'
+          });
+        }
+      } catch (error) {
+        console.error('Error handling match acceptance:', error);
+        socket.emit('match_error', {
+          message: 'Error processing your response'
+        });
+      }
+    });
+    
+    // Handle match rejection
+    socket.on('reject_match', ({ matchId }) => {
+      try {
+        const userId = socket.user.id;
+        console.log(`User ${userId} rejected match ${matchId}`);
+        
+        if (!activeMatches.has(matchId)) {
+          socket.emit('match_error', {
             message: 'Match not found'
           });
           return;
@@ -419,118 +363,93 @@ const initializeSocket = (io) => {
         const otherUserId = matchData.users.find(id => id !== userId);
         const otherUserSocketId = connectedUsers.get(otherUserId);
         
-        if (accepted) {
-          // Update acceptance status
-          matchData.acceptances[userId] = true;
-          activeMatches.set(matchId, matchData);
-          
-          // Notify the other user about this user's acceptance
-          if (otherUserSocketId) {
-            io.to(otherUserSocketId).emit('match:user_accepted', {
-              matchId,
-              userId,
-              message: 'The other user has accepted the match'
-            });
-          }
-          
-          // Check if both users accepted
-          const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
-          
-          if (bothAccepted) {
-            console.log(`Match ${matchId} accepted by both users`);
-            
-            // Get both user ids
-            const [user1Id, user2Id] = matchData.users;
-            
-            // Create the match in the database
-            createMatchInDatabase(matchId, user1Id, user2Id);
-            
-            // Emit match connected to both users
-            matchData.users.forEach(userId => {
-              const socketId = connectedUsers.get(userId);
-              if (socketId) {
-                const otherUserId = userId === user1Id ? user2Id : user1Id;
-                io.to(socketId).emit('match:connected', {
-                  matchId,
-                  otherUserId,
-                  status: 'connected'
-                });
-              }
-            });
-            
-            // Clean up
-            activeMatches.delete(matchId);
-          } else {
-            // Notify the user that we're waiting for the other user
-            socket.emit('match:waiting', {
-              matchId,
-              message: 'Waiting for the other user to accept'
-            });
-          }
-        } else {
-          // User rejected the match
-          
-          // Notify the other user about the rejection
-          if (otherUserSocketId) {
-            io.to(otherUserSocketId).emit('match:rejected', {
-              matchId,
-              rejectedBy: userId,
-              message: 'The other user rejected the match'
-            });
-          }
-          
-          // Clean up
-          activeMatches.delete(matchId);
-          
-          // Auto-restart matchmaking for both users
-          // For the current user
-          setTimeout(() => {
-            if (connectedUsers.has(userId)) {
-              socket.emit('match:restart');
-            }
-          }, 1000);
-          
-          // For the other user
-          setTimeout(() => {
-            if (otherUserSocketId && connectedUsers.has(otherUserId)) {
-              io.to(otherUserSocketId).emit('match:restart');
-            }
-          }, 1000);
+        // Notify the other user about the rejection
+        if (otherUserSocketId) {
+          io.to(otherUserSocketId).emit('match_rejected', {
+            matchId,
+            rejectedBy: userId,
+            message: 'The other user rejected the match'
+          });
         }
+        
+        // Clean up
+        activeMatches.delete(matchId);
+        
+        // Put both users back in the matchmaking pool
+        if (connectedUsers.has(userId)) {
+          const userSocket = io.sockets.sockets.get(socket.id);
+          if (userSocket) {
+            // Add back to pool after a short delay
+            setTimeout(() => {
+              if (connectedUsers.has(userId)) {
+                matchmakingPool.set(userId, {
+                  userId,
+                  socketId: socket.id,
+                  user: socket.user,
+                  interests: socket.user.interests,
+                  joinedAt: new Date()
+                });
+                socket.emit('match_searching', { message: 'Searching for a new match...' });
+                findMatchForUser(userSocket);
+              }
+            }, 1000);
+          }
+        }
+        
+        if (otherUserSocketId && connectedUsers.has(otherUserId)) {
+          const otherSocket = io.sockets.sockets.get(otherUserSocketId);
+          if (otherSocket) {
+            // Add back to pool after a short delay
+            setTimeout(() => {
+              if (connectedUsers.has(otherUserId)) {
+                matchmakingPool.set(otherUserId, {
+                  userId: otherUserId,
+                  socketId: otherUserSocketId,
+                  user: otherSocket.user,
+                  interests: otherSocket.user.interests,
+                  joinedAt: new Date()
+                });
+                io.to(otherUserSocketId).emit('match_searching', { message: 'Searching for a new match...' });
+                findMatchForUser(otherSocket);
+              }
+            }, 1000);
+          }
+        }
+        
+        // Clear any pending timeouts
+        clearMatchmakingTimeouts(userId);
+        clearMatchmakingTimeouts(otherUserId);
       } catch (error) {
-        console.error('Error handling match acceptance/rejection:', error);
-        socket.emit('error', {
-          source: 'match:accepted',
+        console.error('Error handling match rejection:', error);
+        socket.emit('match_error', {
           message: 'Error processing your response'
         });
       }
     });
     
-    // Handle matchmaking restart
-    socket.on('match:restart', (criteria = {}) => {
-      try {
-        const userId = socket.user.id;
-        
-        // Clear any existing timeouts
-        clearMatchmakingTimeouts(userId);
-        
-        console.log(`User ${userId} is restarting matchmaking with criteria:`, criteria);
-        
-        // Simply call findRandomMatch again
-        socket.emit('findRandomMatch', criteria);
-      } catch (error) {
-        console.error('Error restarting matchmaking:', error);
-        socket.emit('error', {
-          source: 'match:restart',
-          message: 'Error restarting matchmaking'
-        });
-      }
+    // Handle cancel matchmaking
+    socket.on('cancel_matchmaking', () => {
+      const userId = socket.user.id;
+      console.log(`User ${userId} cancelled matchmaking`);
+      
+      // Remove user from matchmaking pool
+      matchmakingPool.delete(userId);
+      
+      // Clear any matchmaking timeouts
+      clearMatchmakingTimeouts(userId);
+      
+      socket.emit('match_cancelled', {
+        message: 'Matchmaking cancelled'
+      });
     });
     
-    // Disconnect handler
+    // Disconnect handler with cleanup
     socket.on('disconnect', () => {
       const userId = socket.user.id;
       console.log(`User disconnected: ${userId} (${socket.user.username})`);
+      
+      // Remove user from matchmaking pool
+      matchmakingPool.delete(userId);
       
       // Clear any matchmaking timeouts
       clearMatchmakingTimeouts(userId);
@@ -540,12 +459,6 @@ const initializeSocket = (io) => {
       
       // Update user's online status in database
       updateUserOnlineStatus(userId, false);
-      
-      // Emit offline status to other users
-      io.emit('user:status', {
-        userId: userId,
-        online: false
-      });
       
       // Handle any active matches
       for (const [matchId, matchData] of activeMatches.entries()) {
@@ -596,74 +509,280 @@ const updateUserOnlineStatus = async (userId, online) => {
  */
 const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
   try {
-    const { error } = await supabase
+    console.log(`Creating match record in database: ${matchId} between ${user1Id} and ${user2Id}`);
+    
+    // Get the match data from active matches if it exists
+    let matchData = null;
+    if (activeMatches.has(matchId)) {
+      matchData = activeMatches.get(matchId);
+    }
+    
+    const currentTime = new Date();
+    
+    const { data, error } = await supabase
       .from('matches')
       .insert({
         id: matchId,
         user1_id: user1Id,
         user2_id: user2Id,
         status: 'accepted',
-        compatibility_score: 100, // Simply set to 100 for accepted matches
-        created_at: new Date(),
-        updated_at: new Date()
+        compatibility_score: 100, // Default score for accepted matches
+        shared_interests: matchData?.sharedInterests || [],
+        chat_room_id: `match_${matchId}`,
+        created_at: currentTime,
+        updated_at: currentTime,
+        accepted_at: currentTime
       });
       
     if (error) {
       console.error('Error creating match in database:', error);
+      return { success: false, error };
     }
+    
+    console.log(`Successfully created match record in database: ${matchId}`);
+    
+    // Update user records to indicate they're in a match
+    const updateUser1 = await supabase
+      .from('users')
+      .update({
+        current_match_id: matchId,
+        updated_at: currentTime
+      })
+      .eq('id', user1Id);
+      
+    const updateUser2 = await supabase
+      .from('users')
+      .update({
+        current_match_id: matchId,
+        updated_at: currentTime
+      })
+      .eq('id', user2Id);
+      
+    if (updateUser1.error) {
+      console.error(`Error updating user ${user1Id} with match:`, updateUser1.error);
+    }
+    
+    if (updateUser2.error) {
+      console.error(`Error updating user ${user2Id} with match:`, updateUser2.error);
+    }
+    
+    return { success: true, data };
   } catch (error) {
     console.error('Error creating match in database:', error);
+    return { success: false, error };
   }
 };
 
 /**
  * Notify users when a match is found
- * @param {object} user1Socket - User 1 socket
- * @param {object} user2Socket - User 2 socket
- * @param {string} matchId - Match ID
- * @param {array} matchingInterests - Array of matching interests
+ * @param {object} user1 - User 1
+ * @param {object} user2 - User 2
+ * @param {array} sharedInterests - Array of shared interests
  */
-const notifyMatchFound = (user1Socket, user2Socket, matchId, matchingInterests) => {
+const notifyMatchFound = (user1, user2, sharedInterests) => {
+  // Create a unique match ID
+  const matchId = `match_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  
+  // Add to active matches with appropriate data
+  activeMatches.set(matchId, {
+    id: matchId,
+    users: [user1.id, user2.id],
+    sharedInterests,
+    timestamp: new Date(),
+    status: {
+      [user1.id]: 'pending',
+      [user2.id]: 'pending'
+    }
+  });
+  
+  console.log(`Match created: ${matchId} between ${user1.id} and ${user2.id} with ${sharedInterests.length} shared interests`);
+  
+  // Create properly formatted match data for Flutter client
+  const user1MatchData = createMatchData(user2, sharedInterests, matchId);
+  const user2MatchData = createMatchData(user1, sharedInterests, matchId);
+  
+  // Emit match found event to both users
+  const socket1 = connectedUsers.get(user1.id);
+  const socket2 = connectedUsers.get(user2.id);
+  
+  if (socket1) {
+    ioInstance.to(socket1).emit('match_found', { match: user1MatchData });
+    console.log(`Notified user ${user1.id} about match with ${user2.id}`);
+  }
+  
+  if (socket2) {
+    ioInstance.to(socket2).emit('match_found', { match: user2MatchData });
+    console.log(`Notified user ${user2.id} about match with ${user1.id}`);
+  }
+  
+  return matchId;
+};
+
+// Function to create match data in format expected by Flutter client
+const createMatchData = (otherUser, sharedInterests, matchId) => {
+  // Sanitize user data to include only necessary fields
+  const sanitizedUser = {
+    id: otherUser.id,
+    username: otherUser.username || 'Anonymous',
+    name: otherUser.name || otherUser.username || 'User',
+    profilePicture: otherUser.profilePicture || null,
+    bio: otherUser.bio || null,
+    interests: otherUser.interests || []
+  };
+  
+  // Format in a way that Match.fromJson in Flutter can parse
+  return {
+    id: matchId,
+    user: sanitizedUser,
+    matchingInterests: sharedInterests,
+    createdAt: new Date().toISOString(),
+    isPending: true
+  };
+};
+
+/**
+ * Find a match for a user
+ * @param {object} socket - User socket
+ */
+const findMatchForUser = (socket) => {
   try {
-    // Sanitize user data for sharing
-    const sanitizeUser = (user) => ({
-      id: user.id,
-      firstName: user.first_name || '',
-      lastName: user.last_name || '',
-      username: user.username || '',
-      profilePictureUrl: user.profile_picture_url || '',
-      interests: user.interests || [],
-      bio: user.bio || ''
-    });
-
-    // Notify first user
-    user1Socket.emit('match:found', {
-      matchId,
-      match: {
-        id: matchId,
-        user: sanitizeUser(user2Socket.user),
-        matchingInterests,
-        createdAt: new Date(),
-        isPending: true
+    const userId = socket.user.id;
+    const userInterests = socket.user.interests || [];
+    
+    if (userInterests.length === 0) {
+      console.log(`User ${userId} has no interests. Cannot find match.`);
+      socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
+      return;
+    }
+    
+    console.log(`Finding match for user ${userId} with interests: ${userInterests.join(', ')}`);
+    
+    // Array of potential matches with compatibility scores
+    const potentialMatches = [];
+    
+    // Check all users in the matchmaking pool
+    for (const [otherUserId, otherUser] of matchmakingPool.entries()) {
+      // Skip self
+      if (otherUserId === userId) continue;
+      
+      const otherUserInterests = otherUser.interests || [];
+      
+      // Find shared interests
+      const sharedInterests = userInterests.filter(interest => 
+        otherUserInterests.includes(interest)
+      );
+      
+      // Only consider matches with at least one shared interest
+      if (sharedInterests.length > 0) {
+        potentialMatches.push({
+          userId: otherUserId,
+          socketId: otherUser.socketId,
+          user: otherUser.user,
+          sharedInterests,
+          score: sharedInterests.length // Score based on number of shared interests
+        });
       }
-    });
-
-    // Notify second user
-    user2Socket.emit('match:found', {
-      matchId,
-      match: {
-        id: matchId,
-        user: sanitizeUser(user1Socket.user),
-        matchingInterests,
-        createdAt: new Date(),
-        isPending: true
-      }
-    });
-
-    return { success: true };
+    }
+    
+    // Sort by score (highest first)
+    potentialMatches.sort((a, b) => b.score - a.score);
+    
+    if (potentialMatches.length > 0) {
+      // Get the best match
+      const bestMatch = potentialMatches[0];
+      console.log(`Found best match for user ${userId}: ${bestMatch.userId} with ${bestMatch.score} shared interests`);
+      
+      // Generate a match ID
+      const matchId = uuidv4();
+      
+      // Create active match record
+      activeMatches.set(matchId, {
+        users: [userId, bestMatch.userId],
+        acceptances: {
+          [userId]: false,
+          [bestMatch.userId]: false
+        },
+        sharedInterests: bestMatch.sharedInterests,
+        createdAt: new Date()
+      });
+      
+      // Remove both users from matchmaking pool
+      matchmakingPool.delete(userId);
+      matchmakingPool.delete(bestMatch.userId);
+      
+      // Get sockets for both users
+      const user1Socket = socket;
+      const user2Socket = ioInstance.sockets.sockets.get(bestMatch.socketId);
+      
+      // Notify both users
+      notifyMatchFound(user1Socket.user, user2Socket.user, bestMatch.sharedInterests);
+      
+      // Set timeout for match acceptance
+      const timeoutId = setTimeout(() => {
+        // Check if match still exists and hasn't been fully accepted
+        if (activeMatches.has(matchId)) {
+          const matchData = activeMatches.get(matchId);
+          const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
+          
+          if (!bothAccepted) {
+            console.log(`Match ${matchId} timed out`);
+            
+            // Notify both users
+            matchData.users.forEach(userId => {
+              const socketId = connectedUsers.get(userId);
+              if (socketId) {
+                ioInstance.to(socketId).emit('match_timeout', {
+                  matchId,
+                  message: 'Match timed out due to no response'
+                });
+                
+                // Add user back to matchmaking pool
+                const userSocket = ioInstance.sockets.sockets.get(socketId);
+                if (userSocket) {
+                  matchmakingPool.set(userId, {
+                    userId,
+                    socketId,
+                    user: userSocket.user,
+                    interests: userSocket.user.interests,
+                    joinedAt: new Date()
+                  });
+                  
+                  // Find new match
+                  setTimeout(() => {
+                    ioInstance.to(socketId).emit('match_searching', { message: 'Searching for a new match...' });
+                    findMatchForUser(userSocket);
+                  }, 1000);
+                }
+              }
+            });
+            
+            // Clean up the match
+            activeMatches.delete(matchId);
+          }
+        }
+      }, MATCH_ACCEPTANCE_TIMEOUT);
+      
+      // Store timeout IDs for both users
+      userTimeouts.set(userId, timeoutId);
+      userTimeouts.set(bestMatch.userId, timeoutId);
+    } else {
+      console.log(`No suitable matches found for user ${userId}`);
+      socket.emit('match_not_found', { message: 'No suitable matches found at this time' });
+      
+      // Set a timeout to try again after delay
+      const timeoutId = setTimeout(() => {
+        if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
+          console.log(`Retrying match for user ${userId}`);
+          socket.emit('match_searching', { message: 'Searching for a match...' });
+          findMatchForUser(socket);
+        }
+      }, 10000); // Try again in 10 seconds
+      
+      userTimeouts.set(userId, timeoutId);
+    }
   } catch (error) {
-    console.error(`Error in notifyMatchFound: ${error.message}`);
-    return { success: false, error: error.message };
+    console.error('Error finding match:', error);
+    socket.emit('match_error', { message: 'Server error finding a match' });
   }
 };
 
@@ -672,5 +791,10 @@ module.exports = {
   notifyMatchFound,
   connectedUsers,
   userTimeouts,
-  clearMatchmakingTimeouts
+  clearMatchmakingTimeouts,
+  matchmakingPool,
+  activeMatches,
+  findMatchForUser,
+  createMatchInDatabase,
+  MATCH_ACCEPTANCE_TIMEOUT
 }; 

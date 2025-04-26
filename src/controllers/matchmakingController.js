@@ -2,6 +2,8 @@ const supabase = require('../config/database');
 const { matchmakingRequestSchema, matchResponseSchema } = require('../models/matchmaking');
 const { validateInterests } = require('../utils/interests');
 const { notifyMatchFound } = require('../socket/socketManager');
+const User = require('../models/user');
+const Match = require('../models/match');
 
 // In-memory waiting queue for matchmaking
 // Use a Map for O(1) lookups by userId
@@ -54,6 +56,16 @@ const calculateAge = (dateOfBirth) => {
  * @returns {number} Compatibility score (0 or 100)
  */
 const calculateCompatibility = (user1, user2, criteria) => {
+  console.log(`Calculating compatibility between user ${user1.id} and user ${user2.id}`);
+  
+  // Log all relevant data for debugging
+  console.log(`User 1 (${user1.id}) interests:`, JSON.stringify(user1.interests || []));
+  console.log(`User 2 (${user2.id}) interests:`, JSON.stringify(user2.interests || []));
+  
+  if (criteria.preference) {
+    console.log(`User 1 preference criteria: ${criteria.preference}, User 2 preference: ${user2.preference}`);
+  }
+
   // Only check if preferences match (optional)
   if (criteria.preference && criteria.preference !== user2.preference) {
     console.log(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
@@ -64,14 +76,31 @@ const calculateCompatibility = (user1, user2, criteria) => {
   const user1Interests = user1.interests || [];
   const user2Interests = user2.interests || [];
   
-  // Use Set for efficient intersection calculation
-  const user1InterestsSet = new Set(user1Interests);
-  const sharedInterests = user2Interests.filter(interest => user1InterestsSet.has(interest));
+  // Handle both cases: interests as objects with _id/id or as simple ID strings
+  const getInterestId = (interest) => {
+    if (typeof interest === 'string') return interest;
+    if (interest._id) return interest._id.toString();
+    if (interest.id) return interest.id.toString();
+    return JSON.stringify(interest); // Fallback for unexpected format
+  };
   
-  console.log(`Shared interests between ${user1.id} and ${user2.id}: ${sharedInterests.length > 0 ? sharedInterests.join(', ') : 'None'}`);
+  const user1InterestIds = user1Interests.map(getInterestId);
+  const user2InterestIds = user2Interests.map(getInterestId);
+  
+  console.log(`User 1 interest IDs: ${user1InterestIds.join(', ')}`);
+  console.log(`User 2 interest IDs: ${user2InterestIds.join(', ')}`);
+  
+  // Use Set for efficient intersection calculation
+  const user1InterestsSet = new Set(user1InterestIds);
+  const sharedInterests = user2InterestIds.filter(interestId => user1InterestsSet.has(interestId));
+  
+  console.log(`Shared interests between ${user1.id} and ${user2.id}: ${sharedInterests.length}`);
+  console.log(`Shared interest IDs: ${sharedInterests.join(', ')}`);
   
   // If at least one interest matches, consider it compatible
-  return sharedInterests.length > 0 ? 100 : 0;
+  const score = sharedInterests.length > 0 ? 100 : 0;
+  console.log(`Final compatibility score: ${score}`);
+  return score;
 };
 
 /**
@@ -79,99 +108,103 @@ const calculateCompatibility = (user1, user2, criteria) => {
  * This helps handle high load situations (50k+ users)
  */
 const processMatchmakingQueue = async () => {
-  if (isProcessingQueue || waitingQueue.size === 0) {
-    return;
-  }
-  
+  console.log("Processing matchmaking queue...");
   try {
-    isProcessingQueue = true;
-    console.log(`Processing matchmaking queue with ${waitingQueue.size} users waiting`);
+    // Get all users in the waiting queue
+    const waitingUsers = await User.find({ matchmakingStatus: "waiting" })
+      .select('-password')
+      .populate('interests');
     
-    // Convert map to array for processing
-    const queueEntries = Array.from(waitingQueue.values());
-    let matchesCreated = 0;
+    console.log(`Found ${waitingUsers.length} users in waiting queue`);
     
-    // Process users in batches
-    for (let i = 0; i < queueEntries.length && matchesCreated < MATCH_LIMIT_PER_CYCLE; i++) {
+    // Process users in batches to avoid creating too many connections at once
+    // and to give priority to users who have been waiting longer
+    for (const user of waitingUsers) {
+      console.log(`Processing user ${user.id}`);
+      
       // Skip users who have already been matched in this cycle
-      if (!waitingQueue.has(queueEntries[i].userId)) {
+      if (await User.findById(user.id).then(u => u.matchmakingStatus !== "waiting")) {
+        console.log(`User ${user.id} is no longer waiting, skipping`);
         continue;
       }
       
-      const user = queueEntries[i];
-      
-      // Find potential matches for this user
-      const potentialMatches = queueEntries.filter((entry, index) => {
-        // Don't match with self or already processed entries
-        if (entry.userId === user.userId || index <= i) {
-          return false;
-        }
-        
-        // Don't consider users who have been matched already
-        if (!waitingQueue.has(entry.userId)) {
-          return false;
-        }
-        
-        // Check compatibility (simplified to just matching interests)
-        const compatibilityScore = calculateCompatibility(user.user, entry.user, user.criteria);
-        return compatibilityScore > 0;
+      // Get all other users in waiting status who haven't been matched yet
+      const potentialMatches = waitingUsers.filter(potentialMatch => {
+        return (
+          potentialMatch.id !== user.id &&
+          potentialMatch.matchmakingStatus === "waiting"
+        );
       });
       
-      // If matches found, create the first match
-      if (potentialMatches.length > 0) {
-        const match = potentialMatches[0];
-        
-        try {
-          // Create match in database
-          const { data: newMatch, error: matchError } = await supabase
-            .from('matches')
-            .insert({
-              user1_id: user.userId,
-              user2_id: match.userId,
-              status: 'pending',
-              compatibility_score: 100, // We're using simplified scoring now
-              created_at: new Date(),
-              updated_at: new Date()
-            })
-            .select()
-            .single();
-            
-          if (matchError) {
-            console.error('Error creating match:', matchError);
-            continue;
-          }
-          
-          // Remove both users from waiting queue
-          waitingQueue.delete(user.userId);
-          waitingQueue.delete(match.userId);
-          
-          // Notify both users
-          await notifyMatchFound(newMatch, user.user, match.user);
-          
-          matchesCreated++;
-          console.log(`Match created between ${user.userId} and ${match.userId}`);
-        } catch (error) {
-          console.error('Error during match creation:', error);
-        }
-      }
+      console.log(`Found ${potentialMatches.length} potential matches for user ${user.id}`);
       
-      // If we've reached our batch limit, break to prevent timeout
-      if (matchesCreated >= MATCH_LIMIT_PER_CYCLE) {
-        console.log(`Reached match limit of ${MATCH_LIMIT_PER_CYCLE} for this cycle`);
-        break;
+      // Calculate compatibility with all potential matches
+      const compatibilityScores = potentialMatches.map(potentialMatch => {
+        const compatibility = calculateCompatibility(user, potentialMatch, {
+          preference: user.preference,
+        });
+        
+        return {
+          user: potentialMatch,
+          compatibility,
+        };
+      });
+      
+      // Filter out incompatible matches
+      const compatibleMatches = compatibilityScores.filter(
+        match => match.compatibility > 0
+      );
+      
+      console.log(`Found ${compatibleMatches.length} compatible matches for user ${user.id}`);
+      
+      if (compatibleMatches.length > 0) {
+        // Sort by compatibility (highest first)
+        compatibleMatches.sort((a, b) => b.compatibility - a.compatibility);
+        
+        // Get the best match
+        const bestMatch = compatibleMatches[0];
+        console.log(`Best match for user ${user.id} is user ${bestMatch.user.id} with compatibility ${bestMatch.compatibility}`);
+        
+        // Check if the matched user is still available
+        const matchedUser = await User.findById(bestMatch.user.id);
+        
+        if (matchedUser.matchmakingStatus === "waiting") {
+          console.log(`Creating match between users ${user.id} and ${matchedUser.id}`);
+          
+          // Create a match
+          const match = new Match({
+            users: [user.id, matchedUser.id],
+            status: "pending",
+            createdAt: new Date(),
+            compatibility: bestMatch.compatibility,
+          });
+          
+          await match.save();
+          console.log(`Match created with ID: ${match.id}`);
+          
+          // Update user statuses
+          await User.findByIdAndUpdate(user.id, {
+            matchmakingStatus: "matched",
+            currentMatch: match.id,
+          });
+          
+          await User.findByIdAndUpdate(matchedUser.id, {
+            matchmakingStatus: "matched",
+            currentMatch: match.id,
+          });
+          
+          console.log(`Updated matchmaking status to "matched" for users ${user.id} and ${matchedUser.id}`);
+        } else {
+          console.log(`User ${matchedUser.id} is no longer available for matching`);
+        }
+      } else {
+        console.log(`No compatible matches found for user ${user.id}`);
       }
     }
     
-    console.log(`Completed processing cycle. Created ${matchesCreated} matches. ${waitingQueue.size} users still waiting.`);
+    console.log("Matchmaking queue processing completed");
   } catch (error) {
-    console.error('Error processing matchmaking queue:', error);
-  } finally {
-    isProcessingQueue = false;
-    
-    // If there are still users waiting, schedule another processing cycle
-    if (waitingQueue.size > 0) {
-      setTimeout(processMatchmakingQueue, 1000); // Process again in 1 second
-    }
+    console.error("Error processing matchmaking queue:", error);
   }
 };
 

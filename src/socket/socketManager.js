@@ -232,7 +232,7 @@ const initializeSocket = (io) => {
           socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
           return;
         }
-
+        
         // Add user to matchmaking pool
         matchmakingPool.set(userId, {
           userId,
@@ -328,13 +328,13 @@ const initializeSocket = (io) => {
                 // Join the private chat room
                 socket.join(roomId);
                 
-                const otherUserId = userId === user1Id ? user2Id : user1Id;
+              const otherUserId = userId === user1Id ? user2Id : user1Id;
                 io.to(socketId).emit('match_confirmed', {
-                  matchId,
+                matchId,
                   roomId,
-                  otherUserId,
-                  status: 'connected'
-                });
+                otherUserId,
+                status: 'connected'
+              });
               }
             }
           });
@@ -382,11 +382,11 @@ const initializeSocket = (io) => {
         // Notify the other user about the rejection
         if (otherUserSocketId) {
           io.to(otherUserSocketId).emit('match_rejected', {
-            matchId,
+              matchId,
             rejectedBy: userId,
             message: 'The other user rejected the match'
-          });
-        }
+            });
+          }
         
         // Clean up
         activeMatches.delete(matchId);
@@ -527,42 +527,89 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
   try {
     console.log(`Creating match record in database: ${matchId} between ${user1Id} and ${user2Id}`);
     
-    // Get the match data from active matches if it exists
-    let matchData = null;
-    if (activeMatches.has(matchId)) {
-      matchData = activeMatches.get(matchId);
-    }
-    
-    const currentTime = new Date();
-    
-    const { data, error } = await supabase
+    // First, check if a match already exists between these users
+    const { data: existingMatch, error: queryError } = await supabase
       .from('matches')
-      .insert({
-        id: matchId,
-        user1_id: user1Id,
-        user2_id: user2Id,
-        status: 'accepted',
-        compatibility_score: 100, // Default score for accepted matches
-        shared_interests: matchData?.sharedInterests || [],
-        chat_room_id: `match_${matchId}`,
-        created_at: currentTime,
-        updated_at: currentTime,
-        accepted_at: currentTime
-      });
-      
-    if (error) {
-      console.error('Error creating match in database:', error);
-      return { success: false, error };
+      .select('id')
+      .or(`user1_id.eq.${user1Id},user1_id.eq.${user2Id}`)
+      .or(`user2_id.eq.${user1Id},user2_id.eq.${user2Id}`)
+      .limit(1);
+    
+    if (queryError) {
+      console.error('Error checking for existing match:', queryError);
     }
     
-    console.log(`Successfully created match record in database: ${matchId}`);
+    // If a match already exists, update it instead of creating a new one
+    if (existingMatch && existingMatch.length > 0) {
+      console.log(`Match already exists between users ${user1Id} and ${user2Id}, updating existing match`);
+      
+      // Get the match data from active matches if it exists
+      let matchData = null;
+      if (activeMatches.has(matchId)) {
+        matchData = activeMatches.get(matchId);
+      }
+      
+      const currentTime = new Date();
+      
+      const { data, error } = await supabase
+        .from('matches')
+        .update({
+          status: 'accepted',
+          compatibility_score: 100, // Default score for accepted matches
+          shared_interests: matchData?.sharedInterests || [],
+          chat_room_id: `match_${matchId}`,
+          updated_at: currentTime,
+          accepted_at: currentTime
+        })
+        .eq('id', existingMatch[0].id);
+        
+      if (error) {
+        console.error('Error updating existing match in database:', error);
+        return { success: false, error };
+      }
+      
+      console.log(`Successfully updated existing match in database: ${existingMatch[0].id}`);
+      
+      // Use the existing match ID for updates
+      matchId = existingMatch[0].id;
+    } else {
+      // Get the match data from active matches if it exists
+      let matchData = null;
+      if (activeMatches.has(matchId)) {
+        matchData = activeMatches.get(matchId);
+      }
+      
+      const currentTime = new Date();
+      
+      const { data, error } = await supabase
+        .from('matches')
+        .insert({
+          id: matchId,
+          user1_id: user1Id,
+          user2_id: user2Id,
+          status: 'accepted',
+          compatibility_score: 100, // Default score for accepted matches
+          shared_interests: matchData?.sharedInterests || [],
+          chat_room_id: `match_${matchId}`,
+          created_at: currentTime,
+          updated_at: currentTime,
+          accepted_at: currentTime
+        });
+        
+      if (error) {
+        console.error('Error creating match in database:', error);
+        return { success: false, error };
+      }
+      
+      console.log(`Successfully created match record in database: ${matchId}`);
+    }
     
     // Update user records to indicate they're in a match
     const updateUser1 = await supabase
       .from('users')
       .update({
         current_match_id: matchId,
-        updated_at: currentTime
+        updated_at: new Date()
       })
       .eq('id', user1Id);
       
@@ -570,7 +617,7 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
       .from('users')
       .update({
         current_match_id: matchId,
-        updated_at: currentTime
+        updated_at: new Date()
       })
       .eq('id', user2Id);
       
@@ -582,7 +629,7 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
       console.error(`Error updating user ${user2Id} with match:`, updateUser2.error);
     }
     
-    return { success: true, data };
+    return { success: true };
   } catch (error) {
     console.error('Error creating match in database:', error);
     return { success: false, error };

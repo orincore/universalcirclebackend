@@ -21,6 +21,10 @@ const matchmakingRoutes = require('./routes/matchmakingRoutes');
 const postRoutes = require('./routes/postRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 
+// Import middleware
+const { authenticate } = require('./middlewares/auth');
+const supabase = require('./config/database');
+
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
@@ -69,6 +73,106 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/analytics', analyticsRoutes);
+
+// Add route for creating conversation between matched users
+app.post('/api/messages/conversations', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const currentUserId = req.user.id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    // Check if users have a match
+    const { data: matchData, error: matchError } = await supabase
+      .from('matches')
+      .select('id, status')
+      .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUserId})`)
+      .eq('status', 'accepted')
+      .limit(1);
+    
+    if (matchError) {
+      console.error('Error checking for match:', matchError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error checking for match'
+      });
+    }
+    
+    // If no match exists, create a dummy match for chat
+    let matchId;
+    if (!matchData || matchData.length === 0) {
+      const { data: newMatch, error: newMatchError } = await supabase
+        .from('matches')
+        .insert({
+          user1_id: currentUserId,
+          user2_id: userId,
+          status: 'accepted',
+          created_at: new Date(),
+          updated_at: new Date(),
+          accepted_at: new Date()
+        })
+        .select()
+        .single();
+      
+      if (newMatchError) {
+        console.error('Error creating match for conversation:', newMatchError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error creating match for conversation'
+        });
+      }
+      
+      matchId = newMatch.id;
+    } else {
+      matchId = matchData[0].id;
+    }
+    
+    // Get user details for the conversation
+    const { data: otherUser, error: userError } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, username, profile_picture_url')
+      .eq('id', userId)
+      .single();
+    
+    if (userError) {
+      console.error('Error fetching user details:', userError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching user details'
+      });
+    }
+    
+    return res.status(201).json({
+      success: true,
+      data: {
+        matchId,
+        conversation: {
+          id: matchId, // Use match ID as conversation ID
+          participants: [currentUserId, userId],
+          otherUser: {
+            id: otherUser.id,
+            firstName: otherUser.first_name,
+            lastName: otherUser.last_name,
+            username: otherUser.username,
+            profilePictureUrl: otherUser.profile_picture_url
+          },
+          updatedAt: new Date().toISOString()
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while creating conversation'
+    });
+  }
+});
 
 // Default route
 app.get('/', (req, res) => {

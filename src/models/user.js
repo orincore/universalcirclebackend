@@ -33,7 +33,8 @@ const userRegistrationSchema = Joi.object({
     latitude: Joi.number().required(),
     longitude: Joi.number().required()
   }).required(),
-  interests: Joi.array().custom(interestValidator, 'interests validation').required()
+  interests: Joi.array().custom(interestValidator, 'interests validation').required(),
+  bio: Joi.string().max(500)
 });
 
 /**
@@ -55,7 +56,8 @@ const profileUpdateSchema = Joi.object({
   location: Joi.object({
     latitude: Joi.number(),
     longitude: Joi.number()
-  })
+  }),
+  bio: Joi.string().max(500)
 });
 
 /**

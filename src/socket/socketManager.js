@@ -4,11 +4,17 @@ const supabase = require('../config/database');
 // Track connected users and their socket IDs
 const connectedUsers = new Map();
 
+// Reference to Socket.IO instance
+let ioInstance;
+
 /**
  * Initialize Socket.IO with authentication
  * @param {object} io - Socket.IO server instance
  */
 const initializeSocket = (io) => {
+  // Store reference to io instance
+  ioInstance = io;
+  
   // Socket.IO middleware for authentication
   io.use(async (socket, next) => {
     try {
@@ -215,6 +221,49 @@ const initializeSocket = (io) => {
       }
     });
     
+    // Handle matchmaking restart
+    socket.on('match:restart', async (data) => {
+      try {
+        console.log(`User ${socket.user.id} requested to restart matchmaking with criteria:`, data);
+        
+        // Check if user is already in matchmaking queue
+        const { startMatchmaking } = require('../controllers/matchmakingController');
+        
+        // Create mock request and response objects
+        const req = {
+          user: socket.user,
+          body: data || {},
+          io: ioInstance
+        };
+        
+        const res = {
+          status: (code) => ({
+            json: (responseData) => {
+              if (code >= 400) {
+                console.error(`Error restarting matchmaking for user ${socket.user.id}:`, responseData.message);
+                socket.emit('error', {
+                  source: 'match:restart',
+                  message: responseData.message
+                });
+              } else {
+                console.log(`Matchmaking restarted for user ${socket.user.id}:`, responseData);
+                socket.emit('match:restarted', responseData);
+              }
+            }
+          })
+        };
+        
+        // Call matchmaking controller
+        await startMatchmaking(req, res);
+      } catch (error) {
+        console.error(`Error restarting matchmaking for user ${socket.user.id}:`, error);
+        socket.emit('error', {
+          source: 'match:restart',
+          message: 'Server error when restarting matchmaking'
+        });
+      }
+    });
+    
     // Disconnect handler
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.user.id} (${socket.user.username})`);
@@ -253,6 +302,92 @@ const updateUserOnlineStatus = async (userId, online) => {
   }
 };
 
+/**
+ * Notify users when a match is found
+ * @param {object} match - Match object from database
+ * @param {object} user1 - User 1 details
+ * @param {object} user2 - User 2 details
+ */
+const notifyMatchFound = async (match, user1, user2) => {
+  if (!ioInstance) {
+    console.error('Socket.IO instance not available');
+    return;
+  }
+
+  try {
+    console.log('Match found:', {
+      matchId: match.id,
+      user1Id: user1.id,
+      user1Name: `${user1.first_name} ${user1.last_name}`,
+      user2Id: user2.id,
+      user2Name: `${user2.first_name} ${user2.last_name}`,
+      compatibilityScore: match.compatibility_score
+    });
+
+    // Sanitize user objects to remove sensitive information but include more details for display
+    const sanitizeUser = (user) => ({
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      username: user.username,
+      profilePictureUrl: user.profile_picture_url,
+      interests: user.interests,
+      preference: user.preference,
+      bio: user.bio || '',  // Include bio if available
+      isOnline: user.is_online || false,
+      lastActive: user.last_active || new Date()
+    });
+
+    const user1Sanitized = sanitizeUser(user1);
+    const user2Sanitized = sanitizeUser(user2);
+
+    // Get socket IDs for both matched users
+    const user1SocketId = connectedUsers.get(match.user1_id);
+    const user2SocketId = connectedUsers.get(match.user2_id);
+    
+    console.log('Socket IDs:', {
+      user1SocketId: user1SocketId || 'not connected',
+      user2SocketId: user2SocketId || 'not connected'
+    });
+    
+    // Send match notification to user1
+    if (user1SocketId) {
+      console.log(`Emitting match:found to user1 (${user1.id})`);
+      ioInstance.to(user1SocketId).emit('match:found', {
+        match: {
+          id: match.id,
+          user: user2Sanitized,
+          compatibility: match.compatibility_score,
+          createdAt: match.created_at,
+          isPending: true
+        }
+      });
+    } else {
+      console.log(`User1 (${user1.id}) is not connected, cannot send real-time notification`);
+    }
+    
+    // Send match notification to user2
+    if (user2SocketId) {
+      console.log(`Emitting match:found to user2 (${user2.id})`);
+      ioInstance.to(user2SocketId).emit('match:found', {
+        match: {
+          id: match.id,
+          user: user1Sanitized,
+          compatibility: match.compatibility_score,
+          createdAt: match.created_at,
+          isPending: true
+        }
+      });
+    } else {
+      console.log(`User2 (${user2.id}) is not connected, cannot send real-time notification`);
+    }
+  } catch (error) {
+    console.error('Error notifying match found:', error);
+  }
+};
+
 module.exports = {
-  initializeSocket
+  initializeSocket,
+  notifyMatchFound,
+  connectedUsers
 }; 

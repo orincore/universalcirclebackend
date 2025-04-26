@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 dotenv.config();
 
 // Import socket manager
-const { initializeSocket } = require('./socket/socketManager');
+const { initializeSocket, connectedUsers } = require('./socket/socketManager');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -33,6 +33,9 @@ const io = socketIO(server, {
   }
 });
 
+// Make io instance available to the Express app
+app.set('io', io);
+
 // Initialize socket manager
 initializeSocket(io);
 
@@ -40,6 +43,13 @@ initializeSocket(io);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Make io instance and connectedUsers available to all route handlers
+app.use((req, res, next) => {
+  req.io = io;
+  app.set('connectedUsers', connectedUsers);
+  next();
+});
 
 // Apply rate limiting
 const limiter = rateLimit({

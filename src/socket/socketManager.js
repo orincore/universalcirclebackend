@@ -339,11 +339,11 @@ const initializeSocket = (io) => {
       });
     });
     
-    // Handle match acceptance
-    socket.on('match:accepted', ({ matchId }) => {
+    // Handle match acceptance or rejection
+    socket.on('match:accepted', ({ matchId, accepted }) => {
       try {
         const userId = socket.user.id;
-        console.log(`User ${userId} accepted match ${matchId}`);
+        console.log(`User ${userId} ${accepted ? 'accepted' : 'rejected'} match ${matchId}`);
         
         if (!activeMatches.has(matchId)) {
           socket.emit('error', {
@@ -355,87 +355,93 @@ const initializeSocket = (io) => {
         
         const matchData = activeMatches.get(matchId);
         
-        // Update acceptance status
-        matchData.acceptances[userId] = true;
-        activeMatches.set(matchId, matchData);
+        // Get the other user ID
+        const otherUserId = matchData.users.find(id => id !== userId);
+        const otherUserSocketId = connectedUsers.get(otherUserId);
         
-        // Check if both users accepted
-        const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
-        
-        if (bothAccepted) {
-          console.log(`Match ${matchId} accepted by both users`);
+        if (accepted) {
+          // Update acceptance status
+          matchData.acceptances[userId] = true;
+          activeMatches.set(matchId, matchData);
           
-          // Get both user ids
-          const [user1Id, user2Id] = matchData.users;
+          // Notify the other user about this user's acceptance
+          if (otherUserSocketId) {
+            io.to(otherUserSocketId).emit('match:user_accepted', {
+              matchId,
+              userId,
+              message: 'The other user has accepted the match'
+            });
+          }
           
-          // Create the match in the database
-          createMatchInDatabase(matchId, user1Id, user2Id);
+          // Check if both users accepted
+          const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
           
-          // Emit match connected to both users
-          matchData.users.forEach(userId => {
-            const socketId = connectedUsers.get(userId);
-            if (socketId) {
-              const otherUserId = userId === user1Id ? user2Id : user1Id;
-              io.to(socketId).emit('match:connected', {
-                matchId,
-                otherUserId,
-                status: 'connected'
-              });
-            }
-          });
+          if (bothAccepted) {
+            console.log(`Match ${matchId} accepted by both users`);
+            
+            // Get both user ids
+            const [user1Id, user2Id] = matchData.users;
+            
+            // Create the match in the database
+            createMatchInDatabase(matchId, user1Id, user2Id);
+            
+            // Emit match connected to both users
+            matchData.users.forEach(userId => {
+              const socketId = connectedUsers.get(userId);
+              if (socketId) {
+                const otherUserId = userId === user1Id ? user2Id : user1Id;
+                io.to(socketId).emit('match:connected', {
+                  matchId,
+                  otherUserId,
+                  status: 'connected'
+                });
+              }
+            });
+            
+            // Clean up
+            activeMatches.delete(matchId);
+          } else {
+            // Notify the user that we're waiting for the other user
+            socket.emit('match:waiting', {
+              matchId,
+              message: 'Waiting for the other user to accept'
+            });
+          }
+        } else {
+          // User rejected the match
+          
+          // Notify the other user about the rejection
+          if (otherUserSocketId) {
+            io.to(otherUserSocketId).emit('match:rejected', {
+              matchId,
+              rejectedBy: userId,
+              message: 'The other user rejected the match'
+            });
+          }
           
           // Clean up
           activeMatches.delete(matchId);
-        } else {
-          // Notify the user that we're waiting for the other user
-          socket.emit('match:waiting', {
-            matchId,
-            message: 'Waiting for the other user to accept'
-          });
+          
+          // Auto-restart matchmaking for both users
+          // For the current user
+          setTimeout(() => {
+            if (connectedUsers.has(userId)) {
+              socket.emit('match:restart');
+            }
+          }, 1000);
+          
+          // For the other user
+          setTimeout(() => {
+            if (otherUserSocketId && connectedUsers.has(otherUserId)) {
+              io.to(otherUserSocketId).emit('match:restart');
+            }
+          }, 1000);
         }
       } catch (error) {
-        console.error('Error accepting match:', error);
+        console.error('Error handling match acceptance/rejection:', error);
         socket.emit('error', {
           source: 'match:accepted',
-          message: 'Error accepting match'
-        });
-      }
-    });
-    
-    // Handle match rejection
-    socket.on('match:rejected', ({ matchId }) => {
-      try {
-        const userId = socket.user.id;
-        console.log(`User ${userId} rejected match ${matchId}`);
-        
-        if (!activeMatches.has(matchId)) {
-          socket.emit('error', {
-            source: 'match:rejected',
-            message: 'Match not found'
-          });
-          return;
-        }
-        
-        const matchData = activeMatches.get(matchId);
-        
-        // Notify both users about the rejection
-        matchData.users.forEach(userId => {
-          const socketId = connectedUsers.get(userId);
-          if (socketId) {
-            io.to(socketId).emit('match:rejected', {
-              matchId,
-              message: 'Match was rejected'
-            });
-          }
-        });
-        
-        // Clean up
-        activeMatches.delete(matchId);
-      } catch (error) {
-        console.error('Error rejecting match:', error);
-        socket.emit('error', {
-          source: 'match:rejected',
-          message: 'Error rejecting match'
+          message: 'Error processing your response'
         });
       }
     });

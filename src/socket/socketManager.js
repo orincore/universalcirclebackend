@@ -284,7 +284,7 @@ const initializeSocket = (io) => {
             match: {
               id: matchId,
               user: sanitizeUser(match.user),
-              matchingInterests,
+              matchingInterests: match.matchingInterests,
               createdAt: new Date(),
               isPending: true
             }

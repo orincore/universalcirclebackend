@@ -411,25 +411,25 @@ const respondToMatch = async (req, res) => {
         
         // Notify current user
         if (currentUserSocketId) {
-          console.log(`Emitting match:accepted to current user (${userId})`);
-          req.io.to(currentUserSocketId).emit('match:accepted', {
+          console.log(`Emitting match:connected to current user (${userId})`);
+          req.io.to(currentUserSocketId).emit('match:connected', {
             matchId,
-            userId: otherUserId, // The user they matched with
-            status: 'accepted'
+            otherUserId, // The user they matched with
+            status: 'connected'
           });
         }
         
         // Notify other user
         if (otherUserSocketId) {
-          console.log(`Emitting match:accepted to other user (${otherUserId})`);
-          req.io.to(otherUserSocketId).emit('match:accepted', {
+          console.log(`Emitting match:connected to other user (${otherUserId})`);
+          req.io.to(otherUserSocketId).emit('match:connected', {
             matchId,
-            userId, // The user they matched with
-            status: 'accepted'
+            otherUserId: userId, // The user they matched with
+            status: 'connected'
           });
         }
       } else {
-        console.log('Socket.IO instance not available, cannot emit match:accepted event');
+        console.log('Socket.IO instance not available, cannot emit match:connected event');
       }
     } 
     // Handle rejection case - restart matchmaking for both users
@@ -516,6 +516,11 @@ const getPendingMatches = async (req, res) => {
       const otherUser = match.user1_id === userId ? match.user2 : match.user1;
       const userResponse = match.user1_id === userId ? match.user1_response : match.user2_response;
       
+      // Find matching interests
+      const userInterests = match.user1_id === userId ? match.user1.interests : match.user2.interests;
+      const otherUserInterests = match.user1_id === userId ? match.user2.interests : match.user1.interests;
+      const matchingInterests = userInterests.filter(interest => otherUserInterests.includes(interest));
+      
       // Remove sensitive data
       delete otherUser.password;
       delete otherUser.email;
@@ -531,7 +536,7 @@ const getPendingMatches = async (req, res) => {
           profilePictureUrl: otherUser.profile_picture_url,
           interests: otherUser.interests
         },
-        compatibilityScore: match.compatibility_score,
+        matchingInterests,
         userResponse,
         status: match.status,
         createdAt: match.created_at
@@ -601,6 +606,19 @@ const getMatchmakingStats = async (req, res) => {
       .slice(0, 10)
       .map(([interest, count]) => ({ interest, count }));
     
+    // Get recent match count
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    const { count: recentMatchCount, error: matchCountError } = await supabase
+      .from('matches')
+      .count()
+      .gte('created_at', oneDayAgo.toISOString());
+      
+    if (matchCountError) {
+      console.error('Error counting recent matches:', matchCountError);
+    }
+    
     return res.status(200).json({
       success: true,
       data: {
@@ -608,6 +626,7 @@ const getMatchmakingStats = async (req, res) => {
         isProcessingQueue: isProcessingQueue,
         timeInQueueDistribution: timeInQueueStats,
         topInterests,
+        matchesLast24Hours: recentMatchCount || 0,
         systemLimits: {
           batchSize: BATCH_SIZE,
           matchLimitPerCycle: MATCH_LIMIT_PER_CYCLE,

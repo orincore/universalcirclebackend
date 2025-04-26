@@ -263,6 +263,7 @@ const initializeSocket = (io) => {
         console.log(`User ${userId} accepted match ${matchId}`);
         
         if (!activeMatches.has(matchId)) {
+          console.log(`Match ${matchId} not found in activeMatches map`);
           socket.emit('match_error', {
             message: 'Match not found'
           });
@@ -270,6 +271,13 @@ const initializeSocket = (io) => {
         }
         
         const matchData = activeMatches.get(matchId);
+        console.log(`Match data retrieved for ${matchId}:`, JSON.stringify(matchData));
+        
+        // Ensure the acceptances object exists
+        if (!matchData.acceptances) {
+          console.log(`Match ${matchId} does not have acceptances object, creating it`);
+          matchData.acceptances = {};
+        }
         
         // Update acceptance status
         matchData.acceptances[userId] = true;
@@ -277,6 +285,14 @@ const initializeSocket = (io) => {
         
         // Get the other user ID
         const otherUserId = matchData.users.find(id => id !== userId);
+        if (!otherUserId) {
+          console.log(`Could not find other user in match ${matchId}`);
+          socket.emit('match_error', {
+            message: 'Match data is invalid'
+          });
+          return;
+        }
+        
         const otherUserSocketId = connectedUsers.get(otherUserId);
         
         // Notify the other user about this user's acceptance
@@ -589,13 +605,14 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
     users: [user1.id, user2.id],
     sharedInterests,
     timestamp: new Date(),
-    status: {
-      [user1.id]: 'pending',
-      [user2.id]: 'pending'
+    acceptances: {
+      [user1.id]: false,
+      [user2.id]: false
     }
   });
   
   console.log(`Match created: ${matchId} between ${user1.id} and ${user2.id} with ${sharedInterests.length} shared interests`);
+  console.log(`Match data: ${JSON.stringify(activeMatches.get(matchId))}`);
   
   // Create properly formatted match data for Flutter client
   const user1MatchData = createMatchData(user2, sharedInterests, matchId);

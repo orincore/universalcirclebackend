@@ -1,6 +1,7 @@
 const supabase = require('../config/database');
 const { matchmakingRequestSchema, matchResponseSchema } = require('../models/matchmaking');
 const { validateInterests } = require('../utils/interests');
+const { notifyMatchFound } = require('../socket/socketManager');
 
 // In-memory waiting queue for matchmaking
 let waitingQueue = [];
@@ -205,6 +206,9 @@ const startMatchmaking = async (req, res) => {
       });
     }
 
+    // Notify both users about the match via Socket.IO
+    await notifyMatchFound(newMatch, user, match.user);
+
     return res.status(200).json({
       success: true,
       message: 'Match found',
@@ -275,6 +279,7 @@ const respondToMatch = async (req, res) => {
     const { error, value } = matchResponseSchema.validate(req.body);
     
     if (error) {
+      console.log(`Invalid match response from user ${userId}:`, error.details[0].message);
       return res.status(400).json({
         success: false,
         message: error.details[0].message
@@ -282,6 +287,7 @@ const respondToMatch = async (req, res) => {
     }
 
     const { matchId, accepted } = value;
+    console.log(`User ${userId} responded to match ${matchId}: ${accepted ? 'accepted' : 'declined'}`);
 
     // Get match data
     const { data: match, error: matchError } = await supabase
@@ -292,6 +298,7 @@ const respondToMatch = async (req, res) => {
       .single();
 
     if (matchError || !match) {
+      console.log(`Match ${matchId} not found for user ${userId}`);
       return res.status(404).json({
         success: false,
         message: 'Match not found'
@@ -299,6 +306,7 @@ const respondToMatch = async (req, res) => {
     }
 
     if (match.status !== 'pending') {
+      console.log(`Match ${matchId} is already ${match.status}`);
       return res.status(400).json({
         success: false,
         message: `Match is already ${match.status}`
@@ -307,6 +315,9 @@ const respondToMatch = async (req, res) => {
 
     // Determine which user is responding
     const isUser1 = match.user1_id === userId;
+    const otherUserId = isUser1 ? match.user2_id : match.user1_id;
+    
+    console.log(`User ${userId} is ${isUser1 ? 'user1' : 'user2'} in match, other user is ${otherUserId}`);
     
     // Update match status
     const updateData = {};
@@ -317,18 +328,28 @@ const respondToMatch = async (req, res) => {
       updateData.user2_response = accepted;
     }
     
+    // Check if other user has already responded
+    const otherUserResponse = isUser1 ? match.user2_response : match.user1_response;
+    console.log(`Other user (${otherUserId}) response: ${otherUserResponse === null ? 'pending' : (otherUserResponse ? 'accepted' : 'declined')}`);
+    
     // If the other user has already responded
-    if ((isUser1 && match.user2_response !== null) || 
-        (!isUser1 && match.user1_response !== null)) {
+    const bothAccepted = 
+      (isUser1 && accepted && match.user2_response === true) ||
+      (!isUser1 && accepted && match.user1_response === true);
       
-      // Both accepted
-      if (accepted && (isUser1 ? match.user2_response : match.user1_response)) {
+    const otherUserDeclined = otherUserResponse === false;
+    const thisUserDeclined = !accepted;
+    
+    if (otherUserResponse !== null) {
+      if (bothAccepted) {
         updateData.status = 'accepted';
-      } 
-      // At least one rejected
-      else {
+        console.log(`Both users accepted match ${matchId}, updating status to 'accepted'`);
+      } else {
         updateData.status = 'rejected';
+        console.log(`At least one user rejected match ${matchId}, updating status to 'rejected'`);
       }
+    } else {
+      console.log(`Waiting for other user (${otherUserId}) to respond to match ${matchId}`);
     }
     
     updateData.updated_at = new Date();
@@ -342,11 +363,79 @@ const respondToMatch = async (req, res) => {
       .single();
 
     if (updateError) {
-      console.error('Error updating match:', updateError);
+      console.error(`Error updating match ${matchId}:`, updateError);
       return res.status(500).json({
         success: false,
         message: 'Failed to update match'
       });
+    }
+
+    // Handle both accepted case
+    if (bothAccepted) {
+      console.log(`Match ${matchId} accepted by both users, creating chat connection`);
+      
+      // Emit match:accepted event through socket to both users
+      if (req.io) {
+        // Get both users' socket IDs
+        const connectedUsers = req.app.get('connectedUsers') || new Map();
+        const currentUserSocketId = connectedUsers.get(userId);
+        const otherUserSocketId = connectedUsers.get(otherUserId);
+        
+        // Notify current user
+        if (currentUserSocketId) {
+          console.log(`Emitting match:accepted to current user (${userId})`);
+          req.io.to(currentUserSocketId).emit('match:accepted', {
+            matchId,
+            userId: otherUserId, // The user they matched with
+            status: 'accepted'
+          });
+        }
+        
+        // Notify other user
+        if (otherUserSocketId) {
+          console.log(`Emitting match:accepted to other user (${otherUserId})`);
+          req.io.to(otherUserSocketId).emit('match:accepted', {
+            matchId,
+            userId, // The user they matched with
+            status: 'accepted'
+          });
+        }
+      } else {
+        console.log('Socket.IO instance not available, cannot emit match:accepted event');
+      }
+    } 
+    // Handle rejection case - restart matchmaking for both users
+    else if (thisUserDeclined || otherUserDeclined) {
+      console.log(`Match ${matchId} rejected, restarting matchmaking for both users`);
+      
+      // Emit match:rejected event through socket
+      if (req.io) {
+        // Get both users' socket IDs
+        const connectedUsers = req.app.get('connectedUsers') || new Map();
+        const currentUserSocketId = connectedUsers.get(userId);
+        const otherUserSocketId = connectedUsers.get(otherUserId);
+        
+        // Notify users about rejection and restart matchmaking
+        const rejectPayload = {
+          matchId,
+          status: 'rejected',
+          message: 'Match was rejected, restarting matchmaking'
+        };
+        
+        // Notify current user
+        if (currentUserSocketId) {
+          console.log(`Emitting match:rejected to current user (${userId})`);
+          req.io.to(currentUserSocketId).emit('match:rejected', rejectPayload);
+        }
+        
+        // Notify other user
+        if (otherUserSocketId) {
+          console.log(`Emitting match:rejected to other user (${otherUserId})`);
+          req.io.to(otherUserSocketId).emit('match:rejected', rejectPayload);
+        }
+      } else {
+        console.log('Socket.IO instance not available, cannot emit match:rejected event');
+      }
     }
 
     return res.status(200).json({

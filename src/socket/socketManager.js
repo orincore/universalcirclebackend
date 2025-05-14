@@ -352,13 +352,24 @@ const initializeSocket = (io) => {
           // Create the match in the database
           createMatchInDatabase(matchId, user1Id, user2Id);
           
+          // Create a chat room for the match
+          const roomId = `match_${matchId}`;
+          
           // Emit match connected to both users
           matchData.users.forEach(userId => {
             const socketId = connectedUsers.get(userId);
             if (socketId) {
+              const socketInstance = io.sockets.sockets.get(socketId);
+              if (socketInstance) {
+                // Join the private chat room
+                socketInstance.join(roomId);
+                console.log(`User ${userId} joined chat room ${roomId} via match:accept event`);
+              }
+              
               const otherUserId = userId === user1Id ? user2Id : user1Id;
-              io.to(socketId).emit('match:connected', {
+              io.to(socketId).emit('match:confirmed', {
                 matchId,
+                roomId,
                 otherUserId,
                 status: 'connected'
               });
@@ -506,14 +517,18 @@ const initializeSocket = (io) => {
               if (socket) {
                 // Join the private chat room
                 socket.join(roomId);
+                console.log(`User ${userId} joined chat room ${roomId} via match:accept event`);
                 
-              const otherUserId = userId === user1Id ? user2Id : user1Id;
+                // Get other user ID for this user
+                const otherUserId = userId === user1Id ? user2Id : user1Id;
+                
+                // Send confirmation with chat room details
                 io.to(socketId).emit('match:confirmed', {
-                matchId,
+                  matchId,
                   roomId,
-                otherUserId,
-                status: 'connected'
-              });
+                  otherUserId,
+                  status: 'connected'
+                });
               }
             }
           });

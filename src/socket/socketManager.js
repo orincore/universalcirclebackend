@@ -216,7 +216,7 @@ const initializeSocket = (io) => {
     });
     
     // Handle matchmaking events
-    socket.on('find_match', async (criteria = {}) => {
+    socket.on('match:find', async (criteria = {}) => {
       try {
         // Clear any existing matchmaking timeouts for this user
         const userId = socket.user.id;
@@ -229,7 +229,10 @@ const initializeSocket = (io) => {
         // Validate that user has interests
         if (!socket.user.interests || socket.user.interests.length === 0) {
           console.log(`User ${userId} has no interests. Aborting match.`);
-          socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
+          socket.emit('error', { 
+            source: 'matchmaking',
+            message: 'You need to add interests to your profile before matchmaking' 
+          });
           return;
         }
         
@@ -244,13 +247,14 @@ const initializeSocket = (io) => {
         });
         
         console.log(`Added user ${userId} to matchmaking pool. Pool size: ${matchmakingPool.size}`);
-        socket.emit('match_searching', { message: 'Searching for a match...' });
+        socket.emit('match:waiting', { message: 'Searching for a match...' });
         
         // Find a match for this user
         findMatchForUser(socket);
       } catch (error) {
         console.error('Error finding match:', error);
-        socket.emit('match_error', {
+        socket.emit('error', {
+          source: 'matchmaking',
           message: 'Error finding a match, please try again'
         });
       }
@@ -432,14 +436,14 @@ const initializeSocket = (io) => {
     });
     
     // Handle match acceptance
-    socket.on('accept_match', ({ matchId }) => {
+    socket.on('match:accept', ({ matchId }) => {
       try {
         const userId = socket.user.id;
         console.log(`User ${userId} accepted match ${matchId}`);
         
         if (!activeMatches.has(matchId)) {
           console.log(`Match ${matchId} not found in activeMatches map`);
-          socket.emit('match_error', {
+          socket.emit('error', {
             message: 'Match not found'
           });
           return;
@@ -462,7 +466,7 @@ const initializeSocket = (io) => {
         const otherUserId = matchData.users.find(id => id !== userId);
         if (!otherUserId) {
           console.log(`Could not find other user in match ${matchId}`);
-          socket.emit('match_error', {
+          socket.emit('error', {
             message: 'Match data is invalid'
           });
           return;
@@ -472,7 +476,7 @@ const initializeSocket = (io) => {
         
         // Notify the other user about this user's acceptance
         if (otherUserSocketId) {
-          io.to(otherUserSocketId).emit('match_user_accepted', {
+          io.to(otherUserSocketId).emit('match:userAccepted', {
             matchId,
             userId,
             message: 'The other user has accepted the match'
@@ -504,7 +508,7 @@ const initializeSocket = (io) => {
                 socket.join(roomId);
                 
               const otherUserId = userId === user1Id ? user2Id : user1Id;
-                io.to(socketId).emit('match_confirmed', {
+                io.to(socketId).emit('match:confirmed', {
                 matchId,
                   roomId,
                 otherUserId,
@@ -522,27 +526,27 @@ const initializeSocket = (io) => {
           clearMatchmakingTimeouts(user2Id);
         } else {
           // Notify the user that we're waiting for the other user
-          socket.emit('match_waiting', {
+          socket.emit('match:waiting', {
             matchId,
             message: 'Waiting for the other user to accept'
           });
         }
       } catch (error) {
         console.error('Error handling match acceptance:', error);
-        socket.emit('match_error', {
+        socket.emit('error', {
           message: 'Error processing your response'
         });
       }
     });
     
     // Handle match rejection
-    socket.on('reject_match', ({ matchId }) => {
+    socket.on('match:reject', ({ matchId }) => {
       try {
         const userId = socket.user.id;
         console.log(`User ${userId} rejected match ${matchId}`);
         
         if (!activeMatches.has(matchId)) {
-          socket.emit('match_error', {
+          socket.emit('error', {
             message: 'Match not found'
           });
           return;
@@ -556,7 +560,7 @@ const initializeSocket = (io) => {
         
         // Notify the other user about the rejection
         if (otherUserSocketId) {
-          io.to(otherUserSocketId).emit('match_rejected', {
+          io.to(otherUserSocketId).emit('match:rejected', {
               matchId,
             rejectedBy: userId,
             message: 'The other user rejected the match'
@@ -612,14 +616,14 @@ const initializeSocket = (io) => {
         clearMatchmakingTimeouts(otherUserId);
       } catch (error) {
         console.error('Error handling match rejection:', error);
-        socket.emit('match_error', {
+        socket.emit('error', {
           message: 'Error processing your response'
         });
       }
     });
     
     // Handle cancel matchmaking
-    socket.on('cancel_matchmaking', () => {
+    socket.on('match:cancel', () => {
       const userId = socket.user.id;
       console.log(`User ${userId} cancelled matchmaking`);
       
@@ -629,7 +633,7 @@ const initializeSocket = (io) => {
       // Clear any matchmaking timeouts
       clearMatchmakingTimeouts(userId);
       
-      socket.emit('match_cancelled', {
+      socket.emit('match:cancelled', {
         message: 'Matchmaking cancelled'
       });
     });

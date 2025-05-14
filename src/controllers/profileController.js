@@ -29,6 +29,7 @@ const updateProfile = async (req, res) => {
     if (value.preference) updateData.preference = value.preference;
     if (value.interests) updateData.interests = value.interests;
     if (value.location) updateData.location = value.location;
+    if (value.bio) updateData.bio = value.bio;
     
     // Add updated_at timestamp
     updateData.updated_at = new Date();

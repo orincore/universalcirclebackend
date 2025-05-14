@@ -140,23 +140,98 @@ const getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Get the latest message with each unique user
-    const { data, error } = await supabase.rpc('get_conversations', { 
-      user_id: userId 
-    });
+    // First get all accepted matches for the user
+    const { data: matches, error: matchError } = await supabase
+      .from('matches')
+      .select(`
+        id,
+        user1_id,
+        user2_id,
+        user1:user1_id(id, first_name, last_name, username, profile_picture_url),
+        user2:user2_id(id, first_name, last_name, username, profile_picture_url),
+        status,
+        created_at,
+        updated_at,
+        accepted_at
+      `)
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .eq('status', 'accepted')
+      .order('updated_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching conversations:', error);
+    if (matchError) {
+      console.error('Error fetching matches for conversations:', matchError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch conversations'
       });
     }
 
+    // Get the last message for each match if exists
+    const conversations = [];
+    
+    for (const match of matches) {
+      // Determine the other user in the match
+      const otherUserId = match.user1_id === userId ? match.user2_id : match.user1_id;
+      const otherUser = match.user1_id === userId ? match.user2 : match.user1;
+      
+      // Get the last message between these users if any
+      const { data: lastMessages, error: messageError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userId})`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      // Get unread message count
+      const { count: unreadCount, error: countError } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('sender_id', otherUserId)
+        .eq('receiver_id', userId)
+        .eq('is_read', false);
+        
+      if (messageError || countError) {
+        console.error('Error fetching messages for conversation:', messageError || countError);
+        continue; // Skip this conversation but don't fail the whole request
+      }
+      
+      // Format conversation data
+      const conversation = {
+        id: match.id,
+        participants: [userId, otherUserId],
+        updatedAt: lastMessages && lastMessages.length > 0 
+          ? lastMessages[0].created_at 
+          : match.updated_at,
+        lastMessage: lastMessages && lastMessages.length > 0 
+          ? {
+              id: lastMessages[0].id,
+              content: lastMessages[0].content,
+              senderId: lastMessages[0].sender_id,
+              receiverId: lastMessages[0].receiver_id,
+              createdAt: lastMessages[0].created_at,
+              isRead: lastMessages[0].is_read
+            }
+          : null,
+        otherUser: {
+          id: otherUser.id,
+          firstName: otherUser.first_name,
+          lastName: otherUser.last_name,
+          username: otherUser.username,
+          profilePictureUrl: otherUser.profile_picture_url
+        },
+        unreadCount: unreadCount || 0
+      };
+      
+      conversations.push(conversation);
+    }
+    
+    // Sort by most recent activity
+    conversations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
     return res.status(200).json({
       success: true,
       data: {
-        conversations: data
+        conversations
       }
     });
   } catch (error) {

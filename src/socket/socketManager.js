@@ -580,7 +580,7 @@ const initializeSocket = (io) => {
                   interests: socket.user.interests,
                   joinedAt: new Date()
                 });
-                socket.emit('match_searching', { message: 'Searching for a new match...' });
+                socket.emit('match:waiting', { message: 'Searching for a new match...' });
                 findMatchForUser(userSocket);
               }
             }, 1000);
@@ -600,7 +600,7 @@ const initializeSocket = (io) => {
                   interests: otherSocket.user.interests,
                   joinedAt: new Date()
                 });
-                io.to(otherUserSocketId).emit('match_searching', { message: 'Searching for a new match...' });
+                io.to(otherUserSocketId).emit('match:waiting', { message: 'Searching for a new match...' });
                 findMatchForUser(otherSocket);
               }
             }, 1000);
@@ -845,13 +845,13 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
   const socket2 = connectedUsers.get(user2.id);
   
   if (socket1) {
-    ioInstance.to(socket1).emit('match_found', { match: user1MatchData });
-    console.log(`Notified user ${user1.id} about match with ${user2.id}`);
+    ioInstance.to(socket1).emit('match:found', { match: user1MatchData });
+    console.log(`Notified user ${user1.id} about match with ${user2.id} using match:found event`);
   }
   
   if (socket2) {
-    ioInstance.to(socket2).emit('match_found', { match: user2MatchData });
-    console.log(`Notified user ${user2.id} about match with ${user1.id}`);
+    ioInstance.to(socket2).emit('match:found', { match: user2MatchData });
+    console.log(`Notified user ${user2.id} about match with ${user1.id} using match:found event`);
   }
   
   return matchId;
@@ -890,7 +890,10 @@ const findMatchForUser = (socket) => {
     
     if (userInterests.length === 0) {
       console.log(`User ${userId} has no interests. Cannot find match.`);
-      socket.emit('match_error', { message: 'You need to add interests to your profile before matchmaking' });
+      socket.emit('error', { 
+        source: 'findRandomMatch',
+        message: 'You need to add interests to your profile before matchmaking' 
+      });
       return;
     }
     
@@ -970,7 +973,7 @@ const findMatchForUser = (socket) => {
             matchData.users.forEach(userId => {
               const socketId = connectedUsers.get(userId);
               if (socketId) {
-                ioInstance.to(socketId).emit('match_timeout', {
+                ioInstance.to(socketId).emit('match:timeout', {
                   matchId,
                   message: 'Match timed out due to no response'
                 });
@@ -988,7 +991,7 @@ const findMatchForUser = (socket) => {
                   
                   // Find new match
                   setTimeout(() => {
-                    ioInstance.to(socketId).emit('match_searching', { message: 'Searching for a new match...' });
+                    ioInstance.to(socketId).emit('match:waiting', { message: 'Searching for a new match...' });
                     findMatchForUser(userSocket);
                   }, 1000);
                 }
@@ -1006,13 +1009,13 @@ const findMatchForUser = (socket) => {
       userTimeouts.set(bestMatch.userId, timeoutId);
     } else {
       console.log(`No suitable matches found for user ${userId}`);
-      socket.emit('match_not_found', { message: 'No suitable matches found at this time' });
+      socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
       
       // Set a timeout to try again after delay
       const timeoutId = setTimeout(() => {
         if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
           console.log(`Retrying match for user ${userId}`);
-          socket.emit('match_searching', { message: 'Searching for a match...' });
+          socket.emit('match:waiting', { message: 'Searching for a match...' });
           findMatchForUser(socket);
         }
       }, 10000); // Try again in 10 seconds
@@ -1021,7 +1024,10 @@ const findMatchForUser = (socket) => {
     }
   } catch (error) {
     console.error('Error finding match:', error);
-    socket.emit('match_error', { message: 'Server error finding a match' });
+    socket.emit('error', { 
+      source: 'findRandomMatch',
+      message: 'Server error finding a match' 
+    });
   }
 };
 

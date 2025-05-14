@@ -344,7 +344,7 @@ const initializeSocket = (io) => {
         const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
         
         if (bothAccepted) {
-          console.log(`Match ${matchId} accepted by both users`);
+          console.log(`Match ${matchId} accepted by both users! Creating chat room with ID: match_${matchId}`);
           
           // Get both user ids
           const [user1Id, user2Id] = matchData.users;
@@ -423,6 +423,34 @@ const initializeSocket = (io) => {
         
         // Clean up
         activeMatches.delete(matchId);
+        
+        // Put both users back in the matchmaking pool after a short delay
+        setTimeout(() => {
+          matchData.users.forEach(userId => {
+            const socketId = connectedUsers.get(userId);
+            if (socketId && connectedUsers.has(userId)) {
+              const userSocket = io.sockets.sockets.get(socketId);
+              if (userSocket) {
+                // Add user back to matchmaking pool
+                matchmakingPool.set(userId, {
+                  userId,
+                  socketId,
+                  user: userSocket.user,
+                  interests: userSocket.user.interests,
+                  joinedAt: new Date()
+                });
+                
+                // Notify user about restarting matchmaking
+                io.to(socketId).emit('match:waiting', { 
+                  message: 'Other user declined. Searching for a new match...' 
+                });
+                
+                // Restart matchmaking for this user
+                findMatchForUser(userSocket);
+              }
+            }
+          });
+        }, 1000);
       } catch (error) {
         console.error('Error rejecting match:', error);
         socket.emit('error', {
@@ -498,7 +526,7 @@ const initializeSocket = (io) => {
         const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
         
         if (bothAccepted) {
-          console.log(`Match ${matchId} accepted by both users`);
+          console.log(`Match ${matchId} accepted by both users! Creating chat room with ID: match_${matchId}`);
           
           // Get both user ids
           const [user1Id, user2Id] = matchData.users;
@@ -585,50 +613,51 @@ const initializeSocket = (io) => {
         // Clean up
         activeMatches.delete(matchId);
         
-        // Put both users back in the matchmaking pool
-        if (connectedUsers.has(userId)) {
-          const userSocket = io.sockets.sockets.get(socket.id);
-          if (userSocket) {
-            // Add back to pool after a short delay
-            setTimeout(() => {
-              if (connectedUsers.has(userId)) {
-                matchmakingPool.set(userId, {
-                  userId,
-                  socketId: socket.id,
-                  user: socket.user,
-                  interests: socket.user.interests,
-                  joinedAt: new Date()
-                });
-                socket.emit('match:waiting', { message: 'Searching for a new match...' });
-                findMatchForUser(userSocket);
-              }
-            }, 1000);
+        // Put both users back in the matchmaking pool after a short delay
+        setTimeout(() => {
+          // Handle current user
+          if (connectedUsers.has(userId)) {
+            const userSocket = io.sockets.sockets.get(socket.id);
+            if (userSocket) {
+              matchmakingPool.set(userId, {
+                userId,
+                socketId: socket.id,
+                user: socket.user,
+                interests: socket.user.interests,
+                joinedAt: new Date()
+              });
+              
+              socket.emit('match:waiting', { message: 'Searching for a new match...' });
+              findMatchForUser(userSocket);
+              console.log(`Restarted matchmaking for user ${userId} after rejection`);
+            }
           }
-        }
-        
-        if (otherUserSocketId && connectedUsers.has(otherUserId)) {
-          const otherSocket = io.sockets.sockets.get(otherUserSocketId);
-          if (otherSocket) {
-            // Add back to pool after a short delay
-            setTimeout(() => {
-              if (connectedUsers.has(otherUserId)) {
-                matchmakingPool.set(otherUserId, {
-                  userId: otherUserId,
-                  socketId: otherUserSocketId,
-                  user: otherSocket.user,
-                  interests: otherSocket.user.interests,
-                  joinedAt: new Date()
-                });
-                io.to(otherUserSocketId).emit('match:waiting', { message: 'Searching for a new match...' });
-                findMatchForUser(otherSocket);
-              }
-            }, 1000);
+          
+          // Handle other user
+          if (otherUserSocketId && connectedUsers.has(otherUserId)) {
+            const otherSocket = io.sockets.sockets.get(otherUserSocketId);
+            if (otherSocket) {
+              matchmakingPool.set(otherUserId, {
+                userId: otherUserId,
+                socketId: otherUserSocketId,
+                user: otherSocket.user,
+                interests: otherSocket.user.interests,
+                joinedAt: new Date()
+              });
+              
+              io.to(otherUserSocketId).emit('match:waiting', { 
+                message: 'Other user declined. Searching for a new match...' 
+              });
+              
+              findMatchForUser(otherSocket);
+              console.log(`Restarted matchmaking for user ${otherUserId} after rejection by ${userId}`);
+            }
           }
-        }
-        
-        // Clear any pending timeouts
-        clearMatchmakingTimeouts(userId);
-        clearMatchmakingTimeouts(otherUserId);
+          
+          // Clear any pending timeouts
+          clearMatchmakingTimeouts(userId);
+          clearMatchmakingTimeouts(otherUserId);
+        }, 1000);
       } catch (error) {
         console.error('Error handling match rejection:', error);
         socket.emit('error', {

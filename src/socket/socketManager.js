@@ -1675,10 +1675,7 @@ const initializeSocket = (io) => {
             receiver_id,
             is_read,
             created_at,
-            updated_at,
-            is_edited,
-            reply_to_message_id,
-            reply_to_content
+            updated_at
           `)
           .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
           .order('created_at', { ascending: false })
@@ -1820,10 +1817,7 @@ const initializeSocket = (io) => {
             user_id,
             content,
             media_url,
-            created_at,
-            is_edited,
-            reply_to_message_id,
-            reply_to_content
+            created_at
           `)
           .eq('match_id', matchId)
           .order('created_at', { ascending: false })

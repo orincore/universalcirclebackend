@@ -994,18 +994,28 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
   const user1MatchData = createMatchData(user2, sharedInterests, matchId);
   const user2MatchData = createMatchData(user1, sharedInterests, matchId);
   
-  // Emit match found event to both users
-  const socket1 = connectedUsers.get(user1.id);
-  const socket2 = connectedUsers.get(user2.id);
+  // Get socket IDs directly from the connectedUsers map
+  const socket1Id = connectedUsers.get(user1.id);
+  const socket2Id = connectedUsers.get(user2.id);
   
-  if (socket1) {
-    ioInstance.to(socket1).emit('match:found', { match: user1MatchData });
+  console.log(`User 1 (${user1.id}) socket ID: ${socket1Id || 'not found'}`);
+  console.log(`User 2 (${user2.id}) socket ID: ${socket2Id || 'not found'}`);
+  
+  // Emit match found event to both users
+  if (socket1Id) {
+    ioInstance.to(socket1Id).emit('match:found', { match: user1MatchData });
     console.log(`Notified user ${user1.id} about match with ${user2.id} using match:found event`);
+    console.log(`Emitted data: ${JSON.stringify({ match: user1MatchData })}`);
+  } else {
+    console.error(`Failed to notify user ${user1.id}: Socket ID not found`);
   }
   
-  if (socket2) {
-    ioInstance.to(socket2).emit('match:found', { match: user2MatchData });
+  if (socket2Id) {
+    ioInstance.to(socket2Id).emit('match:found', { match: user2MatchData });
     console.log(`Notified user ${user2.id} about match with ${user1.id} using match:found event`);
+    console.log(`Emitted data: ${JSON.stringify({ match: user2MatchData })}`);
+  } else {
+    console.error(`Failed to notify user ${user2.id}: Socket ID not found`);
   }
   
   return matchId;
@@ -1017,8 +1027,8 @@ const createMatchData = (otherUser, sharedInterests, matchId) => {
   const sanitizedUser = {
     id: otherUser.id,
     username: otherUser.username || 'Anonymous',
-    name: otherUser.name || otherUser.username || 'User',
-    profilePicture: otherUser.profilePicture || null,
+    name: otherUser.name || otherUser.first_name || otherUser.username || 'User',
+    profilePicture: otherUser.profilePicture || otherUser.profile_picture_url || null,
     bio: otherUser.bio || null,
     interests: otherUser.interests || []
   };

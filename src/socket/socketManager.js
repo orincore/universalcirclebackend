@@ -1052,6 +1052,11 @@ const findMatchForUser = (socket) => {
       return;
     }
     
+    // Mark this user as being processed
+    const userPoolData = matchmakingPool.get(userId);
+    userPoolData.isBeingProcessed = true;
+    matchmakingPool.set(userId, userPoolData);
+    
     const userInterests = socket.user.interests || [];
     
     if (userInterests.length === 0) {
@@ -1060,6 +1065,9 @@ const findMatchForUser = (socket) => {
         source: 'findRandomMatch',
         message: 'You need to add interests to your profile before matchmaking' 
       });
+      // Reset processing flag
+      userPoolData.isBeingProcessed = false;
+      matchmakingPool.set(userId, userPoolData);
       return;
     }
     
@@ -1068,13 +1076,8 @@ const findMatchForUser = (socket) => {
     // Debug: Log all users in matchmaking pool
     console.log(`Current matchmaking pool size: ${matchmakingPool.size}`);
     for (const [poolUserId, poolUser] of matchmakingPool.entries()) {
-      console.log(`Pool user ${poolUserId} with interests: ${poolUser.interests ? poolUser.interests.join(', ') : 'none'}`);
-      
-      // Specific debug for the user mentioned in the issue
-      if (userId === '8bf5ac3f-31fd-4bed-95b9-4372cfd5f50c' || poolUserId === '8bf5ac3f-31fd-4bed-95b9-4372cfd5f50c') {
-        console.log(`Debug: Comparing user ${userId} with pool user ${poolUserId}`);
-        console.log(`Debug: User interests: ${userInterests.join(', ')}`);
-        console.log(`Debug: Pool user interests: ${poolUser.interests ? poolUser.interests.join(', ') : 'none'}`);
+      if (poolUserId !== userId) {
+        console.log(`Pool user ${poolUserId} with interests: ${poolUser.interests ? poolUser.interests.join(', ') : 'none'}`);
       }
     }
     
@@ -1088,41 +1091,39 @@ const findMatchForUser = (socket) => {
       
       const otherUserInterests = otherUser.interests || [];
       
+      // Skip users with no interests
+      if (otherUserInterests.length === 0) continue;
+      
       // Find shared interests (case-insensitive comparison)
-      const sharedInterests = userInterests.filter(interest => 
-        otherUserInterests.some(otherInterest => 
-          otherInterest.toLowerCase() === interest.toLowerCase()
-        )
-      );
+      const sharedInterests = [];
+      for (const interest of userInterests) {
+        for (const otherInterest of otherUserInterests) {
+          if (interest.toLowerCase() === otherInterest.toLowerCase() && 
+              !sharedInterests.includes(interest)) {
+            sharedInterests.push(interest);
+          }
+        }
+      }
       
       // Only consider matches with at least one shared interest
       if (sharedInterests.length > 0) {
+        console.log(`Found ${sharedInterests.length} shared interests between users ${userId} and ${otherUserId}: ${sharedInterests.join(', ')}`);
+        
+        // Calculate compatibility score (higher with more shared interests)
+        const userScore = sharedInterests.length / userInterests.length;
+        const otherUserScore = sharedInterests.length / otherUserInterests.length;
+        
+        // Average of both scores weighted by interest count
+        const combinedScore = ((userScore + otherUserScore) / 2) * 100;
+        
         potentialMatches.push({
           userId: otherUserId,
           socketId: otherUser.socketId,
           user: otherUser.user,
           sharedInterests,
-          score: sharedInterests.length // Score based on number of shared interests
+          score: combinedScore // Better scoring based on relative interest match
         });
       }
-    }
-    
-    // Special case for specific user IDs - force a match to help debug
-    if ((userId === '8bf5ac3f-31fd-4bed-95b9-4372cfd5f50c' && otherUserId === '2e0bc60b-42da-46a8-9bcd-b7682921fdbe') ||
-        (userId === '2e0bc60b-42da-46a8-9bcd-b7682921fdbe' && otherUserId === '8bf5ac3f-31fd-4bed-95b9-4372cfd5f50c')) {
-      console.log('DEBUG: Force-matching the specific users mentioned in the issue');
-      
-      // Create dummy shared interests if none exist
-      const forcedInterests = sharedInterests.length > 0 ? sharedInterests : ['Forced Match', 'Debugging'];
-      
-      // Add with high score to ensure it's selected
-      potentialMatches.push({
-        userId: otherUserId,
-        socketId: otherUser.socketId,
-        user: otherUser.user,
-        sharedInterests: forcedInterests,
-        score: 1000 // Very high score to ensure selection
-      });
     }
     
     // Sort by score (highest first)
@@ -1131,14 +1132,24 @@ const findMatchForUser = (socket) => {
     if (potentialMatches.length > 0) {
       // Get the best match
       const bestMatch = potentialMatches[0];
-      console.log(`Found best match for user ${userId}: ${bestMatch.userId} with ${bestMatch.score} shared interests`);
+      console.log(`Found best match for user ${userId}: ${bestMatch.userId} with score ${bestMatch.score.toFixed(2)} and ${bestMatch.sharedInterests.length} shared interests`);
       
       // Generate a match ID
       const matchId = uuidv4();
       
+      // Get match data for the other user
+      const matchUser = matchmakingPool.get(bestMatch.userId);
+      if (!matchUser) {
+        console.log(`Selected match ${bestMatch.userId} is no longer in the pool. Skipping.`);
+        // Reset processing flag
+        userPoolData.isBeingProcessed = false;
+        matchmakingPool.set(userId, userPoolData);
+        return;
+      }
+      
       // Mark both users as being processed
-      matchmakingPool.get(userId).isBeingProcessed = true;
-      matchmakingPool.get(bestMatch.userId).isBeingProcessed = true;
+      matchUser.isBeingProcessed = true;
+      matchmakingPool.set(bestMatch.userId, matchUser);
       
       // Create active match record
       activeMatches.set(matchId, {
@@ -1151,7 +1162,7 @@ const findMatchForUser = (socket) => {
         createdAt: new Date()
       });
       
-      console.log(`Created active match with ID: ${matchId} (type: ${typeof matchId})`);
+      console.log(`Created active match with ID: ${matchId}`);
       
       // Remove both users from matchmaking pool
       matchmakingPool.delete(userId);
@@ -1160,6 +1171,24 @@ const findMatchForUser = (socket) => {
       // Get sockets for both users
       const user1Socket = socket;
       const user2Socket = ioInstance.sockets.sockets.get(bestMatch.socketId);
+      
+      if (!user2Socket) {
+        console.log(`Could not find socket for user ${bestMatch.userId}. Aborting match.`);
+        
+        // Put the first user back in pool
+        matchmakingPool.set(userId, {
+          userId,
+          socketId: socket.id,
+          user: socket.user,
+          interests: userInterests,
+          joinedAt: new Date(),
+          isBeingProcessed: false
+        });
+        
+        // Clean up match data
+        activeMatches.delete(matchId);
+        return;
+      }
       
       // Notify both users
       const createdMatchId = notifyMatchFound(user1Socket.user, user2Socket.user, bestMatch.sharedInterests);
@@ -1194,7 +1223,8 @@ const findMatchForUser = (socket) => {
                     socketId,
                     user: userSocket.user,
                     interests: userSocket.user.interests,
-                    joinedAt: new Date()
+                    joinedAt: new Date(),
+                    isBeingProcessed: false
                   });
                   
                   // Find new match
@@ -1215,12 +1245,13 @@ const findMatchForUser = (socket) => {
       // Store timeout IDs for both users
       userTimeouts.set(userId, timeoutId);
       userTimeouts.set(bestMatch.userId, timeoutId);
-      
-      // Store the match ID relation for reference
-      console.log(`Storing timeout relation - uuidMatchId: ${createdMatchId}, originalMatchId: ${matchId}`);
     } else {
       console.log(`No suitable matches found for user ${userId}`);
       socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
+      
+      // Reset processing flag but keep in matchmaking pool
+      userPoolData.isBeingProcessed = false;
+      matchmakingPool.set(userId, userPoolData);
       
       // Set a timeout to try again after delay
       const timeoutId = setTimeout(() => {
@@ -1239,6 +1270,14 @@ const findMatchForUser = (socket) => {
       source: 'findRandomMatch',
       message: 'Server error finding a match' 
     });
+    
+    // If user exists in pool, reset processing flag
+    const userId = socket.user.id;
+    if (matchmakingPool.has(userId)) {
+      const userPoolData = matchmakingPool.get(userId);
+      userPoolData.isBeingProcessed = false;
+      matchmakingPool.set(userId, userPoolData);
+    }
   }
 };
 

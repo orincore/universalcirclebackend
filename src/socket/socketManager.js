@@ -344,7 +344,7 @@ const initializeSocket = (io) => {
         const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
         
         if (bothAccepted) {
-          console.log(`Match ${matchId} accepted by both users! Creating chat room with ID: match_${matchId}`);
+          console.log(`Match ${matchId} accepted by both users! Creating chat room with ID: ${matchId}`);
           
           // Get both user ids
           const [user1Id, user2Id] = matchData.users;
@@ -353,7 +353,7 @@ const initializeSocket = (io) => {
           createMatchInDatabase(matchId, user1Id, user2Id);
           
           // Create a chat room for the match
-          const roomId = `match_${matchId}`;
+          const roomId = matchId;
           
           // Emit match connected to both users
           matchData.users.forEach(userId => {
@@ -526,7 +526,7 @@ const initializeSocket = (io) => {
         const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
         
         if (bothAccepted) {
-          console.log(`Match ${matchId} accepted by both users! Creating chat room with ID: match_${matchId}`);
+          console.log(`Match ${matchId} accepted by both users! Creating chat room with ID: ${matchId}`);
           
           // Get both user ids
           const [user1Id, user2Id] = matchData.users;
@@ -535,7 +535,7 @@ const initializeSocket = (io) => {
           createMatchInDatabase(matchId, user1Id, user2Id);
           
           // Create a chat room for the match
-          const roomId = `match_${matchId}`;
+          const roomId = matchId;
           
           // Emit match confirmed to both users
           matchData.users.forEach(userId => {
@@ -682,6 +682,37 @@ const initializeSocket = (io) => {
       });
     });
     
+    // Handle messages in match rooms
+    socket.on('match:message', (data) => {
+      try {
+        const { matchId, message } = data;
+        const userId = socket.user.id;
+        
+        console.log(`User ${userId} sending message in match room ${matchId}: ${message}`);
+        
+        // Emit the message to the match room
+        socket.to(matchId).emit('match:message', {
+          senderId: userId,
+          senderName: socket.user.username || 'User',
+          message,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Send confirmation to sender
+        socket.emit('match:messageSent', {
+          matchId,
+          message,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error sending match message:', error);
+        socket.emit('error', {
+          source: 'match:message',
+          message: 'Failed to send message'
+        });
+      }
+    });
+    
     // Disconnect handler with cleanup
     socket.on('disconnect', () => {
       const userId = socket.user.id;
@@ -780,7 +811,7 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
           status: 'accepted',
           compatibility_score: 100, // Default score for accepted matches
           shared_interests: matchData?.sharedInterests || [],
-          chat_room_id: `match_${matchId}`,
+          chat_room_id: matchId,
           updated_at: currentTime,
           accepted_at: currentTime
         })
@@ -813,7 +844,7 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
         status: 'accepted',
           compatibility_score: 100, // Default score for accepted matches
           shared_interests: matchData?.sharedInterests || [],
-          chat_room_id: `match_${matchId}`,
+          chat_room_id: matchId,
           created_at: currentTime,
           updated_at: currentTime,
           accepted_at: currentTime
@@ -866,8 +897,9 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
  * @param {array} sharedInterests - Array of shared interests
  */
 const notifyMatchFound = (user1, user2, sharedInterests) => {
-  // Create a unique match ID
-  const matchId = `match_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  // Create a unique match ID using UUID
+  const matchId = uuidv4();
+  console.log(`Generated UUID match ID: ${matchId}`);
   
   // Add to active matches with appropriate data
   activeMatches.set(matchId, {
@@ -996,6 +1028,8 @@ const findMatchForUser = (socket) => {
         createdAt: new Date()
       });
       
+      console.log(`Created active match with ID: ${matchId} (type: ${typeof matchId})`);
+      
       // Remove both users from matchmaking pool
       matchmakingPool.delete(userId);
       matchmakingPool.delete(bestMatch.userId);
@@ -1005,24 +1039,27 @@ const findMatchForUser = (socket) => {
       const user2Socket = ioInstance.sockets.sockets.get(bestMatch.socketId);
       
       // Notify both users
-      notifyMatchFound(user1Socket.user, user2Socket.user, bestMatch.sharedInterests);
+      const createdMatchId = notifyMatchFound(user1Socket.user, user2Socket.user, bestMatch.sharedInterests);
+      
+      // Use the returned match ID for the timeout to ensure consistency
+      console.log(`Using match ID for timeout: ${createdMatchId}`);
       
       // Set timeout for match acceptance
       const timeoutId = setTimeout(() => {
         // Check if match still exists and hasn't been fully accepted
-        if (activeMatches.has(matchId)) {
-          const matchData = activeMatches.get(matchId);
+        if (activeMatches.has(createdMatchId)) {
+          const matchData = activeMatches.get(createdMatchId);
           const bothAccepted = Object.values(matchData.acceptances).every(status => status === true);
           
           if (!bothAccepted) {
-            console.log(`Match ${matchId} timed out`);
+            console.log(`Match ${createdMatchId} timed out`);
             
             // Notify both users
             matchData.users.forEach(userId => {
               const socketId = connectedUsers.get(userId);
               if (socketId) {
                 ioInstance.to(socketId).emit('match:timeout', {
-                  matchId,
+                  matchId: createdMatchId,
                   message: 'Match timed out due to no response'
                 });
                 
@@ -1047,7 +1084,7 @@ const findMatchForUser = (socket) => {
             });
             
             // Clean up the match
-            activeMatches.delete(matchId);
+            activeMatches.delete(createdMatchId);
           }
         }
       }, MATCH_ACCEPTANCE_TIMEOUT);
@@ -1055,6 +1092,9 @@ const findMatchForUser = (socket) => {
       // Store timeout IDs for both users
       userTimeouts.set(userId, timeoutId);
       userTimeouts.set(bestMatch.userId, timeoutId);
+      
+      // Store the match ID relation for reference
+      console.log(`Storing timeout relation - uuidMatchId: ${createdMatchId}, originalMatchId: ${matchId}`);
     } else {
       console.log(`No suitable matches found for user ${userId}`);
       socket.emit('match:notFound', { message: 'No suitable matches found at this time' });

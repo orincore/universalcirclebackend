@@ -976,17 +976,22 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
       console.error('Error checking for existing match:', queryError);
     }
     
+    // Get the match data from active matches if it exists
+    let matchData = null;
+    if (activeMatches.has(matchId)) {
+      matchData = activeMatches.get(matchId);
+    }
+    
+    const currentTime = new Date();
+    let dbMatchId = matchId; // Store the DB match ID, initialize with our UUID
+    
     // If a match already exists, update it instead of creating a new one
     if (existingMatch && existingMatch.length > 0) {
       console.log(`Match already exists between users ${user1Id} and ${user2Id}, updating existing match`);
       
-      // Get the match data from active matches if it exists
-      let matchData = null;
-      if (activeMatches.has(matchId)) {
-        matchData = activeMatches.get(matchId);
-      }
-      
-      const currentTime = new Date();
+      // Store the existing match ID from the database for reference
+      dbMatchId = existingMatch[0].id;
+      console.log(`Using existing database match ID: ${dbMatchId}`);
       
       const { data, error } = await supabase
         .from('matches')
@@ -994,40 +999,30 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
           status: 'accepted',
           compatibility_score: 100, // Default score for accepted matches
           shared_interests: matchData?.sharedInterests || [],
-          chat_room_id: matchId,
+          chat_room_id: matchId, // Use our UUID for the chat room
           updated_at: currentTime,
           accepted_at: currentTime
         })
-        .eq('id', existingMatch[0].id);
+        .eq('id', dbMatchId);
         
       if (error) {
         console.error('Error updating existing match in database:', error);
         return { success: false, error };
       }
       
-      console.log(`Successfully updated existing match in database: ${existingMatch[0].id}`);
-      
-      // Use the existing match ID for updates
-      matchId = existingMatch[0].id;
+      console.log(`Successfully updated existing match in database: ${dbMatchId}`);
     } else {
-      // Get the match data from active matches if it exists
-      let matchData = null;
-      if (activeMatches.has(matchId)) {
-        matchData = activeMatches.get(matchId);
-      }
-      
-      const currentTime = new Date();
-      
+      // Insert a new match
       const { data, error } = await supabase
       .from('matches')
       .insert({
-        id: matchId,
+        id: matchId, // Use our UUID for the match ID
         user1_id: user1Id,
         user2_id: user2Id,
         status: 'accepted',
           compatibility_score: 100, // Default score for accepted matches
           shared_interests: matchData?.sharedInterests || [],
-          chat_room_id: matchId,
+          chat_room_id: matchId, // Use our UUID for the chat room
           created_at: currentTime,
           updated_at: currentTime,
           accepted_at: currentTime
@@ -1041,11 +1036,14 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
       console.log(`Successfully created match record in database: ${matchId}`);
     }
     
+    // Always use the UUID for updating user records
+    console.log(`Updating users with match ID: ${matchId} (uuid format)`);
+    
     // Update user records to indicate they're in a match
     const updateUser1 = await supabase
       .from('users')
       .update({
-        current_match_id: matchId,
+        current_match_id: matchId, // Use the UUID matchId for the user record
         updated_at: new Date()
       })
       .eq('id', user1Id);
@@ -1053,7 +1051,7 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
     const updateUser2 = await supabase
       .from('users')
       .update({
-        current_match_id: matchId,
+        current_match_id: matchId, // Use the UUID matchId for the user record
         updated_at: new Date()
       })
       .eq('id', user2Id);
@@ -1066,7 +1064,7 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
       console.error(`Error updating user ${user2Id} with match:`, updateUser2.error);
     }
     
-    return { success: true };
+    return { success: true, matchId };
   } catch (error) {
     console.error('Error creating match in database:', error);
     return { success: false, error };

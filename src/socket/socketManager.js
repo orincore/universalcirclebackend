@@ -809,13 +809,39 @@ const initializeSocket = (io) => {
         if (matchData.users.includes(userId)) {
           // Notify the other user about disconnection
           const otherUserId = matchData.users.find(id => id !== userId);
-          const otherSocketId = connectedUsers.get(otherUserId);
-          
-          if (otherSocketId) {
-            io.to(otherSocketId).emit('match:disconnected', {
-              matchId,
-              message: 'The other user disconnected'
-            });
+          if (otherUserId) {
+            const otherSocketId = connectedUsers.get(otherUserId);
+            
+            if (otherSocketId) {
+              io.to(otherSocketId).emit('match:disconnected', {
+                matchId,
+                message: 'The other user disconnected'
+              });
+              
+              // Put the other user back in matchmaking pool if they're still connected
+              const otherUserSocket = io.sockets.sockets.get(otherSocketId);
+              if (otherUserSocket) {
+                console.log(`Returning user ${otherUserId} to matchmaking pool after match partner disconnected`);
+                matchmakingPool.set(otherUserId, {
+                  userId: otherUserId,
+                  socketId: otherSocketId,
+                  user: otherUserSocket.user,
+                  interests: otherUserSocket.user.interests,
+                  joinedAt: new Date(),
+                  isBeingProcessed: false
+                });
+                
+                // Let them know we're searching again
+                io.to(otherSocketId).emit('match:waiting', { 
+                  message: 'Other user disconnected. Searching for a new match...' 
+                });
+                
+                // Start matchmaking for this user again
+                setTimeout(() => {
+                  findMatchForUser(otherUserSocket);
+                }, 1000);
+              }
+            }
           }
           
           // Clean up the match
@@ -1001,21 +1027,73 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
   console.log(`User 1 (${user1.id}) socket ID: ${socket1Id || 'not found'}`);
   console.log(`User 2 (${user2.id}) socket ID: ${socket2Id || 'not found'}`);
   
+  let bothNotified = true;
+  
   // Emit match found event to both users
   if (socket1Id) {
-    ioInstance.to(socket1Id).emit('match:found', { match: user1MatchData });
-    console.log(`Notified user ${user1.id} about match with ${user2.id} using match:found event`);
-    console.log(`Emitted data: ${JSON.stringify({ match: user1MatchData })}`);
+    // Double check that socket is valid
+    const socket1 = ioInstance.sockets.sockets.get(socket1Id);
+    if (socket1) {
+      ioInstance.to(socket1Id).emit('match:found', { match: user1MatchData });
+      console.log(`Notified user ${user1.id} about match with ${user2.id} using match:found event`);
+      console.log(`Emitted data: ${JSON.stringify({ match: user1MatchData })}`);
+    } else {
+      console.error(`Failed to notify user ${user1.id}: Socket exists in map but is invalid`);
+      bothNotified = false;
+    }
   } else {
     console.error(`Failed to notify user ${user1.id}: Socket ID not found`);
+    bothNotified = false;
   }
   
   if (socket2Id) {
-    ioInstance.to(socket2Id).emit('match:found', { match: user2MatchData });
-    console.log(`Notified user ${user2.id} about match with ${user1.id} using match:found event`);
-    console.log(`Emitted data: ${JSON.stringify({ match: user2MatchData })}`);
+    // Double check that socket is valid
+    const socket2 = ioInstance.sockets.sockets.get(socket2Id);
+    if (socket2) {
+      ioInstance.to(socket2Id).emit('match:found', { match: user2MatchData });
+      console.log(`Notified user ${user2.id} about match with ${user1.id} using match:found event`);
+      console.log(`Emitted data: ${JSON.stringify({ match: user2MatchData })}`);
+    } else {
+      console.error(`Failed to notify user ${user2.id}: Socket exists in map but is invalid`);
+      bothNotified = false;
+    }
   } else {
     console.error(`Failed to notify user ${user2.id}: Socket ID not found`);
+    bothNotified = false;
+  }
+  
+  // If either user couldn't be notified, put them back in the matchmaking pool
+  if (!bothNotified) {
+    // Clean up the match
+    activeMatches.delete(matchId);
+    
+    // Check user 1 socket
+    const socket1 = socket1Id ? ioInstance.sockets.sockets.get(socket1Id) : null;
+    if (socket1) {
+      console.log(`Returning user ${user1.id} to matchmaking pool due to notification failure`);
+      matchmakingPool.set(user1.id, {
+        userId: user1.id,
+        socketId: socket1Id,
+        user: user1,
+        interests: user1.interests,
+        joinedAt: new Date(),
+        isBeingProcessed: false
+      });
+    }
+    
+    // Check user 2 socket
+    const socket2 = socket2Id ? ioInstance.sockets.sockets.get(socket2Id) : null;
+    if (socket2) {
+      console.log(`Returning user ${user2.id} to matchmaking pool due to notification failure`);
+      matchmakingPool.set(user2.id, {
+        userId: user2.id,
+        socketId: socket2Id,
+        user: user2,
+        interests: user2.interests,
+        joinedAt: new Date(),
+        isBeingProcessed: false
+      });
+    }
   }
   
   return matchId;
@@ -1099,6 +1177,28 @@ const findMatchForUser = (socket) => {
       // Skip self
       if (otherUserId === userId) continue;
       
+      // Skip users that are already being processed
+      if (otherUser.isBeingProcessed) {
+        console.log(`Skipping user ${otherUserId} as they are already being processed`);
+        continue;
+      }
+      
+      // Verify that the other user has a valid socket connection
+      if (!connectedUsers.has(otherUserId)) {
+        console.log(`User ${otherUserId} is in matchmaking pool but has no socket connection. Removing from pool.`);
+        matchmakingPool.delete(otherUserId);
+        continue;
+      }
+      
+      // Verify that the other user's socket ID is valid
+      const otherUserSocketId = connectedUsers.get(otherUserId);
+      const otherUserSocket = ioInstance.sockets.sockets.get(otherUserSocketId);
+      if (!otherUserSocket) {
+        console.log(`User ${otherUserId} has invalid socket ID ${otherUserSocketId}. Removing from pool.`);
+        matchmakingPool.delete(otherUserId);
+        continue;
+      }
+      
       const otherUserInterests = otherUser.interests || [];
       
       // Skip users with no interests
@@ -1128,7 +1228,7 @@ const findMatchForUser = (socket) => {
         
         potentialMatches.push({
           userId: otherUserId,
-          socketId: otherUser.socketId,
+          socketId: otherUserSocketId,
           user: otherUser.user,
           sharedInterests,
           score: combinedScore // Better scoring based on relative interest match
@@ -1157,6 +1257,24 @@ const findMatchForUser = (socket) => {
         return;
       }
       
+      // Double-check socket connection for both users
+      const user1SocketId = connectedUsers.get(userId);
+      const user2SocketId = connectedUsers.get(bestMatch.userId);
+      
+      if (!user1SocketId || !user2SocketId) {
+        console.log(`One or both users have invalid socket IDs. Cannot create match.`);
+        // Reset processing flag for both users
+        userPoolData.isBeingProcessed = false;
+        matchmakingPool.set(userId, userPoolData);
+        
+        if (matchmakingPool.has(bestMatch.userId)) {
+          const otherUserData = matchmakingPool.get(bestMatch.userId);
+          otherUserData.isBeingProcessed = false;
+          matchmakingPool.set(bestMatch.userId, otherUserData);
+        }
+        return;
+      }
+      
       // Mark both users as being processed
       matchUser.isBeingProcessed = true;
       matchmakingPool.set(bestMatch.userId, matchUser);
@@ -1173,10 +1291,6 @@ const findMatchForUser = (socket) => {
       });
       
       console.log(`Created active match with ID: ${matchId}`);
-      
-      // Remove both users from matchmaking pool
-      matchmakingPool.delete(userId);
-      matchmakingPool.delete(bestMatch.userId);
       
       // Get sockets for both users
       const user1Socket = socket;
@@ -1199,6 +1313,10 @@ const findMatchForUser = (socket) => {
         activeMatches.delete(matchId);
         return;
       }
+      
+      // Remove both users from matchmaking pool
+      matchmakingPool.delete(userId);
+      matchmakingPool.delete(bestMatch.userId);
       
       // Notify both users
       const createdMatchId = notifyMatchFound(user1Socket.user, user2Socket.user, bestMatch.sharedInterests);

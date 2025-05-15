@@ -298,6 +298,760 @@ const initializeSocket = (io) => {
       }
     });
     
+    // Handle messages in match rooms
+    socket.on('match:message', (data) => {
+      try {
+        const { matchId, message } = data;
+        const userId = socket.user.id;
+        
+        console.log(`User ${userId} sending message in match room ${matchId}: ${message}`);
+        
+        // Emit the message to the match room
+        socket.to(matchId).emit('match:message', {
+          senderId: userId,
+          senderName: socket.user.username || 'User',
+          message,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Send confirmation to sender
+        socket.emit('match:messageSent', {
+          matchId,
+          message,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error sending match message:', error);
+        socket.emit('error', {
+          source: 'match:message',
+          message: 'Failed to send message'
+        });
+      }
+    });
+
+    // NEW ENHANCED MESSAGING FEATURES
+
+    // Mark messages as read
+    socket.on('message:markRead', async (data) => {
+      try {
+        const { messageId, conversationId } = data;
+        const userId = socket.user.id;
+        
+        // Update message in database
+        const { data: updatedMessage, error } = await supabase
+          .from('messages')
+          .update({
+            is_read: true,
+            updated_at: new Date()
+          })
+          .eq('id', messageId)
+          .eq('receiver_id', userId) // Safety check to ensure user can only mark messages sent to them
+          .select()
+          .single();
+          
+        if (error) {
+          console.error('Error marking message as read:', error);
+          socket.emit('error', {
+            source: 'message:markRead',
+            message: 'Failed to mark message as read'
+          });
+          return;
+        }
+        
+        // Emit read receipt to sender
+        const senderSocketId = connectedUsers.get(updatedMessage.sender_id);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('message:read', {
+            messageId,
+            conversationId,
+            readAt: updatedMessage.updated_at,
+            readBy: userId
+          });
+        }
+        
+        // Confirm to the reader
+        socket.emit('message:readConfirmed', {
+          messageId,
+          conversationId,
+          readAt: updatedMessage.updated_at
+        });
+          
+      } catch (error) {
+        console.error('Error in message:markRead:', error);
+        socket.emit('error', {
+          source: 'message:markRead',
+          message: 'Server error processing read receipt'
+        });
+      }
+    });
+
+    // Mark all messages in a conversation as read
+    socket.on('message:markAllRead', async (data) => {
+      try {
+        const { conversationId } = data;
+        const userId = socket.user.id;
+        
+        // Find the other user ID from the conversation
+        let otherUserId;
+        if (conversationId.startsWith('conv_')) {
+          // If using conversation IDs in format conv_user1_user2
+          const userIds = conversationId.substring(5).split('_');
+          otherUserId = userIds[0] === userId ? userIds[1] : userIds[0];
+        } else {
+          otherUserId = conversationId; // Direct using user ID
+        }
+        
+        // Update all unread messages in database
+        const { data: updatedMessages, error } = await supabase
+          .from('messages')
+          .update({
+            is_read: true,
+            updated_at: new Date()
+          })
+          .eq('receiver_id', userId)
+          .eq('sender_id', otherUserId)
+          .eq('is_read', false)
+          .select('id');
+          
+        if (error) {
+          console.error('Error marking all messages as read:', error);
+          socket.emit('error', {
+            source: 'message:markAllRead',
+            message: 'Failed to mark messages as read'
+          });
+          return;
+        }
+        
+        const messageIds = updatedMessages.map(msg => msg.id);
+        
+        // Emit read receipt to sender
+        const senderSocketId = connectedUsers.get(otherUserId);
+        if (senderSocketId && messageIds.length > 0) {
+          io.to(senderSocketId).emit('message:allRead', {
+            messageIds,
+            conversationId,
+            readAt: new Date().toISOString(),
+            readBy: userId
+          });
+        }
+        
+        // Confirm to the reader
+        socket.emit('message:allReadConfirmed', {
+          count: messageIds.length,
+          conversationId,
+          readAt: new Date().toISOString()
+        });
+          
+      } catch (error) {
+        console.error('Error in message:markAllRead:', error);
+        socket.emit('error', {
+          source: 'message:markAllRead',
+          message: 'Server error processing read receipts'
+        });
+      }
+    });
+
+    // Edit a message
+    socket.on('message:edit', async (data) => {
+      try {
+        const { messageId, content } = data;
+        const userId = socket.user.id;
+        
+        // First, fetch the message to verify ownership
+        const { data: message, error: fetchError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', messageId)
+          .single();
+          
+        if (fetchError || !message) {
+          console.error('Error fetching message:', fetchError);
+          socket.emit('error', {
+            source: 'message:edit',
+            message: 'Message not found'
+          });
+          return;
+        }
+        
+        // Verify the user is the sender
+        if (message.sender_id !== userId) {
+          socket.emit('error', {
+            source: 'message:edit',
+            message: 'You can only edit your own messages'
+          });
+          return;
+        }
+        
+        // Check if message is too old to edit (optional - for example, 24 hours)
+        const messageTime = new Date(message.created_at).getTime();
+        const currentTime = new Date().getTime();
+        const timeLimit = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        
+        if (currentTime - messageTime > timeLimit) {
+          socket.emit('error', {
+            source: 'message:edit',
+            message: 'Message is too old to edit'
+          });
+          return;
+        }
+        
+        // Update the message
+        const { data: updatedMessage, error: updateError } = await supabase
+          .from('messages')
+          .update({
+            content: content,
+            updated_at: new Date(),
+            is_edited: true
+          })
+          .eq('id', messageId)
+          .select()
+          .single();
+          
+        if (updateError) {
+          console.error('Error updating message:', updateError);
+          socket.emit('error', {
+            source: 'message:edit',
+            message: 'Failed to update message'
+          });
+          return;
+        }
+        
+        // Notify receiver about edit
+        const receiverSocketId = connectedUsers.get(message.receiver_id);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit('message:edited', {
+            messageId,
+            conversationId: message.receiver_id,
+            content: updatedMessage.content,
+            updatedAt: updatedMessage.updated_at
+          });
+        }
+        
+        // Confirm to sender
+        socket.emit('message:editConfirmed', {
+          messageId,
+          conversationId: message.receiver_id,
+          content: updatedMessage.content,
+          updatedAt: updatedMessage.updated_at
+        });
+          
+      } catch (error) {
+        console.error('Error in message:edit:', error);
+        socket.emit('error', {
+          source: 'message:edit',
+          message: 'Server error processing message edit'
+        });
+      }
+    });
+
+    // Delete a message
+    socket.on('message:delete', async (data) => {
+      try {
+        const { messageId, forEveryone = false } = data;
+        const userId = socket.user.id;
+        
+        // First, fetch the message to verify ownership
+        const { data: message, error: fetchError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', messageId)
+          .single();
+          
+        if (fetchError || !message) {
+          console.error('Error fetching message:', fetchError);
+          socket.emit('error', {
+            source: 'message:delete',
+            message: 'Message not found'
+          });
+          return;
+        }
+        
+        // Verify the user is either the sender (can delete for everyone) or receiver (can delete for self)
+        if (message.sender_id !== userId && message.receiver_id !== userId) {
+          socket.emit('error', {
+            source: 'message:delete',
+            message: 'You do not have permission to delete this message'
+          });
+          return;
+        }
+        
+        // Handle delete for everyone (sender only) or delete for self
+        if (forEveryone && message.sender_id === userId) {
+          // Completely delete the message
+          const { error: deleteError } = await supabase
+            .from('messages')
+            .delete()
+            .eq('id', messageId);
+            
+          if (deleteError) {
+            console.error('Error deleting message:', deleteError);
+            socket.emit('error', {
+              source: 'message:delete',
+              message: 'Failed to delete message'
+            });
+            return;
+          }
+          
+          // Notify receiver about deletion
+          const receiverSocketId = connectedUsers.get(message.receiver_id);
+          if (receiverSocketId) {
+            io.to(receiverSocketId).emit('message:deleted', {
+              messageId,
+              conversationId: message.receiver_id, // Using receiver ID as conversation ID
+              deletedBy: userId,
+              deletedForEveryone: true
+            });
+          }
+          
+          // Confirm to sender
+          socket.emit('message:deleteConfirmed', {
+            messageId,
+            conversationId: message.receiver_id,
+            deletedForEveryone: true
+          });
+          
+        } else {
+          // For "delete for self" - keep message but mark as deleted for this user
+          // This requires an additional column in your messages table
+          
+          // Example implementation (you may need to modify based on your schema)
+          const updateField = message.sender_id === userId 
+            ? { deleted_by_sender: true }
+            : { deleted_by_receiver: true };
+            
+          const { error: updateError } = await supabase
+            .from('messages')
+            .update(updateField)
+            .eq('id', messageId);
+            
+          if (updateError) {
+            console.error('Error updating message delete status:', updateError);
+            socket.emit('error', {
+              source: 'message:delete',
+              message: 'Failed to delete message'
+            });
+            return;
+          }
+          
+          // Confirm to user
+          socket.emit('message:deleteConfirmed', {
+            messageId,
+            conversationId: message.sender_id === userId ? message.receiver_id : message.sender_id,
+            deletedForEveryone: false
+          });
+        }
+          
+      } catch (error) {
+        console.error('Error in message:delete:', error);
+        socket.emit('error', {
+          source: 'message:delete',
+          message: 'Server error processing message deletion'
+        });
+      }
+    });
+
+    // Add a reaction to a message
+    socket.on('message:react', async (data) => {
+      try {
+        const { messageId, reaction } = data;
+        const userId = socket.user.id;
+        
+        // First, fetch the message
+        const { data: message, error: fetchError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', messageId)
+          .single();
+          
+        if (fetchError || !message) {
+          console.error('Error fetching message:', fetchError);
+          socket.emit('error', {
+            source: 'message:react',
+            message: 'Message not found'
+          });
+          return;
+        }
+        
+        // Verify user is part of the conversation
+        if (message.sender_id !== userId && message.receiver_id !== userId) {
+          socket.emit('error', {
+            source: 'message:react',
+            message: 'You cannot react to this message'
+          });
+          return;
+        }
+        
+        // Check if message_reactions table exists, if not create it
+        // This assumes you'll add a message_reactions table to your database
+        
+        // Remove any existing reaction from this user
+        await supabase
+          .from('message_reactions')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', userId);
+          
+        // Add the new reaction (if not null/empty)
+        let reactionData = null;
+        
+        if (reaction) {
+          const { data: newReaction, error: insertError } = await supabase
+            .from('message_reactions')
+            .insert({
+              message_id: messageId,
+              user_id: userId,
+              reaction: reaction,
+              created_at: new Date()
+            })
+            .select()
+            .single();
+            
+          if (insertError) {
+            console.error('Error adding reaction:', insertError);
+            socket.emit('error', {
+              source: 'message:react',
+              message: 'Failed to add reaction'
+            });
+            return;
+          }
+          
+          reactionData = newReaction;
+        }
+        
+        // Get all reactions for this message
+        const { data: allReactions, error: reactionsError } = await supabase
+          .from('message_reactions')
+          .select('*')
+          .eq('message_id', messageId);
+          
+        if (reactionsError) {
+          console.error('Error fetching reactions:', reactionsError);
+        }
+        
+        // Format reactions summary
+        const reactionsSummary = allReactions ? allReactions.reduce((acc, curr) => {
+          if (!acc[curr.reaction]) acc[curr.reaction] = [];
+          acc[curr.reaction].push(curr.user_id);
+          return acc;
+        }, {}) : {};
+        
+        // Determine other party in the conversation
+        const otherUserId = message.sender_id === userId ? message.receiver_id : message.sender_id;
+        
+        // Notify other user about reaction
+        const otherUserSocketId = connectedUsers.get(otherUserId);
+        if (otherUserSocketId) {
+          io.to(otherUserSocketId).emit('message:reacted', {
+            messageId,
+            userId,
+            reaction,
+            conversationId: otherUserId === message.receiver_id ? userId : otherUserId,
+            reactionsSummary
+          });
+        }
+        
+        // Confirm to user who reacted
+        socket.emit('message:reactConfirmed', {
+          messageId,
+          reaction,
+          conversationId: otherUserId,
+          reactionsSummary
+        });
+          
+      } catch (error) {
+        console.error('Error in message:react:', error);
+        socket.emit('error', {
+          source: 'message:react',
+          message: 'Server error processing reaction'
+        });
+      }
+    });
+
+    // Send a reply to a specific message
+    socket.on('message:reply', async (data) => {
+      try {
+        const { receiverId, content, replyToMessageId, mediaUrl } = data;
+        const senderId = socket.user.id;
+        
+        // Validate required fields
+        if (!receiverId || !content || !replyToMessageId) {
+          socket.emit('error', {
+            source: 'message:reply',
+            message: 'Receiver ID, content, and replyToMessageId are required'
+          });
+          return;
+        }
+        
+        // Fetch the original message being replied to
+        const { data: originalMessage, error: fetchError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', replyToMessageId)
+          .single();
+          
+        if (fetchError) {
+          console.error('Error fetching original message:', fetchError);
+          socket.emit('error', {
+            source: 'message:reply',
+            message: 'Original message not found'
+          });
+          return;
+        }
+        
+        // Create message with reply metadata
+        const { data: message, error } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content,
+            media_url: mediaUrl || null,
+            is_read: false,
+            created_at: new Date(),
+            updated_at: new Date(),
+            reply_to_message_id: replyToMessageId,
+            reply_to_content: originalMessage.content.substring(0, 100) // Store preview of original
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('Error creating reply message:', error);
+          socket.emit('error', {
+            source: 'message:reply',
+            message: 'Failed to send reply'
+          });
+          return;
+        }
+        
+        // Add sender info to the message object
+        message.sender = {
+          id: socket.user.id,
+          firstName: socket.user.first_name,
+          lastName: socket.user.last_name,
+          username: socket.user.username,
+          profilePictureUrl: socket.user.profile_picture_url
+        };
+        
+        // Add reply info
+        message.replyTo = {
+          messageId: originalMessage.id,
+          content: originalMessage.content,
+          senderId: originalMessage.sender_id
+        };
+        
+        // Emit to sender
+        socket.emit('message:sent', message);
+        
+        // Emit to receiver if online
+        const receiverSocketId = connectedUsers.get(receiverId);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit('message:received', message);
+        }
+          
+      } catch (error) {
+        console.error('Error in message:reply:', error);
+        socket.emit('error', {
+          source: 'message:reply',
+          message: 'Server error sending reply'
+        });
+      }
+    });
+
+    // Enhanced Match Chat Features
+
+    // Edit a match chat message
+    socket.on('match:editMessage', (data) => {
+      try {
+        const { matchId, messageId, content } = data;
+        const userId = socket.user.id;
+        
+        // Emit edited message to the match room
+        socket.to(matchId).emit('match:messageEdited', {
+          messageId,
+          senderId: userId,
+          senderName: socket.user.username || 'User',
+          content,
+          editedAt: new Date().toISOString()
+        });
+        
+        // Confirm to sender
+        socket.emit('match:messageEditConfirmed', {
+          messageId,
+          matchId,
+          content,
+          editedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error editing match message:', error);
+        socket.emit('error', {
+          source: 'match:editMessage',
+          message: 'Failed to edit message'
+        });
+      }
+    });
+
+    // Delete a match chat message
+    socket.on('match:deleteMessage', (data) => {
+      try {
+        const { matchId, messageId } = data;
+        const userId = socket.user.id;
+        
+        // Emit deletion to the match room
+        socket.to(matchId).emit('match:messageDeleted', {
+          messageId,
+          deletedBy: userId,
+          deletedAt: new Date().toISOString()
+        });
+        
+        // Confirm to sender
+        socket.emit('match:messageDeleteConfirmed', {
+          messageId,
+          matchId,
+          deletedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error deleting match message:', error);
+        socket.emit('error', {
+          source: 'match:deleteMessage',
+          message: 'Failed to delete message'
+        });
+      }
+    });
+
+    // React to a match chat message
+    socket.on('match:reactToMessage', (data) => {
+      try {
+        const { matchId, messageId, reaction } = data;
+        const userId = socket.user.id;
+        
+        // Emit reaction to the match room
+        socket.to(matchId).emit('match:messageReaction', {
+          messageId,
+          userId,
+          reaction,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Confirm to sender
+        socket.emit('match:reactionConfirmed', {
+          messageId,
+          matchId,
+          reaction,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error processing match message reaction:', error);
+        socket.emit('error', {
+          source: 'match:reactToMessage',
+          message: 'Failed to process reaction'
+        });
+      }
+    });
+
+    // Reply to a match chat message
+    socket.on('match:replyToMessage', (data) => {
+      try {
+        const { matchId, replyToMessageId, replyToContent, message } = data;
+        const userId = socket.user.id;
+        
+        // Generate a unique ID for this message
+        const messageId = uuidv4();
+        
+        // Emit the reply to the match room
+        socket.to(matchId).emit('match:message', {
+          messageId,
+          senderId: userId,
+          senderName: socket.user.username || 'User',
+          message,
+          timestamp: new Date().toISOString(),
+          replyTo: {
+            messageId: replyToMessageId,
+            content: replyToContent
+          }
+        });
+        
+        // Send confirmation to sender
+        socket.emit('match:messageSent', {
+          messageId,
+          matchId,
+          message,
+          timestamp: new Date().toISOString(),
+          replyTo: {
+            messageId: replyToMessageId,
+            content: replyToContent
+          }
+        });
+      } catch (error) {
+        console.error('Error sending match reply:', error);
+        socket.emit('error', {
+          source: 'match:replyToMessage',
+          message: 'Failed to send reply'
+        });
+      }
+    });
+
+    // Enhanced typing indicators
+    socket.on('typing:start', (data) => {
+      try {
+        const { receiverId, matchId } = data;
+        const userId = socket.user.id;
+        
+        // For private chat
+        if (receiverId) {
+          const receiverSocketId = connectedUsers.get(receiverId);
+          if (receiverSocketId) {
+            io.to(receiverSocketId).emit('typing:start', {
+              userId,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+        
+        // For match chat
+        if (matchId) {
+          socket.to(matchId).emit('match:typing', {
+            userId,
+            username: socket.user.username,
+            isTyping: true,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('Error in typing indicator:', error);
+      }
+    });
+
+    socket.on('typing:stop', (data) => {
+      try {
+        const { receiverId, matchId } = data;
+        const userId = socket.user.id;
+        
+        // For private chat
+        if (receiverId) {
+          const receiverSocketId = connectedUsers.get(receiverId);
+          if (receiverSocketId) {
+            io.to(receiverSocketId).emit('typing:stop', {
+              userId,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+        
+        // For match chat
+        if (matchId) {
+          socket.to(matchId).emit('match:typing', {
+            userId,
+            username: socket.user.username,
+            isTyping: false,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('Error in typing indicator:', error);
+      }
+    });
+    
     // Handle typing indicators
     socket.on('typing:start', (data) => {
       const { receiverId } = data;
@@ -837,37 +1591,6 @@ const initializeSocket = (io) => {
       socket.emit('match:cancelled', {
         message: 'Matchmaking cancelled'
       });
-    });
-    
-    // Handle messages in match rooms
-    socket.on('match:message', (data) => {
-      try {
-        const { matchId, message } = data;
-        const userId = socket.user.id;
-        
-        console.log(`User ${userId} sending message in match room ${matchId}: ${message}`);
-        
-        // Emit the message to the match room
-        socket.to(matchId).emit('match:message', {
-          senderId: userId,
-          senderName: socket.user.username || 'User',
-          message,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Send confirmation to sender
-        socket.emit('match:messageSent', {
-          matchId,
-          message,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error('Error sending match message:', error);
-        socket.emit('error', {
-          source: 'match:message',
-          message: 'Failed to send message'
-        });
-      }
     });
     
     // Disconnect handler with cleanup

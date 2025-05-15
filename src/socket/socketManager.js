@@ -1655,6 +1655,254 @@ const initializeSocket = (io) => {
         }
       }
     });
+
+    // Load private conversation messages
+    socket.on('messages:load', async (data) => {
+      try {
+        const { userId, limit = 20, before } = data;
+        const currentUserId = socket.user.id;
+        
+        console.log(`User ${currentUserId} loading messages with user ${userId}`);
+        
+        // Build query to get messages between the two users
+        let query = supabase
+          .from('messages')
+          .select(`
+            id,
+            content,
+            media_url,
+            sender_id,
+            receiver_id,
+            is_read,
+            created_at,
+            updated_at,
+            is_edited,
+            reply_to_message_id,
+            reply_to_content
+          `)
+          .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        
+        // Add pagination if 'before' timestamp is provided
+        if (before) {
+          query = query.lt('created_at', before);
+        }
+        
+        const { data: messages, error } = await query;
+        
+        if (error) {
+          console.error('Error loading messages:', error);
+          socket.emit('error', {
+            source: 'messages:load',
+            message: 'Failed to load messages'
+          });
+          return;
+        }
+        
+        // Get user details for message senders
+        const userIds = [...new Set(messages.map(m => m.sender_id))];
+        const { data: users, error: userError } = await supabase
+          .from('users')
+          .select('id, username, first_name, last_name, profile_picture_url')
+          .in('id', userIds);
+          
+        if (userError) {
+          console.error('Error loading user details:', userError);
+        }
+        
+        // Create a map of user details for easy lookup
+        const userMap = {};
+        if (users) {
+          users.forEach(user => {
+            userMap[user.id] = {
+              id: user.id,
+              username: user.username,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              profilePictureUrl: user.profile_picture_url
+            };
+          });
+        }
+        
+        // Add user details to messages
+        const messagesWithUsers = messages.map(message => {
+          return {
+            ...message,
+            sender: userMap[message.sender_id] || { id: message.sender_id }
+          };
+        });
+        
+        // Check if there are more messages to load
+        const hasMore = messages.length === limit;
+        
+        // Emit response
+        socket.emit('messages:loaded', {
+          messages: messagesWithUsers,
+          hasMore,
+          conversationId: userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Mark messages as read
+        if (messages.length > 0) {
+          const messagesToMark = messages.filter(m => 
+            m.receiver_id === currentUserId && !m.is_read
+          );
+          
+          if (messagesToMark.length > 0) {
+            await supabase
+              .from('messages')
+              .update({ is_read: true, updated_at: new Date() })
+              .in('id', messagesToMark.map(m => m.id));
+              
+            // Notify sender about read messages
+            const senderSocketId = connectedUsers.get(userId);
+            if (senderSocketId) {
+              io.to(senderSocketId).emit('message:allRead', {
+                messageIds: messagesToMark.map(m => m.id),
+                conversationId: currentUserId,
+                readAt: new Date().toISOString(),
+                readBy: currentUserId
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in messages:load:', error);
+        socket.emit('error', {
+          source: 'messages:load',
+          message: 'Server error loading messages'
+        });
+      }
+    });
+    
+    // Load match chat messages
+    socket.on('match:loadMessages', async (data) => {
+      try {
+        const { matchId, limit = 20, before } = data;
+        const userId = socket.user.id;
+        
+        console.log(`User ${userId} loading messages for match ${matchId}`);
+        
+        // Verify user is part of the match
+        const { data: match, error: matchError } = await supabase
+          .from('matches')
+          .select('*')
+          .eq('id', matchId)
+          .single();
+          
+        if (matchError || !match) {
+          console.error('Error finding match:', matchError);
+          socket.emit('error', {
+            source: 'match:loadMessages',
+            message: 'Match not found'
+          });
+          return;
+        }
+        
+        if (match.user1_id !== userId && match.user2_id !== userId) {
+          socket.emit('error', {
+            source: 'match:loadMessages',
+            message: 'You are not part of this match'
+          });
+          return;
+        }
+        
+        // Build query to get match messages
+        // Note: This assumes you have a match_messages table
+        // If not, you may need to adjust this query or create the table
+        let query = supabase
+          .from('match_messages')
+          .select(`
+            id,
+            match_id,
+            user_id,
+            content,
+            media_url,
+            created_at,
+            is_edited,
+            reply_to_message_id,
+            reply_to_content
+          `)
+          .eq('match_id', matchId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        
+        // Add pagination if 'before' timestamp is provided
+        if (before) {
+          query = query.lt('created_at', before);
+        }
+        
+        const { data: messages, error } = await query;
+        
+        // If the match_messages table doesn't exist or there's another error
+        if (error) {
+          console.error('Error loading match messages:', error);
+          
+          // Return an appropriate response even if there's an error
+          // This might be the case if match chat messages are stored differently
+          socket.emit('match:messagesLoaded', {
+            messages: [],
+            hasMore: false,
+            matchId,
+            timestamp: new Date().toISOString(),
+            error: 'Could not load messages'
+          });
+          return;
+        }
+        
+        // Get user details for message senders
+        const userIds = [...new Set(messages.map(m => m.user_id))];
+        const { data: users, error: userError } = await supabase
+          .from('users')
+          .select('id, username, first_name, last_name, profile_picture_url')
+          .in('id', userIds);
+          
+        if (userError) {
+          console.error('Error loading user details:', userError);
+        }
+        
+        // Create a map of user details for easy lookup
+        const userMap = {};
+        if (users) {
+          users.forEach(user => {
+            userMap[user.id] = {
+              id: user.id,
+              username: user.username,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              profilePictureUrl: user.profile_picture_url
+            };
+          });
+        }
+        
+        // Add user details to messages
+        const messagesWithUsers = messages.map(message => {
+          return {
+            ...message,
+            sender: userMap[message.user_id] || { id: message.user_id }
+          };
+        });
+        
+        // Check if there are more messages to load
+        const hasMore = messages.length === limit;
+        
+        // Emit response
+        socket.emit('match:messagesLoaded', {
+          messages: messagesWithUsers,
+          hasMore,
+          matchId,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error in match:loadMessages:', error);
+        socket.emit('error', {
+          source: 'match:loadMessages',
+          message: 'Server error loading match messages'
+        });
+      }
+    });
   });
 };
 

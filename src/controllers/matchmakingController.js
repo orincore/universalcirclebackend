@@ -3,10 +3,11 @@ const { matchmakingRequestSchema, matchResponseSchema } = require('../models/mat
 const { validateInterests } = require('../utils/interests');
 const { notifyMatchFound } = require('../socket/socketManager');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const logger = require('../utils/logger');
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+const model = genAI.getGenerativeModel({ model: 'gemini-1.0-pro' });
 
 // In-memory waiting queue for matchmaking
 // Use a Map for O(1) lookups by userId
@@ -92,9 +93,9 @@ const calculateCompatibilityWithAI = async (user1, user2, criteria) => {
     // Basic compatibility check first - for efficiency, filter out obvious non-matches
     // Only check if preferences match (optional)
     if (criteria.preference && criteria.preference !== user2.preference) {
-      console.log(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
-    return 0;
-  }
+      logger.info(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
+      return 0;
+    }
 
     // Check for at least 1 shared interest - quick filter before calling AI
     const user1Interests = user1.interests || [];
@@ -105,9 +106,9 @@ const calculateCompatibilityWithAI = async (user1, user2, criteria) => {
     const sharedInterests = user2Interests.filter(interest => user1InterestsSet.has(interest));
     
     if (sharedInterests.length === 0) {
-      console.log(`No shared interests between ${user1.id} and ${user2.id}`);
-    return 0;
-  }
+      logger.info(`No shared interests between ${user1.id} and ${user2.id}`);
+      return 0;
+    }
 
     // Create user profiles to send to Gemini
     const user1Profile = {
@@ -144,27 +145,36 @@ const calculateCompatibilityWithAI = async (user1, user2, criteria) => {
       Return only a numeric score between 0-100.
     `;
     
-    // Call Gemini API
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const responseText = response.text();
+    logger.info(`Requesting compatibility score from Gemini AI for users ${user1.id} and ${user2.id}`);
     
-    // Parse the compatibility score
-    const score = parseInt(responseText.trim(), 10);
-    
-    // Validate the score is within range
-    if (isNaN(score) || score < 0 || score > 100) {
-      console.log(`Invalid score from Gemini API: ${responseText}, defaulting to legacy calculation`);
-      // Fallback to basic scoring
+    try {
+      // Call Gemini API
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+      
+      // Parse the compatibility score
+      const score = parseInt(responseText.trim(), 10);
+      
+      // Validate the score is within range
+      if (isNaN(score) || score < 0 || score > 100) {
+        logger.warn(`Invalid score from Gemini API: ${responseText}, defaulting to legacy calculation`);
+        // Fallback to basic scoring
+        return sharedInterests.length > 0 ? 80 : 0;
+      }
+      
+      logger.info(`AI compatibility score between ${user1.id} and ${user2.id}: ${score}`);
+      return score;
+    } catch (aiError) {
+      logger.error(`Gemini AI API error: ${aiError.message}`);
+      // Fallback to basic scoring in case of AI error
+      logger.info('Using fallback scoring method due to AI error');
       return sharedInterests.length > 0 ? 80 : 0;
     }
     
-    console.log(`AI compatibility score between ${user1.id} and ${user2.id}: ${score}`);
-    return score;
-    
   } catch (error) {
-    console.error('Error calculating AI compatibility:', error);
-    // Fallback to basic scoring in case of error
+    logger.error('Error in compatibility calculation:', error);
+    // Fallback to basic scoring in case of any other error
     const user1Interests = user1.interests || [];
     const user2Interests = user2.interests || [];
     const user1InterestsSet = new Set(user1Interests);

@@ -275,15 +275,30 @@ const triggerAIProcessing = async (reportId) => {
             action: result.action
           };
           
-          logger.info('🤖 AI processing result:', safeResult);
+          if (result.success) {
+            logger.info(`🤖 AI processing result for ${reportId}: Success - ${safeResult.message}`);
+          } else {
+            logger.error(`🤖 AI processing result for ${reportId}: Failed - ${safeResult.message}`);
+            
+            // Log error details if available
+            if (result.error) {
+              logger.error(`Error details for report ${reportId}: ${result.error}`);
+            }
+          }
         } catch (err) {
           // Safe error handling
           const safeError = {
-            message: err.message,
-            name: err.name,
+            message: err.message || 'Unknown error',
+            name: err.name || 'UnknownError',
             code: err.code
           };
-          logger.error('Error in local AI processing:', safeError);
+          logger.error(`Error in local AI processing for report ${reportId}: ${safeError.name} - ${safeError.message}`);
+          
+          // Add stack trace for debugging if available
+          if (err.stack) {
+            const stackSummary = err.stack.split('\n').slice(0, 3).join('\n');
+            logger.error(`Stack trace: ${stackSummary}`);
+          }
         }
       }, 0);
       logger.info('🤖 Auto-moderation scheduled');
@@ -291,13 +306,18 @@ const triggerAIProcessing = async (reportId) => {
   } catch (error) {
     // Safe error handling
     const safeError = {
-      message: error.message,
-      name: error.name,
+      message: error.message || 'Unknown error',
+      name: error.name || 'UnknownError',
       code: error.code
     };
-    logger.error('Error triggering AI processing:', safeError);
-    throw error;
+    logger.error(`Error triggering AI processing for report ${reportId}: ${safeError.name} - ${safeError.message}`);
+    
+    // Don't throw error to prevent request failure
+    // Instead return false to indicate failure
+    return false;
   }
+  
+  return true; // Indicate success
 };
 
 /**

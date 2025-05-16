@@ -71,15 +71,31 @@ const processReportAsync = async (reportId) => {
       logger.info(`AI successfully processed report ${reportId}: ${safeResult.message}`);
     } else {
       logger.error(`AI failed to process report ${reportId}: ${safeResult.message}`);
+      
+      // Log the error details if available
+      if (result.error) {
+        logger.error(`Error details for report ${reportId}: ${result.error}`);
+      }
     }
   } catch (error) {
     // Safe error handling to avoid circular references
     const safeError = {
       message: error.message || 'Unknown error',
-      name: error.name,
+      name: error.name || 'UnknownError',
       code: error.code
     };
-    logger.error(`Error in processReportAsync for report ${reportId}:`, safeError);
+    
+    logger.error(`Error in processReportAsync for report ${reportId}: ${safeError.name} - ${safeError.message}`);
+    
+    // Attempt to add additional debugging information
+    try {
+      if (error.stack) {
+        const stackSummary = error.stack.split('\n').slice(0, 3).join('\n');
+        logger.error(`Stack trace summary: ${stackSummary}`);
+      }
+    } catch (stackError) {
+      // Ignore errors when trying to extract the stack
+    }
   }
 };
 

@@ -239,16 +239,15 @@ const processReportWithAI = async (reportId) => {
     }
   } catch (error) {
     // Safe error handling to avoid circular JSON structure
-    logger.error('Error in processReportWithAI:');
-    
-    // Extract safe properties to avoid circular references
     const safeError = {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
+      message: error.message || 'Unknown error',
+      name: error.name || 'UnknownError',
       code: error.code,
       status: error.status
     };
+    
+    // Log the error with essential details
+    logger.error(`Error in processReportWithAI: ${safeError.name} - ${safeError.message}`);
     
     return {
       success: false,

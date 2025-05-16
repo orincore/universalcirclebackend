@@ -1,8 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 
-// Check if environment variables are loaded
+// Get environment variables that were loaded in index.js
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 

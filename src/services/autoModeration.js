@@ -37,26 +37,56 @@ const getUserReportHistory = async (userId) => {
  * @returns {Promise<string>} Message content or empty string if not found
  */
 const getMessageContent = async (messageId) => {
+  let client;
   try {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        'SELECT content FROM messages WHERE id = $1',
-        [messageId]
-      );
-      
-      if (result.rows.length === 0) {
-        info(`Message ${messageId} not found`);
-        return '';
-      }
-      
-      return result.rows[0].content;
-    } finally {
-      client.release();
+    info(`Attempting to connect to database to get message ${messageId}`);
+    
+    // Log database configuration for debugging
+    info('Database host:', process.env.PGHOST || 'default');
+    info('Database name:', process.env.PGDATABASE || 'default');
+    info('Database port:', process.env.PGPORT || '5432');
+    
+    // Attempt to get a client from the pool
+    client = await pool.connect();
+    info(`Connected to database successfully, querying for message ${messageId}`);
+    
+    const result = await client.query(
+      'SELECT content FROM messages WHERE id = $1',
+      [messageId]
+    );
+    
+    if (result.rows.length === 0) {
+      info(`Message ${messageId} not found in database`);
+      return '';
     }
+    
+    info(`Successfully retrieved content for message ${messageId}`);
+    return result.rows[0].content;
   } catch (error) {
-    info('Error fetching message content:', error);
+    info(`Error fetching message ${messageId} content:`, error);
+    
+    // For connection errors, add more diagnostic information
+    if (error.code === 'ECONNREFUSED') {
+      info('Database connection refused. Check database server status and connection details.');
+    } else if (error.code === 'ETIMEDOUT') {
+      info('Database connection timed out. Check network connectivity and firewall settings.');
+    } else if (error.code === 'ENOTFOUND') {
+      info('Database host not found. Check hostname and DNS resolution.');
+    } else if (error.code === 'ECONNRESET') {
+      info('Connection reset by database server. Check server logs for issues.');
+    }
+    
     return '';
+  } finally {
+    // Always release the client, but only if it was obtained
+    if (client) {
+      try {
+        client.release();
+        info('Database client released successfully');
+      } catch (releaseError) {
+        info('Error releasing database client:', releaseError);
+      }
+    }
   }
 };
 
@@ -253,7 +283,7 @@ const processReportWithAI = async (report) => {
           reportData.id, 
           'RESOLVED', 
           `Auto-resolved by Gemini AI: ${aiDecision.explanation}. User banned due to multiple violations.`,
-          'Gemini AI'  // Set resolved_by to Gemini AI
+          GEMINI_AI_USER_ID  // Use UUID instead of string "Gemini AI"
         );
       }
       
@@ -261,7 +291,7 @@ const processReportWithAI = async (report) => {
         reportData.id, 
         'RESOLVED', 
         `Auto-resolved by Gemini AI: ${aiDecision.explanation}`,
-        'Gemini AI'  // Set resolved_by to Gemini AI
+        GEMINI_AI_USER_ID  // Use UUID instead of string "Gemini AI"
       );
     } else if (aiDecision.classification === 'ACCEPTABLE' && aiDecision.confidence >= 0.9) {
       // High confidence that this is acceptable content
@@ -269,7 +299,7 @@ const processReportWithAI = async (report) => {
         reportData.id, 
         'REJECTED', 
         `Rejected by Gemini AI: ${aiDecision.explanation}`,
-        'Gemini AI'  // Set resolved_by to Gemini AI
+        GEMINI_AI_USER_ID  // Use UUID instead of string "Gemini AI"
       );
     } else {
       // Borderline cases or lower confidence - mark for human review

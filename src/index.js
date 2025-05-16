@@ -16,6 +16,15 @@ const supabase = require('./config/database');
 // Import socket manager
 const { initializeSocket, connectedUsers } = require('./socket/socketManager');
 
+// Import middleware
+const { authenticate } = require('./middlewares/auth');
+
+// Import logger
+const logger = require('./utils/logger');
+
+// Import health monitoring service
+const { startHealthMonitoring } = require('./services/healthMonitor');
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const interestRoutes = require('./routes/interestRoutes');
@@ -28,9 +37,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const adminMessageRoutes = require('./routes/adminMessageRoutes');
 const userMessageRoutes = require('./routes/userMessageRoutes');
-
-// Import middleware
-const { authenticate } = require('./middlewares/auth');
+const healthRoutes = require('./routes/healthRoutes');
 
 // Initialize Express app
 const app = express();
@@ -83,6 +90,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/messages', adminMessageRoutes);
+app.use('/api/health', healthRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {
@@ -238,6 +246,9 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Start health monitoring
+  startHealthMonitoring(io);
 });
 
 // Export for testing

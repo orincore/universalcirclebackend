@@ -58,6 +58,58 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+/**
+ * Middleware to check if a user has admin privileges
+ */
+const isAdmin = async (req, res, next) => {
+  try {
+    // First ensure we have a user from the authenticate middleware
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+    
+    // Check if user has admin role in database
+    const { data, error } = await supabase
+      .from('users')
+      .select('is_admin, role')
+      .eq('id', req.user.id)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error checking admin status:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error checking admin privileges'
+      });
+    }
+    
+    // Check if user has admin permissions
+    const isAdmin = data.is_admin === true || data.role === 'admin';
+    
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized. Admin privileges required.'
+      });
+    }
+    
+    // Add admin flag to user object
+    req.user.isAdmin = true;
+    
+    next();
+  } catch (error) {
+    console.error('Admin authorization error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error checking admin privileges'
+    });
+  }
+};
+
 module.exports = {
-  authenticate
+  authenticate,
+  isAdmin
 }; 

@@ -8,8 +8,6 @@ const {
   updateUserBanStatus,
   getDetailedMatchmakingStats,
   getServerHealth,
-  getReportedContent,
-  resolveReport,
   deletePost,
   getSystemSettings,
   updateSystemSettings
@@ -32,8 +30,6 @@ router.patch('/users/:userId/ban', updateUserBanStatus);
 router.get('/matchmaking/stats', getDetailedMatchmakingStats);
 
 // Content moderation routes
-router.get('/moderation/reports', getReportedContent);
-router.patch('/moderation/reports/:reportId', resolveReport);
 router.delete('/moderation/posts/:postId', deletePost);
 
 // System settings routes

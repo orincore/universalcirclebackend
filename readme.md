@@ -44,6 +44,7 @@ Additional features include:
 - Typing indicators
 - Message reactions and emoji support
 - Content moderation for chat messages and posts
+- Comprehensive content reporting system
 - Scheduled system notifications
 - User activity logging for analytics
 - Rate limiting to prevent abuse
@@ -52,6 +53,33 @@ Additional features include:
 - Post bookmarking and collections
 - User verification badges for trusted accounts
 - Advanced feed customization options
+
+## Content Reporting System
+
+The platform includes a robust content reporting system that allows users to report problematic content:
+
+- Users can report messages, users, and posts with predefined categories:
+  - Inappropriate Content
+  - Spam
+  - Harassment
+  - Impersonation
+  - Others
+
+- Reports include optional comments to provide additional context
+- All reports are tracked in a dedicated reports table with appropriate indexing
+- Admin dashboard provides comprehensive report management:
+  - Filter reports by type, status, and date range
+  - View detailed information about reported content
+  - Update report status (pending, resolved, dismissed)
+  - Add admin notes for internal documentation
+
+- Analytics dashboard shows report trends and distributions:
+  - Report frequency over time
+  - Distribution by report category
+  - Resolution rates and average resolution time
+  - Recent activity feed including new reports
+
+The reporting system is designed to scale with the platform's growth and integrates seamlessly with the existing analytics infrastructure.
 
 The server environment variables are managed using a .env file. AWS S3 credentials, Supabase keys, JWT secret keys, and Gemini API key are stored securely. The server is designed with middleware for JWT validation and with utility functions for token generation/verification and password hashing/comparison.
 

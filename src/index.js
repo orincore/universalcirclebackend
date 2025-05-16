@@ -25,6 +25,9 @@ const logger = require('./utils/logger');
 // Import health monitoring service
 const { startHealthMonitoring } = require('./services/healthMonitor');
 
+// Import and run database migrations
+const { runMigrations } = require('./database/runMigrations');
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const interestRoutes = require('./routes/interestRoutes');
@@ -39,6 +42,9 @@ const adminMessageRoutes = require('./routes/adminMessageRoutes');
 const userMessageRoutes = require('./routes/userMessageRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const adminAnalyticsRoutes = require('./routes/adminAnalyticsRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const adminReportRoutes = require('./routes/adminReportRoutes');
+const adminAuthRoutes = require('./routes/adminAuthRoutes');
 
 // Initialize Express app
 const app = express();
@@ -89,10 +95,13 @@ app.use('/api/messages/user', userMessageRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin/messages', adminMessageRoutes);
+app.use('/api/admin/analytics', adminAnalyticsRoutes);
+app.use('/api/admin/reports', adminReportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/admin/analytics', adminAnalyticsRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {
@@ -246,11 +255,19 @@ app.use((req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   
+  // Run database migrations
+  try {
+    await runMigrations();
+    console.log('Database migrations completed.');
+  } catch (error) {
+    console.error('Error running migrations:', error);
+  }
+  
   // Start health monitoring
-  startHealthMonitoring(io);
+  startHealthMonitoring();
 });
 
 // Export for testing

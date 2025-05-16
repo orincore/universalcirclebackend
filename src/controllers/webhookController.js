@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../database/dbConfig');
-const logger = require('../utils/logger');
+const { info, error, warn } = require('../utils/logger');
 const autoModeration = require('../services/autoModeration');
 const geminiAI = require('../services/geminiAI');
 
@@ -65,7 +65,7 @@ router.post('/test-report-moderation', async (req, res) => {
       );
       
       await client.query('COMMIT');
-      logger.info(`✅ Test report created: ${reportId}`);
+      info(`✅ Test report created: ${reportId}`);
       
       // Process the report with AI
       const report = { 
@@ -84,21 +84,21 @@ router.post('/test-report-moderation', async (req, res) => {
         message: 'Report processed successfully',
         report: result
       });
-    } catch (error) {
+    } catch (err) {
       await client.query('ROLLBACK');
-      logger.error(`❌ Error creating test report: ${error.message}`);
+      error(`❌ Error creating test report: ${err.message}`);
       return res.status(500).json({ 
         success: false, 
-        message: `Error creating test report: ${error.message}` 
+        message: `Error creating test report: ${err.message}` 
       });
     } finally {
       client.release();
     }
-  } catch (error) {
-    logger.error(`❌ Error in test-report-moderation endpoint: ${error.message}`);
+  } catch (err) {
+    error(`❌ Error in test-report-moderation endpoint: ${err.message}`);
     return res.status(500).json({ 
       success: false, 
-      message: `Server error: ${error.message}` 
+      message: `Server error: ${err.message}` 
     });
   }
 });
@@ -151,10 +151,10 @@ const processNewReport = async (req, res) => {
     // Process the report asynchronously
     processReportAsync(reportId);
     
-  } catch (error) {
+  } catch (err) {
     // Use shared safe error handling
-    const safeError = geminiAI.getSafeErrorDetails(error);
-    logger.error(`Error in webhook processNewReport: ${safeError.name} - ${safeError.message}`);
+    const safeError = geminiAI.getSafeErrorDetails(err);
+    error(`Error in webhook processNewReport: ${safeError.name} - ${safeError.message}`);
     return res.status(500).json({
       success: false,
       message: 'Server error processing webhook'
@@ -168,7 +168,7 @@ const processNewReport = async (req, res) => {
  */
 const processReportAsync = async (reportId) => {
   try {
-    logger.info(`Starting AI processing for report ${reportId}`);
+    info(`Starting AI processing for report ${reportId}`);
     
     const result = await autoModeration.processReportWithAI(reportId);
     
@@ -180,31 +180,34 @@ const processReportAsync = async (reportId) => {
     };
     
     if (result.success) {
-      logger.info(`AI successfully processed report ${reportId}: ${safeResult.message}`);
+      info(`AI successfully processed report ${reportId}: ${safeResult.message}`);
     } else {
-      logger.error(`AI failed to process report ${reportId}: ${safeResult.message}`);
+      error(`AI failed to process report ${reportId}: ${safeResult.message}`);
       
       // Log the error details if available
       if (result.error) {
-        logger.error(`Error details for report ${reportId}: ${result.error}`);
+        error(`Error details for report ${reportId}: ${result.error}`);
       }
     }
-  } catch (error) {
+  } catch (err) {
     // Use shared safe error handling
-    const safeError = geminiAI.getSafeErrorDetails(error);
+    const safeError = geminiAI.getSafeErrorDetails(err);
     
-    logger.error(`Error in processReportAsync for report ${reportId}: ${safeError.name} - ${safeError.message}`);
+    error(`Error in processReportAsync for report ${reportId}: ${safeError.name} - ${safeError.message}`);
     
     // Attempt to add additional debugging information
     try {
-      if (error.stack) {
-        const stackSummary = error.stack.split('\n').slice(0, 3).join('\n');
-        logger.error(`Stack trace summary: ${stackSummary}`);
+      if (err.stack) {
+        const stackSummary = err.stack.split('\n').slice(0, 3).join('\n');
+        error(`Stack trace summary: ${stackSummary}`);
       }
     } catch (stackError) {
       // Ignore errors when trying to extract the stack
     }
   }
 };
+
+// Add route for report processing
+router.post('/report-processing', processNewReport);
 
 module.exports = router; 

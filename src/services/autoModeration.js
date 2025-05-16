@@ -1,5 +1,5 @@
 const supabase = require('../config/database');
-const logger = require('../utils/logger');
+const { info, error, warn } = require('../utils/logger');
 const geminiAI = require('./geminiAI');
 const { pool } = require('../database/dbConfig');
 
@@ -20,13 +20,13 @@ const getUserReportHistory = async (userId) => {
       .order('created_at', { ascending: false });
       
     if (error) {
-      logger.error('Error fetching user report history:', error);
+      info('Error fetching user report history:', error);
       return [];
     }
     
     return data || [];
   } catch (error) {
-    logger.error('Error in getUserReportHistory:', error);
+    info('Error in getUserReportHistory:', error);
     return [];
   }
 };
@@ -45,7 +45,7 @@ const getMessageContent = async (messageId) => {
       .single();
       
     if (error || !data) {
-      logger.error('Error fetching message content:', error);
+      info('Error fetching message content:', error);
       return { content: null, senderId: null };
     }
     
@@ -54,7 +54,7 @@ const getMessageContent = async (messageId) => {
       senderId: data.sender_id
     };
   } catch (error) {
-    logger.error('Error in getMessageContent:', error);
+    info('Error in getMessageContent:', error);
     return { content: null, senderId: null };
   }
 };
@@ -87,14 +87,14 @@ const banUser = async (userId, reason, duration) => {
       .eq('id', userId);
       
     if (error) {
-      logger.error('Error banning user:', error);
+      info('Error banning user:', error);
       return false;
     }
     
-    logger.info(`User ${userId} banned. Reason: ${reason}, Duration: ${duration}`);
+    info(`User ${userId} banned. Reason: ${reason}, Duration: ${duration}`);
     return true;
   } catch (error) {
-    logger.error('Error in banUser:', error);
+    info('Error in banUser:', error);
     return false;
   }
 };
@@ -106,7 +106,7 @@ const banUser = async (userId, reason, duration) => {
  */
 const deleteInappropriateMessage = async (messageId) => {
   try {
-    logger.info(`🤖 Attempting to delete inappropriate message: ${messageId}`);
+    info(`🤖 Attempting to delete inappropriate message: ${messageId}`);
     
     const client = await pool.connect();
     
@@ -120,7 +120,7 @@ const deleteInappropriateMessage = async (messageId) => {
       );
       
       if (messageResult.rows.length === 0) {
-        logger.warn(`❌ Message ${messageId} not found for deletion`);
+        info(`❌ Message ${messageId} not found for deletion`);
         await client.query('ROLLBACK');
         return false;
       }
@@ -160,17 +160,17 @@ const deleteInappropriateMessage = async (messageId) => {
       );
       
       await client.query('COMMIT');
-      logger.info(`✅ Successfully deleted inappropriate message: ${messageId}`);
+      info(`✅ Successfully deleted inappropriate message: ${messageId}`);
       return true;
     } catch (error) {
       await client.query('ROLLBACK');
-      logger.error(`❌ Error deleting inappropriate message: ${error.message}`);
+      info(`❌ Error deleting inappropriate message: ${error.message}`);
       return false;
     } finally {
       client.release();
     }
   } catch (error) {
-    logger.error(`❌ Database connection error during message deletion: ${error.message}`);
+    info(`❌ Database connection error during message deletion: ${error.message}`);
     return false;
   }
 };
@@ -184,7 +184,7 @@ const processReportWithAI = async (report) => {
   try {
     const { message_id, reason, reported_by, reported_user_id } = report;
 
-    logger.info(`🤖 Processing report for message ${message_id} with Gemini AI`);
+    info(`🤖 Processing report for message ${message_id} with Gemini AI`);
 
     // Get the message content
     const client = await pool.connect();
@@ -198,7 +198,7 @@ const processReportWithAI = async (report) => {
       );
 
       if (result.rows.length === 0) {
-        logger.warn(`❌ Message ${message_id} not found for AI processing`);
+        info(`❌ Message ${message_id} not found for AI processing`);
         // Update report status to indicate message not found
         await updateReportStatus(report.id, 'resolved', 'Message not found');
         return { ...report, status: 'resolved', resolution_notes: 'Message not found' };
@@ -230,7 +230,7 @@ const processReportWithAI = async (report) => {
       
       // Analyze the message
       const analysis = await geminiAI.analyzeMessageContent(messageContent);
-      logger.info(`🤖 AI Analysis: ${analysis.classification}, Confidence: ${analysis.confidence}`);
+      info(`🤖 AI Analysis: ${analysis.classification}, Confidence: ${analysis.confidence}`);
 
       let status = 'pending';
       let resolutionNotes = '';
@@ -281,7 +281,7 @@ const processReportWithAI = async (report) => {
       client.release();
     }
   } catch (error) {
-    logger.error(`❌ Error processing report with AI: ${error.message}`);
+    info(`❌ Error processing report with AI: ${error.message}`);
     return { ...report, ai_error: error.message };
   }
 };
@@ -307,7 +307,7 @@ const updateReportStatus = async (reportId, status, comment) => {
       .eq('id', reportId);
       
     if (error) {
-      logger.error('Error updating report status:', error);
+      info('Error updating report status:', error);
       return false;
     }
     
@@ -324,12 +324,12 @@ const updateReportStatus = async (reportId, status, comment) => {
       });
       
     if (logError) {
-      logger.error('Error logging admin activity:', logError);
+      info('Error logging admin activity:', logError);
     }
     
     return true;
   } catch (error) {
-    logger.error('Error in updateReportStatus:', error);
+    info('Error in updateReportStatus:', error);
     return false;
   }
 };

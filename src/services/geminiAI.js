@@ -1,5 +1,5 @@
 const axios = require('axios');
-const logger = require('../utils/logger');
+const { info, error, warn } = require('../utils/logger');
 
 // Configuration for Gemini API
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -35,14 +35,14 @@ const getSafeErrorDetails = (error) => {
  */
 const analyzeMessageContent = async (messageContent) => {
   try {
-    logger.info('🤖 Starting Gemini AI content analysis');
+    info('🤖 Starting Gemini AI content analysis');
     
     if (!GEMINI_API_KEY) {
-      logger.error('❌ Gemini API key not configured');
+      error('❌ Gemini API key not configured');
       throw new Error('Gemini AI service not configured');
     }
 
-    logger.info('🤖 Preparing prompt for content analysis');
+    info('🤖 Preparing prompt for content analysis');
     
     const prompt = `
       You are a content moderation AI for a social app. Analyze the following message and determine if it violates platform guidelines.
@@ -72,7 +72,7 @@ const analyzeMessageContent = async (messageContent) => {
       }
     `;
 
-    logger.info('🤖 Sending request to Gemini API');
+    info('🤖 Sending request to Gemini API');
     
     try {
       const response = await axios.post(
@@ -88,11 +88,11 @@ const analyzeMessageContent = async (messageContent) => {
         }
       );
       
-      logger.info('🤖 Received response from Gemini API');
+      info('🤖 Received response from Gemini API');
 
       // Check if response contains expected data
       if (!response.data || !response.data.candidates || !response.data.candidates[0]?.content?.parts?.[0]?.text) {
-        logger.error('❌ Unexpected Gemini API response format:', JSON.stringify(response.data));
+        error('❌ Unexpected Gemini API response format:', JSON.stringify(response.data));
         throw new Error('Invalid response format from Gemini API');
       }
 
@@ -104,7 +104,7 @@ const analyzeMessageContent = async (messageContent) => {
       const endIndex = generatedText.lastIndexOf('}') + 1;
       
       if (startIndex === -1 || endIndex === 0) {
-        logger.error('❌ Could not find JSON in Gemini response:', generatedText);
+        error('❌ Could not find JSON in Gemini response:', generatedText);
         // Fallback response for when Gemini doesn't return proper JSON
         return {
           classification: "ACCEPTABLE",
@@ -120,7 +120,7 @@ const analyzeMessageContent = async (messageContent) => {
       try {
         // Parse and return the analysis
         const result = JSON.parse(jsonStr);
-        logger.info(`🤖 Successfully parsed Gemini response: ${result.classification} (confidence: ${result.confidence})`);
+        info(`🤖 Successfully parsed Gemini response: ${result.classification} (confidence: ${result.confidence})`);
         
         // Ensure the result has the recommendedAction field
         if (!result.recommendedAction) {
@@ -136,8 +136,8 @@ const analyzeMessageContent = async (messageContent) => {
         
         return result;
       } catch (jsonError) {
-        logger.error('❌ Failed to parse Gemini JSON response:', getSafeErrorDetails(jsonError));
-        logger.error('Raw response:', generatedText);
+        error('❌ Failed to parse Gemini JSON response:', getSafeErrorDetails(jsonError));
+        error('Raw response:', generatedText);
         // Fallback response for when JSON parsing fails
         return {
           classification: "ACCEPTABLE", 
@@ -150,11 +150,11 @@ const analyzeMessageContent = async (messageContent) => {
     } catch (axiosError) {
       // Handle Axios errors specifically to avoid circular references
       const safeError = getSafeErrorDetails(axiosError);
-      logger.error(`❌ Axios error calling Gemini API: ${safeError.name} - ${safeError.message}`);
+      error(`❌ Axios error calling Gemini API: ${safeError.name} - ${safeError.message}`);
       
       // Check if it's a 404 error indicating wrong endpoint
       if (axiosError.response && axiosError.response.status === 404) {
-        logger.error('❌ 404 error: API endpoint may be incorrect. Check GEMINI_API_URL value.');
+        error('❌ 404 error: API endpoint may be incorrect. Check GEMINI_API_URL value.');
       }
       
       throw new Error(`Gemini API request failed: ${safeError.message}`);
@@ -162,7 +162,7 @@ const analyzeMessageContent = async (messageContent) => {
   } catch (error) {
     // Handle all other errors
     const safeError = getSafeErrorDetails(error);
-    logger.error(`❌ Error analyzing message with Gemini AI: ${safeError.name} - ${safeError.message}`);
+    error(`❌ Error analyzing message with Gemini AI: ${safeError.name} - ${safeError.message}`);
     
     // Return a fallback response instead of throwing error to prevent system failure
     return {
@@ -184,7 +184,7 @@ const analyzeMessageContent = async (messageContent) => {
 const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
   try {
     if (!GEMINI_API_KEY) {
-      logger.error('Gemini API key not configured');
+      error('Gemini API key not configured');
       throw new Error('Gemini AI service not configured');
     }
 
@@ -234,7 +234,7 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
 
       // Check if response contains expected data
       if (!response.data || !response.data.candidates || !response.data.candidates[0]?.content?.parts?.[0]?.text) {
-        logger.error('❌ Unexpected Gemini API response format:', JSON.stringify(response.data));
+        error('❌ Unexpected Gemini API response format:', JSON.stringify(response.data));
         return {
           action: "NO_ACTION",
           confidence: 0.9,
@@ -250,7 +250,7 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
       const endIndex = generatedText.lastIndexOf('}') + 1;
       
       if (startIndex === -1 || endIndex === 0) {
-        logger.error('❌ Could not find JSON in Gemini response:', generatedText);
+        error('❌ Could not find JSON in Gemini response:', generatedText);
         return {
           action: "NO_ACTION",
           confidence: 0.9,
@@ -265,7 +265,7 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
         return JSON.parse(jsonStr);
       } catch (jsonError) {
         const safeError = getSafeErrorDetails(jsonError);
-        logger.error(`❌ Failed to parse Gemini JSON response: ${safeError.name} - ${safeError.message}`);
+        error(`❌ Failed to parse Gemini JSON response: ${safeError.name} - ${safeError.message}`);
         return {
           action: "NO_ACTION",
           confidence: 0.9,
@@ -275,13 +275,13 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
     } catch (axiosError) {
       // Handle Axios errors specifically to avoid circular references
       const safeError = getSafeErrorDetails(axiosError);
-      logger.error(`❌ Axios error in evaluateUserHistory: ${safeError.name} - ${safeError.message}`);
+      error(`❌ Axios error in evaluateUserHistory: ${safeError.name} - ${safeError.message}`);
       
       throw new Error(`Gemini API request failed: ${safeError.message}`);
     }
   } catch (error) {
     const safeError = getSafeErrorDetails(error);
-    logger.error(`Error evaluating user with Gemini AI: ${safeError.name} - ${safeError.message}`);
+    error(`Error evaluating user with Gemini AI: ${safeError.name} - ${safeError.message}`);
     return {
       action: "NO_ACTION",
       confidence: 0.9,

@@ -10,7 +10,7 @@
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('./database/dbConfig');
-const logger = require('./utils/logger');
+const { info, error, warn } = require('./utils/logger');
 
 // Configuration
 const API_URL = 'http://localhost:5000/api';
@@ -60,13 +60,13 @@ async function createTestConversation() {
         [conversationId, TEST_USER_ID_1, TEST_USER_ID_2]
       );
       
-      logger.info(`✅ Created test conversation: ${conversationId}`);
+      info(`✅ Created test conversation: ${conversationId}`);
       return conversationId;
     } finally {
       client.release();
     }
   } catch (error) {
-    logger.error(`❌ Error creating test conversation: ${error.message}`);
+    error(`❌ Error creating test conversation: ${error.message}`);
     throw error;
   }
 }
@@ -86,13 +86,13 @@ async function createTestMessage(conversationId, messageContent) {
         [messageId, conversationId, TEST_USER_ID_1, messageContent]
       );
       
-      logger.info(`✅ Created test message: ${messageId}`);
+      info(`✅ Created test message: ${messageId}`);
       return messageId;
     } finally {
       client.release();
     }
   } catch (error) {
-    logger.error(`❌ Error creating test message: ${error.message}`);
+    error(`❌ Error creating test message: ${error.message}`);
     throw error;
   }
 }
@@ -109,14 +109,14 @@ async function reportMessage(messageId, messageContent) {
       reason: 'Inappropriate content'
     });
     
-    logger.info('✅ Report processed successfully');
-    logger.info(`📊 Analysis result: ${JSON.stringify(response.data.report.ai_analysis)}`);
-    logger.info(`🔍 Resolution: ${response.data.report.resolution_notes}`);
-    logger.info(`🗑️ Message deleted: ${response.data.report.message_deleted ? 'Yes' : 'No'}`);
+    info('✅ Report processed successfully');
+    info(`📊 Analysis result: ${JSON.stringify(response.data.report.ai_analysis)}`);
+    info(`🔍 Resolution: ${response.data.report.resolution_notes}`);
+    info(`🗑️ Message deleted: ${response.data.report.message_deleted ? 'Yes' : 'No'}`);
     
     return response.data;
   } catch (error) {
-    logger.error(`❌ Error reporting message: ${error.response?.data?.message || error.message}`);
+    error(`❌ Error reporting message: ${error.response?.data?.message || error.message}`);
     throw error;
   }
 }
@@ -135,13 +135,13 @@ async function checkMessageExists(messageId) {
       );
       
       const exists = result.rows.length > 0;
-      logger.info(`🔍 Message ${messageId} exists: ${exists}`);
+      info(`🔍 Message ${messageId} exists: ${exists}`);
       return exists;
     } finally {
       client.release();
     }
   } catch (error) {
-    logger.error(`❌ Error checking message: ${error.message}`);
+    error(`❌ Error checking message: ${error.message}`);
     throw error;
   }
 }
@@ -151,15 +151,15 @@ async function checkMessageExists(messageId) {
  */
 async function runTest() {
   try {
-    logger.info('🚀 Starting automated moderation test');
+    info('🚀 Starting automated moderation test');
     
     // Create test conversation
     const conversationId = await createTestConversation();
     
     // Test each message
     for (const [index, testMessage] of testMessages.entries()) {
-      logger.info(`\n📝 TEST ${index + 1}: ${testMessage.description}`);
-      logger.info(`📝 Message content: "${testMessage.content}"`);
+      info(`\n📝 TEST ${index + 1}: ${testMessage.description}`);
+      info(`📝 Message content: "${testMessage.content}"`);
       
       // Create test message
       const messageId = await createTestMessage(conversationId, testMessage.content);
@@ -170,13 +170,13 @@ async function runTest() {
       // Check if message still exists
       const messageExists = await checkMessageExists(messageId);
       
-      logger.info(`📊 Test ${index + 1} Result: ${messageExists ? 'Message remains' : 'Message deleted'}`);
-      logger.info('---------------------------------------------------');
+      info(`📊 Test ${index + 1} Result: ${messageExists ? 'Message remains' : 'Message deleted'}`);
+      info('---------------------------------------------------');
     }
     
-    logger.info('✅ All tests completed');
+    info('✅ All tests completed');
   } catch (error) {
-    logger.error(`❌ Test failed: ${error.message}`);
+    error(`❌ Test failed: ${error.message}`);
   }
 }
 

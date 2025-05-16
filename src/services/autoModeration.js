@@ -2,6 +2,9 @@ const supabase = require('../config/database');
 const logger = require('../utils/logger');
 const geminiAI = require('./geminiAI');
 
+// Use a fixed UUID for Gemini AI in the database
+const GEMINI_AI_USER_ID = '00000000-0000-4000-a000-000000000001'; // Special UUID for Gemini AI
+
 /**
  * Check if a user has been reported multiple times
  * @param {string} userId - User ID to check
@@ -260,7 +263,8 @@ const updateReportStatus = async (reportId, status, comment) => {
       .update({
         status: status,
         admin_comment: comment,
-        updated_at: new Date()
+        updated_at: new Date(),
+        resolved_by: status === 'pending' ? null : GEMINI_AI_USER_ID // Set Gemini AI as resolver if not pending
       })
       .eq('id', reportId);
       
@@ -273,7 +277,7 @@ const updateReportStatus = async (reportId, status, comment) => {
     const { error: logError } = await supabase
       .from('admin_activity_log')
       .insert({
-        admin_id: null, // Null indicates AI
+        admin_id: GEMINI_AI_USER_ID, // Use Gemini AI ID instead of null
         action: `report_${status}`,
         details: `Report ${reportId} ${status} by Gemini AI: ${comment}`,
         created_at: new Date(),

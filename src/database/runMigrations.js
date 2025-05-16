@@ -1,3 +1,6 @@
+const supabase = require('../config/database');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
 const { migrateReportsTable } = require('./migrations/create_reports_table_migration');
 
@@ -10,6 +13,15 @@ const runMigrations = async () => {
     
     // Run migrations in sequence
     await migrateReportsTable();
+    
+    // Create user_interests table
+    await runMigration('createUserInterestsTable.sql');
+    
+    // Create admin activity log table
+    await runMigration('createAdminActivityLog.sql');
+    
+    // Create Gemini AI user for automated actions
+    await runMigration('createGeminiUser.sql');
     
     logger.info('All migrations completed successfully!');
     return true;

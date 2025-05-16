@@ -50,18 +50,25 @@ const analyzeMessageContent = async (messageContent) => {
       Message: "${messageContent}"
       
       Classify this message into one of these categories:
-      1. INAPPROPRIATE - Contains hate speech, harassment, explicit content, threats, etc.
-      2. BORDERLINE - May be offensive but doesn't clearly violate guidelines
+      1. INAPPROPRIATE - Contains hate speech, harassment, explicit sexual content, threats, violence, illegal activity, terrorism, child exploitation, self-harm, etc.
+      2. BORDERLINE - May be offensive or concerning but doesn't clearly violate guidelines (mild profanity, adult themes without explicit content, etc.)
       3. ACCEPTABLE - Does not violate any guidelines
       
-      Provide your classification and a brief explanation for your decision.
+      For clarity:
+      - Explicit sexual content, harassment, threats, hate speech, and discrimination are considered INAPPROPRIATE with high confidence
+      - Messages that clearly indicate illegal activity are INAPPROPRIATE with high confidence
+      - Give higher confidence scores (0.85+) when you are certain the message violates guidelines
+      - Give lower confidence scores (0.5-0.7) when there is ambiguity
+      
+      Provide your classification and a detailed explanation for your decision.
       
       Format your response as a JSON object with these fields:
       {
         "classification": "INAPPROPRIATE|BORDERLINE|ACCEPTABLE",
-        "confidence": 0-1 (your confidence level),
+        "confidence": 0-1 (your confidence level, use 0.85+ for clear violations),
         "explanation": "brief explanation",
-        "violatedPolicies": ["list of specific policies violated, if any"]
+        "violatedPolicies": ["list of specific policies violated, if any"],
+        "recommendedAction": "DELETE|WARNING|NONE" (DELETE for serious violations, WARNING for borderline)
       }
     `;
 
@@ -103,7 +110,8 @@ const analyzeMessageContent = async (messageContent) => {
           classification: "ACCEPTABLE",
           confidence: 0.9,
           explanation: "Fallback analysis due to error. Message appears to be acceptable.",
-          violatedPolicies: []
+          violatedPolicies: [],
+          recommendedAction: "NONE"
         };
       }
       
@@ -112,7 +120,20 @@ const analyzeMessageContent = async (messageContent) => {
       try {
         // Parse and return the analysis
         const result = JSON.parse(jsonStr);
-        logger.info('🤖 Successfully parsed Gemini response:', result.classification);
+        logger.info(`🤖 Successfully parsed Gemini response: ${result.classification} (confidence: ${result.confidence})`);
+        
+        // Ensure the result has the recommendedAction field
+        if (!result.recommendedAction) {
+          if (result.classification === "INAPPROPRIATE" && result.confidence >= 0.85) {
+            result.recommendedAction = "DELETE";
+          } else if (result.classification === "INAPPROPRIATE" || 
+                   (result.classification === "BORDERLINE" && result.confidence >= 0.7)) {
+            result.recommendedAction = "WARNING";
+          } else {
+            result.recommendedAction = "NONE";
+          }
+        }
+        
         return result;
       } catch (jsonError) {
         logger.error('❌ Failed to parse Gemini JSON response:', getSafeErrorDetails(jsonError));
@@ -122,7 +143,8 @@ const analyzeMessageContent = async (messageContent) => {
           classification: "ACCEPTABLE", 
           confidence: 0.9,
           explanation: "Fallback analysis due to error. Message appears to be acceptable.",
-          violatedPolicies: []
+          violatedPolicies: [],
+          recommendedAction: "NONE"
         };
       }
     } catch (axiosError) {
@@ -147,7 +169,8 @@ const analyzeMessageContent = async (messageContent) => {
       classification: "ACCEPTABLE",
       confidence: 0.9,
       explanation: "Fallback analysis due to API error. Message assumed acceptable.",
-      violatedPolicies: []
+      violatedPolicies: [],
+      recommendedAction: "NONE"
     };
   }
 };

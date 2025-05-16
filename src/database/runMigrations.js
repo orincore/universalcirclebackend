@@ -22,6 +22,9 @@ const runMigrations = async () => {
     
     // Create Gemini AI user for automated actions
     await runMigration('createGeminiUser.sql');
+
+    // Create test users for moderation testing
+    await runMigration('createTestUsers.sql');
     
     logger.info('All migrations completed successfully!');
     return true;

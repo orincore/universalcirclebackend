@@ -1,6 +1,121 @@
+const express = require('express');
+const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
+const { pool } = require('../database/dbConfig');
 const logger = require('../utils/logger');
 const autoModeration = require('../services/autoModeration');
 const geminiAI = require('../services/geminiAI');
+
+/**
+ * @swagger
+ * /api/webhook/test-report-moderation:
+ *   post:
+ *     summary: Test the automated report moderation system
+ *     description: Creates a test report and processes it through Gemini AI
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message_id:
+ *                 type: string
+ *                 description: ID of the message to report
+ *               reported_by:
+ *                 type: string
+ *                 description: ID of the user reporting the message
+ *               reported_user_id:
+ *                 type: string
+ *                 description: ID of the user who sent the message
+ *               reason:
+ *                 type: string
+ *                 description: Reason for the report
+ *     responses:
+ *       200:
+ *         description: Successfully processed the report
+ *       400:
+ *         description: Invalid input data
+ *       500:
+ *         description: Server error
+ */
+router.post('/test-report-moderation', async (req, res) => {
+  try {
+    const { message_id, reported_by, reported_user_id, reason } = req.body;
+    
+    if (!message_id || !reported_by || !reported_user_id || !reason) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: message_id, reported_by, reported_user_id, reason' 
+      });
+    }
+    
+    // Create a test report
+    const reportId = uuidv4();
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Insert the report
+      await client.query(
+        `INSERT INTO reports (id, message_id, reported_by, reported_user_id, reason, status, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [reportId, message_id, reported_by, reported_user_id, reason, 'pending']
+      );
+      
+      await client.query('COMMIT');
+      logger.info(`✅ Test report created: ${reportId}`);
+      
+      // Process the report with AI
+      const report = { 
+        id: reportId, 
+        message_id, 
+        reported_by, 
+        reported_user_id, 
+        reason, 
+        status: 'pending' 
+      };
+      
+      const result = await autoModeration.processReportWithAI(report);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Report processed successfully',
+        report: result
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`❌ Error creating test report: ${error.message}`);
+      return res.status(500).json({ 
+        success: false, 
+        message: `Error creating test report: ${error.message}` 
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error(`❌ Error in test-report-moderation endpoint: ${error.message}`);
+    return res.status(500).json({ 
+      success: false, 
+      message: `Server error: ${error.message}` 
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/webhook/health:
+ *   get:
+ *     summary: Check webhook health
+ *     description: Returns status of webhook service
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ */
+router.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
 
 /**
  * Process a newly submitted report with AI
@@ -92,6 +207,4 @@ const processReportAsync = async (reportId) => {
   }
 };
 
-module.exports = {
-  processNewReport
-}; 
+module.exports = router; 

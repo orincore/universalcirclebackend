@@ -113,16 +113,27 @@ const submitReport = async (req, res) => {
       comment: comment || null,
       reporter_id: req.user.id,
       created_at: new Date(),
-      status: 'pending'
+      status: 'pending',
+      // Initialize other fields as NULL
+      details: null,
+      action_taken: null,
+      admin_notes: null,
+      resolved_by: null,
+      updated_at: null,
+      admin_comment: null
     };
     
     // Set specific fields based on content type
     if (contentType === 'user') {
       reportData.reported_user_id = contentId;
-    } else if (contentType === 'message') {
-      reportData.reported_message_id = contentId;
+      reportData.reported_post_id = null;
     } else if (contentType === 'post') {
       reportData.reported_post_id = contentId;
+      reportData.reported_user_id = null;
+    } else {
+      // For other content types, both fields should be null
+      reportData.reported_user_id = null;
+      reportData.reported_post_id = null;
     }
     
     // Create the report

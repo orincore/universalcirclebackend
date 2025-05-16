@@ -1,7 +1,7 @@
 const supabase = require('../config/database');
 const { info, error, warn } = require('../utils/logger');
 const geminiAI = require('./geminiAI');
-const { pool } = require('../database/dbConfig');
+const crypto = require('crypto');
 
 // Use a fixed UUID for Gemini AI in the database
 const GEMINI_AI_USER_ID = '00000000-0000-4000-a000-000000000001'; // Special UUID for Gemini AI
@@ -37,56 +37,31 @@ const getUserReportHistory = async (userId) => {
  * @returns {Promise<string>} Message content or empty string if not found
  */
 const getMessageContent = async (messageId) => {
-  let client;
   try {
-    info(`Attempting to connect to database to get message ${messageId}`);
+    info(`Attempting to retrieve message ${messageId} using Supabase`);
     
-    // Log database configuration for debugging
-    info('Database host:', process.env.PGHOST || 'default');
-    info('Database name:', process.env.PGDATABASE || 'default');
-    info('Database port:', process.env.PGPORT || '5432');
+    // Use Supabase client instead of direct PostgreSQL connection
+    const { data, error } = await supabase
+      .from('messages')
+      .select('content')
+      .eq('id', messageId)
+      .single();
     
-    // Attempt to get a client from the pool
-    client = await pool.connect();
-    info(`Connected to database successfully, querying for message ${messageId}`);
+    if (error) {
+      info(`Error retrieving message ${messageId} with Supabase:`, error);
+      return '';
+    }
     
-    const result = await client.query(
-      'SELECT content FROM messages WHERE id = $1',
-      [messageId]
-    );
-    
-    if (result.rows.length === 0) {
+    if (!data) {
       info(`Message ${messageId} not found in database`);
       return '';
     }
     
     info(`Successfully retrieved content for message ${messageId}`);
-    return result.rows[0].content;
+    return data.content;
   } catch (error) {
-    info(`Error fetching message ${messageId} content:`, error);
-    
-    // For connection errors, add more diagnostic information
-    if (error.code === 'ECONNREFUSED') {
-      info('Database connection refused. Check database server status and connection details.');
-    } else if (error.code === 'ETIMEDOUT') {
-      info('Database connection timed out. Check network connectivity and firewall settings.');
-    } else if (error.code === 'ENOTFOUND') {
-      info('Database host not found. Check hostname and DNS resolution.');
-    } else if (error.code === 'ECONNRESET') {
-      info('Connection reset by database server. Check server logs for issues.');
-    }
-    
+    info(`Error in getMessageContent for message ${messageId}:`, error);
     return '';
-  } finally {
-    // Always release the client, but only if it was obtained
-    if (client) {
-      try {
-        client.release();
-        info('Database client released successfully');
-      } catch (releaseError) {
-        info('Error releasing database client:', releaseError);
-      }
-    }
   }
 };
 
@@ -139,69 +114,73 @@ const deleteInappropriateMessage = async (messageId) => {
   try {
     info(`🤖 Attempting to delete inappropriate message: ${messageId}`);
     
-    const client = await pool.connect();
+    // First, get the message details
+    const { data: messageData, error: messageError } = await supabase
+      .from('messages')
+      .select('conversation_id, sender_id')
+      .eq('id', messageId)
+      .single();
     
-    try {
-      await client.query('BEGIN');
-      
-      // Get the message details before deleting
-      const messageResult = await client.query(
-        'SELECT conversation_id, sender_id FROM messages WHERE id = $1',
-        [messageId]
-      );
-      
-      if (messageResult.rows.length === 0) {
-        info(`❌ Message ${messageId} not found for deletion`);
-        await client.query('ROLLBACK');
-        return false;
-      }
-      
-      const { conversation_id, sender_id } = messageResult.rows[0];
-      
-      // Delete the message
-      await client.query(
-        'DELETE FROM messages WHERE id = $1',
-        [messageId]
-      );
-      
-      // Create a system message explaining the deletion
-      await client.query(
-        `INSERT INTO messages (id, conversation_id, sender_id, content, is_system_message, created_at) 
-         VALUES (uuid_generate_v4(), $1, $2, $3, TRUE, NOW())`,
-        [
-          conversation_id, 
-          GEMINI_AI_USER_ID,
-          '⚠️ A message was removed by our automated content moderation system for violating community guidelines.'
-        ]
-      );
-      
-      // Log the action to admin activity log
-      await client.query(
-        `INSERT INTO admin_activity_log (admin_id, action_type, target_type, target_id, details, created_at)
-         VALUES ($1, 'delete_message', 'message', $2, $3, NOW())`,
-        [
-          GEMINI_AI_USER_ID,
-          messageId,
-          JSON.stringify({
-            reason: 'Automated removal of inappropriate content',
-            conversation_id,
-            user_id: sender_id
-          })
-        ]
-      );
-      
-      await client.query('COMMIT');
-      info(`✅ Successfully deleted inappropriate message: ${messageId}`);
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      info(`❌ Error deleting inappropriate message: ${error.message}`);
+    if (messageError || !messageData) {
+      info(`❌ Message ${messageId} not found for deletion: ${messageError?.message || 'No data'}`);
       return false;
-    } finally {
-      client.release();
     }
+    
+    const { conversation_id, sender_id } = messageData;
+    
+    // Delete the message
+    const { error: deleteError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+    
+    if (deleteError) {
+      info(`❌ Error deleting message ${messageId}: ${deleteError.message}`);
+      return false;
+    }
+    
+    // Create a system message explaining the deletion
+    const { error: systemMsgError } = await supabase
+      .from('messages')
+      .insert({
+        id: crypto.randomUUID(), // Generate UUID in JavaScript
+        conversation_id,
+        sender_id: GEMINI_AI_USER_ID,
+        content: '⚠️ A message was removed by our automated content moderation system for violating community guidelines.',
+        is_system_message: true,
+        created_at: new Date().toISOString()
+      });
+    
+    if (systemMsgError) {
+      info(`❌ Error creating system message: ${systemMsgError.message}`);
+      // Continue even if system message fails
+    }
+    
+    // Log the action to admin activity log
+    const { error: logError } = await supabase
+      .from('admin_activity_log')
+      .insert({
+        admin_id: GEMINI_AI_USER_ID,
+        action_type: 'delete_message',
+        target_type: 'message',
+        target_id: messageId,
+        details: JSON.stringify({
+          reason: 'Automated removal of inappropriate content',
+          conversation_id,
+          user_id: sender_id
+        }),
+        created_at: new Date().toISOString()
+      });
+    
+    if (logError) {
+      info(`❌ Error logging admin activity: ${logError.message}`);
+      // Continue even if logging fails
+    }
+    
+    info(`✅ Successfully deleted inappropriate message: ${messageId}`);
+    return true;
   } catch (error) {
-    info(`❌ Database connection error during message deletion: ${error.message}`);
+    info(`❌ Error in deleteInappropriateMessage: ${error.message}`);
     return false;
   }
 };

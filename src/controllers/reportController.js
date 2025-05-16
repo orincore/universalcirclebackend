@@ -271,7 +271,7 @@ const triggerAIProcessing = async (reportId) => {
           // First get the complete report data
           const { data: report, error: reportError } = await supabase
             .from('reports')
-            .select('id, content_id, reported_by, reported_user_id, reason, status, content_type')
+            .select('id, content_id, reporter_id, reported_user_id, reason, status, content_type, comment, admin_comment, resolved_by, updated_at')
             .eq('id', reportId)
             .single();
           
@@ -283,8 +283,9 @@ const triggerAIProcessing = async (reportId) => {
           // Use content_id as message_id when content_type is 'message' 
           if (report.content_type === 'message') {
             report.message_id = report.content_id;
+            report.reported_by = report.reporter_id; // Map to the expected property name
             
-            logger.info(`🤖 Retrieved report data for processing: ${reportId}, message_id: ${report.message_id}`);
+            logger.info(`🤖 Retrieved report data for processing: ${reportId}, message_id: ${report.content_id}`);
           } else {
             logger.info(`🤖 Retrieved report data for processing: ${reportId}, content_type: ${report.content_type}`);
           }

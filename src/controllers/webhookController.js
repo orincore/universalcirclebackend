@@ -176,7 +176,8 @@ const processReportAsync = async (reportId) => {
     try {
       // Get the full report data
       const reportResult = await client.query(
-        `SELECT id, content_id, reported_by, reported_user_id, reason, status, content_type
+        `SELECT id, content_id, reporter_id, reported_user_id, reason, status, content_type, 
+         comment, admin_comment, resolved_by, updated_at
          FROM reports WHERE id = $1`,
         [reportId]
       );
@@ -191,7 +192,8 @@ const processReportAsync = async (reportId) => {
       // Add message_id property if this is a message report
       if (report.content_type === 'message') {
         report.message_id = report.content_id;
-        info(`🤖 Retrieved report data for ${reportId}, message_id: ${report.message_id}`);
+        report.reported_by = report.reporter_id; // Map to the expected property name
+        info(`🤖 Retrieved report data for ${reportId}, message_id: ${report.content_id}`);
       } else {
         info(`🤖 Retrieved report data for ${reportId}, content_type: ${report.content_type}`);
       }

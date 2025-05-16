@@ -97,12 +97,11 @@ app.post('/api/messages/conversations', authenticate, async (req, res) => {
       });
     }
     
-    // Check if users have a match
+    // Check if any match exists between the users (regardless of status)
     const { data: matchData, error: matchError } = await supabase
       .from('matches')
       .select('id, status')
       .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUserId})`)
-      .eq('status', 'accepted')
       .limit(1);
     
     if (matchError) {
@@ -113,17 +112,18 @@ app.post('/api/messages/conversations', authenticate, async (req, res) => {
       });
     }
     
-    // If no match exists, create a dummy match for chat
+    // If no match exists, create a new one. If match exists, update it if needed
     let matchId;
     if (!matchData || matchData.length === 0) {
+      // Create a new match
       const { data: newMatch, error: newMatchError } = await supabase
         .from('matches')
         .insert({
           user1_id: currentUserId,
           user2_id: userId,
           status: 'accepted',
-          compatibility_score: 100, // Add default compatibility score to prevent not-null constraint violation
-          shared_interests: [], // Add empty array for shared interests
+          compatibility_score: 100,
+          shared_interests: [],
           created_at: new Date(),
           updated_at: new Date(),
           accepted_at: new Date()
@@ -141,7 +141,29 @@ app.post('/api/messages/conversations', authenticate, async (req, res) => {
       
       matchId = newMatch.id;
     } else {
+      // Match exists, update if not already accepted
       matchId = matchData[0].id;
+      
+      if (matchData[0].status !== 'accepted') {
+        const { error: updateError } = await supabase
+          .from('matches')
+          .update({
+            status: 'accepted',
+            compatibility_score: 100,
+            shared_interests: [],
+            updated_at: new Date(),
+            accepted_at: new Date()
+          })
+          .eq('id', matchId);
+        
+        if (updateError) {
+          console.error('Error updating existing match:', updateError);
+          return res.status(500).json({
+            success: false,
+            message: 'Error updating existing match'
+          });
+        }
+      }
     }
     
     // Get user details for the conversation

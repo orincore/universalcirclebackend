@@ -1,6 +1,7 @@
 const supabase = require('../config/database');
 const { messageCreateSchema, messageMediaSchema } = require('../models/message');
 const { generateUploadUrl } = require('../utils/awsS3');
+const { notifyConversationDeleted } = require('../socket/socketManager');
 
 /**
  * Send a message to another user
@@ -363,6 +364,9 @@ const deleteConversation = async (req, res) => {
         }
       }
     }
+
+    // Notify both users about the conversation deletion via socket
+    notifyConversationDeleted(currentUserId, userId);
 
     return res.status(200).json({
       success: true,

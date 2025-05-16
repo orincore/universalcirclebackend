@@ -1897,6 +1897,93 @@ const initializeSocket = (io) => {
         });
       }
     });
+
+    // Add socket event handler for conversation deletion
+    socket.on('conversation:delete', async (data) => {
+      try {
+        const { otherUserId } = data;
+        const currentUserId = socket.user.id;
+        
+        if (!otherUserId) {
+          socket.emit('error', {
+            source: 'conversation:delete',
+            message: 'Other user ID is required'
+          });
+          return;
+        }
+        
+        console.log(`User ${currentUserId} requested to delete conversation with ${otherUserId}`);
+        
+        // 1. Delete all messages between the two users
+        const { error: deleteMessagesError } = await supabase
+          .from('messages')
+          .delete()
+          .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUserId})`);
+
+        if (deleteMessagesError) {
+          console.error('Error deleting messages:', deleteMessagesError);
+          socket.emit('error', {
+            source: 'conversation:delete',
+            message: 'Failed to delete messages'
+          });
+          return;
+        }
+        
+        // 2. Find and update match status to 'removed'
+        const { data: match, error: matchFindError } = await supabase
+          .from('matches')
+          .select('id, status')
+          .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${otherUserId}),and(user1_id.eq.${otherUserId},user2_id.eq.${currentUserId})`)
+          .eq('status', 'accepted')
+          .single();
+
+        if (matchFindError && matchFindError.code !== 'PGRST116') { // PGRST116 is "Results contain 0 rows"
+          console.error('Error finding match:', matchFindError);
+          socket.emit('error', {
+            source: 'conversation:delete',
+            message: 'Failed to find match'
+          });
+          return;
+        }
+
+        // If match exists, update its status
+        if (match) {
+          const { error: matchUpdateError } = await supabase
+            .from('matches')
+            .update({ 
+              status: 'removed',
+              updated_at: new Date()
+            })
+            .eq('id', match.id);
+
+          if (matchUpdateError) {
+            console.error('Error updating match:', matchUpdateError);
+            socket.emit('error', {
+              source: 'conversation:delete',
+              message: 'Failed to update match status'
+            });
+            return;
+          }
+        }
+        
+        // 3. Notify both users about the conversation deletion
+        notifyConversationDeleted(currentUserId, otherUserId);
+        
+        // 4. Send success confirmation to user who initiated deletion
+        socket.emit('conversation:deleteConfirmed', {
+          otherUserId,
+          timestamp: new Date().toISOString(),
+          status: 'success'
+        });
+        
+      } catch (error) {
+        console.error('Error in conversation:delete:', error);
+        socket.emit('error', {
+          source: 'conversation:delete',
+          message: 'Server error processing conversation deletion'
+        });
+      }
+    });
   });
 };
 
@@ -2509,6 +2596,45 @@ const notifyBulkMessageDeletion = (messageIds, user1Id, user2Id) => {
   }
 };
 
+/**
+ * Notify users when a conversation has been deleted
+ * @param {string} currentUserId - ID of the user who deleted the conversation
+ * @param {string} otherUserId - ID of the other user in the conversation
+ */
+const notifyConversationDeleted = (currentUserId, otherUserId) => {
+  try {
+    const timestamp = new Date().toISOString();
+    console.log(`Notifying conversation deletion between ${currentUserId} and ${otherUserId}`);
+    
+    // Notify the user who initiated the deletion (confirmation)
+    const senderSocketId = connectedUsers.get(currentUserId);
+    if (senderSocketId) {
+      ioInstance.to(senderSocketId).emit('conversation:deleted', {
+        receiverId: otherUserId,
+        senderId: currentUserId,
+        timestamp,
+        status: 'success',
+        message: 'Conversation deleted successfully'
+      });
+      console.log(`Sent confirmation to user ${currentUserId}`);
+    }
+    
+    // Notify the other user that the conversation was deleted
+    const receiverSocketId = connectedUsers.get(otherUserId);
+    if (receiverSocketId) {
+      ioInstance.to(receiverSocketId).emit('conversation:deleted', {
+        receiverId: otherUserId,
+        senderId: currentUserId,
+        timestamp,
+        message: 'The other user has deleted this conversation'
+      });
+      console.log(`Sent notification to user ${otherUserId}`);
+    }
+  } catch (error) {
+    console.error('Error in notifyConversationDeleted:', error);
+  }
+};
+
 module.exports = {
   initializeSocket,
   notifyMatchFound,
@@ -2524,5 +2650,6 @@ module.exports = {
   stopGlobalMatchmaking,
   findMatchesForAllUsers,
   notifyMessageDeletion,
-  notifyBulkMessageDeletion
+  notifyBulkMessageDeletion,
+  notifyConversationDeleted
 }; 

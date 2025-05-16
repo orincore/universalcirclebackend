@@ -138,9 +138,9 @@ const submitReport = async (req, res) => {
       reportData.reported_user_id = contentId;
       reportData.reported_post_id = null;
     } else if (contentType === 'message') {
-      // For messages, we need to set reported_post_id since that's what the schema expects
-      // Previously we were looking for reported_message_id which doesn't exist
-      reportData.reported_post_id = contentId;
+      // For messages, we should NOT set reported_post_id as it has a foreign key to posts table
+      // Instead, we'll just use content_type and content_id to identify the message
+      reportData.reported_post_id = null;
       reportData.reported_user_id = null;
       
       // Add additional check to see if the message exists

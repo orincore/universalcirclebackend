@@ -4,7 +4,8 @@ const {
   sendMessage,
   getConversation,
   getConversations,
-  getMessageMediaUploadUrl
+  getMessageMediaUploadUrl,
+  deleteConversation
 } = require('../controllers/messageController');
 const { authenticate } = require('../middlewares/auth');
 
@@ -22,5 +23,8 @@ router.get('/conversations', getConversations);
 
 // Get pre-signed URL for message media upload
 router.post('/media-upload-url', getMessageMediaUploadUrl);
+
+// Delete conversation with another user
+router.delete('/conversation/:userId', deleteConversation);
 
 module.exports = router; 

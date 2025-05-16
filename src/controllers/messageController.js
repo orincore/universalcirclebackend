@@ -286,9 +286,101 @@ const getMessageMediaUploadUrl = async (req, res) => {
   }
 };
 
+/**
+ * Delete all messages between current user and another user and remove from chat list
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const deleteConversation = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const { userId } = req.params;
+
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    // Start a transaction for multiple operations
+    const { error: transactionError } = await supabase.rpc('delete_conversation_data', {
+      current_user_id: currentUserId,
+      other_user_id: userId
+    });
+
+    if (transactionError) {
+      // If RPC doesn't exist, fall back to multiple separate operations
+      console.log('RPC not available, using separate operations');
+
+      // 1. Delete all messages between the two users
+      const { error: deleteMessagesError } = await supabase
+        .from('messages')
+        .delete()
+        .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`);
+
+      if (deleteMessagesError) {
+        console.error('Error deleting messages:', deleteMessagesError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to delete messages'
+        });
+      }
+
+      // 2. Find and update the match to remove from chat list (set status to 'removed')
+      const { data: match, error: matchFindError } = await supabase
+        .from('matches')
+        .select('id, status')
+        .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUserId})`)
+        .eq('status', 'accepted')
+        .single();
+
+      if (matchFindError && matchFindError.code !== 'PGRST116') { // PGRST116 is "Results contain 0 rows"
+        console.error('Error finding match:', matchFindError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to find match'
+        });
+      }
+
+      // If match exists, update its status
+      if (match) {
+        const { error: matchUpdateError } = await supabase
+          .from('matches')
+          .update({ 
+            status: 'removed',
+            updated_at: new Date()
+          })
+          .eq('id', match.id);
+
+        if (matchUpdateError) {
+          console.error('Error updating match:', matchUpdateError);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to update match status'
+          });
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Conversation deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete conversation error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while deleting conversation'
+    });
+  }
+};
+
 module.exports = {
   sendMessage,
   getConversation,
   getConversations,
-  getMessageMediaUploadUrl
+  getMessageMediaUploadUrl,
+  deleteConversation
 }; 

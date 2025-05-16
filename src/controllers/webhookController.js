@@ -170,24 +170,49 @@ const processReportAsync = async (reportId) => {
   try {
     info(`Starting AI processing for report ${reportId}`);
     
-    const result = await autoModeration.processReportWithAI(reportId);
+    // First fetch the complete report data
+    const client = await pool.connect();
     
-    // Safely log the result without circular references
-    const safeResult = {
-      success: result.success,
-      message: result.message,
-      action: result.action || 'unknown'
-    };
-    
-    if (result.success) {
-      info(`AI successfully processed report ${reportId}: ${safeResult.message}`);
-    } else {
-      error(`AI failed to process report ${reportId}: ${safeResult.message}`);
+    try {
+      // Get the full report data
+      const reportResult = await client.query(
+        `SELECT id, message_id, reported_by, reported_user_id, reason, status, created_at 
+         FROM reports WHERE id = $1`,
+        [reportId]
+      );
       
-      // Log the error details if available
-      if (result.error) {
-        error(`Error details for report ${reportId}: ${result.error}`);
+      if (reportResult.rows.length === 0) {
+        error(`Report ${reportId} not found for AI processing`);
+        return;
       }
+      
+      const report = reportResult.rows[0];
+      info(`🤖 Retrieved report data for ${reportId}, message_id: ${report.message_id}`);
+      
+      // Process the report with AI using the complete report object
+      const result = await autoModeration.processReportWithAI(report);
+      
+      // Safely log the result without circular references
+      const safeResult = {
+        success: result && !result.ai_error,
+        message: result.resolution_notes || result.ai_error || 'Unknown result',
+        action: result.status || 'unknown'
+      };
+      
+      if (safeResult.success) {
+        info(`AI successfully processed report ${reportId}: ${safeResult.message}`);
+      } else {
+        error(`AI failed to process report ${reportId}: ${safeResult.message}`);
+        
+        // Log the error details if available
+        if (result.ai_error) {
+          error(`Error details for report ${reportId}: ${result.ai_error}`);
+        }
+      }
+    } catch (dbError) {
+      error(`Database error retrieving report ${reportId}: ${dbError.message}`);
+    } finally {
+      client.release();
     }
   } catch (err) {
     // Use shared safe error handling

@@ -267,24 +267,44 @@ const triggerAIProcessing = async (reportId) => {
       setTimeout(async () => {
         try {
           logger.info(`🤖 Processing report asynchronously: ${reportId}`);
-          const result = await autoModeration.processReportWithAI(reportId);
+          
+          // First get the complete report data
+          const { data: report, error: reportError } = await supabase
+            .from('reports')
+            .select('id, message_id, reported_by, reported_user_id, reason, status, content_id, content_type')
+            .eq('id', reportId)
+            .single();
+          
+          if (reportError || !report) {
+            logger.error(`❌ Error retrieving report data for ${reportId}: ${reportError?.message || 'Report not found'}`);
+            return;
+          }
+          
+          // Use message_id if available, otherwise use content_id if it's a message type
+          if (!report.message_id && report.content_type === 'message') {
+            report.message_id = report.content_id;
+          }
+          
+          logger.info(`🤖 Retrieved report data for processing: ${reportId}, message_id: ${report.message_id || 'unknown'}`);
+          
+          // Process the report with the complete data
+          const result = await autoModeration.processReportWithAI(report);
           
           // Safely log the result without circular references
-          const safeResult = {
-            success: result.success,
-            message: result.message,
-            action: result.action
-          };
-          
-          if (result.success) {
-            logger.info(`🤖 AI processing result for ${reportId}: Success - ${safeResult.message}`);
-          } else {
-            logger.error(`🤖 AI processing result for ${reportId}: Failed - ${safeResult.message}`);
+          if (result) {
+            const safeResult = {
+              success: !result.ai_error,
+              message: result.resolution_notes || result.ai_error || 'Unknown result',
+              status: result.status
+            };
             
-            // Log error details if available
-            if (result.error) {
-              logger.error(`Error details for report ${reportId}: ${result.error}`);
+            if (safeResult.success) {
+              logger.info(`🤖 AI processing result for ${reportId}: Success - ${safeResult.message}`);
+            } else {
+              logger.error(`🤖 AI processing result for ${reportId}: Failed - ${safeResult.message}`);
             }
+          } else {
+            logger.error(`❌ No result returned for report ${reportId}`);
           }
         } catch (err) {
           // Use shared safe error handling

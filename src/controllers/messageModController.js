@@ -1,4 +1,5 @@
 const supabase = require('../config/database');
+const { notifyMessageDeletion, notifyBulkMessageDeletion } = require('../socket/socketManager');
 
 /**
  * Submit a report for a user and/or specific messages
@@ -263,6 +264,9 @@ const deleteMessage = async (req, res) => {
       created_at: new Date()
     });
     
+    // Notify users about the deletion via socket
+    notifyMessageDeletion(messageId, message.sender_id, message.receiver_id);
+    
     return res.status(200).json({
       success: true,
       message: 'Message deleted successfully'
@@ -291,6 +295,17 @@ const deleteConversation = async (req, res) => {
         success: false,
         message: 'Both user IDs are required'
       });
+    }
+    
+    // Get message IDs before deletion for notification
+    const { data: messageIds, error: messageIdsError } = await supabase
+      .from('messages')
+      .select('id')
+      .or(`and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`);
+    
+    if (messageIdsError) {
+      console.error('Error getting message IDs:', messageIdsError);
+      // Continue anyway, we can still delete the messages even if we can't notify about specific IDs
     }
     
     // Count messages before deletion for confirmation
@@ -338,6 +353,12 @@ const deleteConversation = async (req, res) => {
       reason: reason || 'Violated community guidelines',
       created_at: new Date()
     });
+    
+    // Notify users about bulk deletion via socket
+    if (messageIds && messageIds.length > 0) {
+      const ids = messageIds.map(msg => msg.id);
+      notifyBulkMessageDeletion(ids, user1Id, user2Id);
+    }
     
     return res.status(200).json({
       success: true,

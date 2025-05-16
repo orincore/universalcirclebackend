@@ -1,4 +1,5 @@
 const supabase = require('../config/database');
+const { notifyMessageDeletion, notifyBulkMessageDeletion } = require('../socket/socketManager');
 
 /**
  * Delete a specific message (user can only delete their own messages)
@@ -20,7 +21,7 @@ const deleteOwnMessage = async (req, res) => {
     // Check if the message exists and belongs to the user
     const { data: message, error: messageError } = await supabase
       .from('messages')
-      .select('id, sender_id')
+      .select('id, sender_id, receiver_id')
       .eq('id', messageId)
       .single();
     
@@ -54,6 +55,9 @@ const deleteOwnMessage = async (req, res) => {
       });
     }
     
+    // Notify users about the message deletion
+    notifyMessageDeletion(messageId, message.sender_id, message.receiver_id);
+    
     return res.status(200).json({
       success: true,
       message: 'Message deleted successfully'
@@ -83,6 +87,17 @@ const deleteConversationForUser = async (req, res) => {
         success: false,
         message: 'Other user ID is required'
       });
+    }
+    
+    // Get the message IDs for notification purposes
+    const { data: messageIds, error: messageIdsError } = await supabase
+      .from('messages')
+      .select('id')
+      .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userId})`);
+    
+    if (messageIdsError) {
+      console.error('Error getting message IDs:', messageIdsError);
+      // Continue anyway, we can still mark messages as deleted even if we can't notify about specific IDs
     }
     
     // Check if the conversation exists
@@ -135,6 +150,12 @@ const deleteConversationForUser = async (req, res) => {
         success: false,
         message: 'Failed to delete conversation (received messages)'
       });
+    }
+    
+    // Notify users about bulk deletion via socket
+    if (messageIds && messageIds.length > 0) {
+      const ids = messageIds.map(msg => msg.id);
+      notifyBulkMessageDeletion(ids, userId, otherUserId);
     }
     
     return res.status(200).json({

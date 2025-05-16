@@ -2455,6 +2455,60 @@ const findMatchForUser = (socket) => {
   }
 };
 
+// Handle message deletion notifications
+const notifyMessageDeletion = (messageId, senderId, receiverId) => {
+  try {
+    // Notify the sender (if they are online)
+    const senderSocketId = connectedUsers.get(senderId);
+    if (senderSocketId) {
+      ioInstance.to(senderSocketId).emit('message:delete', {
+        messageId,
+        deletedAt: new Date().toISOString()
+      });
+    }
+    
+    // Notify the receiver (if they are online)
+    const receiverSocketId = connectedUsers.get(receiverId);
+    if (receiverSocketId) {
+      ioInstance.to(receiverSocketId).emit('message:delete', {
+        messageId,
+        deletedAt: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Error in notifyMessageDeletion:', error);
+  }
+};
+
+// Handle bulk message deletion notifications
+const notifyBulkMessageDeletion = (messageIds, user1Id, user2Id) => {
+  try {
+    const deletedAt = new Date().toISOString();
+    
+    // Notify first user (if online)
+    const user1SocketId = connectedUsers.get(user1Id);
+    if (user1SocketId) {
+      ioInstance.to(user1SocketId).emit('message:bulkDelete', {
+        messageIds,
+        otherUserId: user2Id,
+        deletedAt
+      });
+    }
+    
+    // Notify second user (if online)
+    const user2SocketId = connectedUsers.get(user2Id);
+    if (user2SocketId) {
+      ioInstance.to(user2SocketId).emit('message:bulkDelete', {
+        messageIds,
+        otherUserId: user1Id,
+        deletedAt
+      });
+    }
+  } catch (error) {
+    console.error('Error in notifyBulkMessageDeletion:', error);
+  }
+};
+
 module.exports = {
   initializeSocket,
   notifyMatchFound,
@@ -2468,5 +2522,7 @@ module.exports = {
   MATCH_ACCEPTANCE_TIMEOUT,
   startGlobalMatchmaking,
   stopGlobalMatchmaking,
-  findMatchesForAllUsers
+  findMatchesForAllUsers,
+  notifyMessageDeletion,
+  notifyBulkMessageDeletion
 }; 

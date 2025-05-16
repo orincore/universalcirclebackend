@@ -163,18 +163,32 @@ const login = async (req, res) => {
     // Remove password from response
     delete user.password;
 
-    // Generate JWT token
-    const token = generateToken(user);
+    // Generate JWT token with admin flag if user is admin
+    const token = generateToken({
+      ...user,
+      isAdmin: user.is_admin // Add admin flag to token payload based on user status
+    });
 
-    // Update last login timestamp
+    // Update last login timestamp (and admin_login_count if user is admin)
+    const updateData = { last_login: new Date() };
+    
+    if (user.is_admin) {
+      updateData.admin_login_count = (user.admin_login_count || 0) + 1;
+    }
+    
     await supabase
       .from('users')
-      .update({ last_login: new Date() })
+      .update(updateData)
       .eq('id', user.id);
+
+    // Log admin login
+    if (user.is_admin) {
+      console.log(`Admin login successful: ${user.username} (${user.id})`);
+    }
 
     return res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: user.is_admin ? 'Admin login successful' : 'Login successful',
       data: {
         user,
         token

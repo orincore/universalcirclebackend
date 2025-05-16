@@ -35,7 +35,6 @@ const matchmakingRoutes = require('./routes/matchmakingRoutes');
 const postRoutes = require('./routes/postRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const adminAuthRoutes = require('./routes/adminAuthRoutes');
 const adminMessageRoutes = require('./routes/adminMessageRoutes');
 const userMessageRoutes = require('./routes/userMessageRoutes');
 const healthRoutes = require('./routes/healthRoutes');
@@ -89,9 +88,8 @@ app.use('/api/messages/user', userMessageRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin/messages', adminMessageRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 
 // Add route for creating conversation between matched users

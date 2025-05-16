@@ -1,6 +1,7 @@
 const { verifyToken } = require('../utils/jwt');
 const supabase = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const { info, error, warn } = require('../utils/logger');
 
 // Track connected users and their socket IDs
 const connectedUsers = new Map();
@@ -31,7 +32,15 @@ let poolCleanupIntervalId = null;
  * Clean up the matchmaking pool by removing disconnected users
  */
 const cleanMatchmakingPool = () => {
-  console.log(`Running matchmaking pool cleanup. Current pool size: ${matchmakingPool.size}`);
+  // Skip verbose logging if the pool is empty
+  const poolSize = matchmakingPool.size;
+  if (poolSize === 0) {
+    // No need to log anything if the pool is already empty
+    return;
+  }
+  
+  // Only log when there are actually users in the pool
+  info(`Running matchmaking pool cleanup. Current pool size: ${poolSize}`);
   
   // Track how many users were removed
   let removedCount = 0;
@@ -42,14 +51,14 @@ const cleanMatchmakingPool = () => {
     
     // Check if user is connected
     if (!connectedUsers.has(userId)) {
-      console.log(`Cleanup: User ${userId} is not in connected users map. Removing from pool.`);
+      info(`Cleanup: User ${userId} is not in connected users map. Removing from pool.`);
       shouldRemove = true;
     } else {
       // Check if socket is valid
       const socketId = connectedUsers.get(userId);
       const socket = ioInstance.sockets.sockets.get(socketId);
       if (!socket) {
-        console.log(`Cleanup: User ${userId} has invalid socket ID ${socketId}. Removing from pool.`);
+        info(`Cleanup: User ${userId} has invalid socket ID ${socketId}. Removing from pool.`);
         shouldRemove = true;
         // Also remove from connected users map
         connectedUsers.delete(userId);
@@ -66,7 +75,10 @@ const cleanMatchmakingPool = () => {
     }
   }
   
-  console.log(`Matchmaking pool cleanup completed. Removed ${removedCount} users. New pool size: ${matchmakingPool.size}`);
+  // Only log if users were actually removed or if debug logging is enabled
+  if (removedCount > 0) {
+    info(`Matchmaking pool cleanup completed. Removed ${removedCount} users. New pool size: ${matchmakingPool.size}`);
+  }
 };
 
 /**
@@ -76,12 +88,19 @@ const findMatchesForAllUsers = () => {
   // Clean up the pool first to ensure all users are valid
   cleanMatchmakingPool();
   
-  if (matchmakingPool.size < 2) {
-    console.log(`Not enough users in matchmaking pool (${matchmakingPool.size}). Need at least 2 users.`);
+  // Skip all processing if the pool is too small
+  const poolSize = matchmakingPool.size;
+  if (poolSize < 2) {
+    // Only log this once every 12 checks (once per minute) to reduce spam
+    // Using a timestamp-based approach to avoid needing to store state
+    const now = Date.now();
+    if (now % (MATCHMAKING_INTERVAL * 12) < MATCHMAKING_INTERVAL) {
+      info(`Not enough users in matchmaking pool (${poolSize}). Need at least 2 users.`);
+    }
     return;
   }
   
-  console.log(`Running global matchmaking for ${matchmakingPool.size} users in pool`);
+  info(`Running global matchmaking for ${poolSize} users in pool`);
   
   // Convert the map to array for easier processing
   const usersInPool = Array.from(matchmakingPool.values());
@@ -99,14 +118,14 @@ const findMatchesForAllUsers = () => {
     // Get user socket
     const socketId = connectedUsers.get(userId);
     if (!socketId) {
-      console.log(`User ${userId} has no socket ID in connected users map, removing from pool`);
+      info(`User ${userId} has no socket ID in connected users map, removing from pool`);
       matchmakingPool.delete(userId);
       continue;
     }
     
     const socket = ioInstance.sockets.sockets.get(socketId);
     if (!socket) {
-      console.log(`User ${userId} socket not found, removing from pool`);
+      info(`User ${userId} socket not found, removing from pool`);
       matchmakingPool.delete(userId);
       continue;
     }
@@ -124,16 +143,16 @@ const findMatchesForAllUsers = () => {
  */
 const startGlobalMatchmaking = () => {
   if (matchmakingIntervalId !== null) {
-    console.log('Global matchmaking already running');
+    info('Global matchmaking already running');
     return;
   }
   
-  console.log('Starting global matchmaking system');
+  info('Starting global matchmaking system');
   matchmakingIntervalId = setInterval(findMatchesForAllUsers, MATCHMAKING_INTERVAL);
   
   // Also start the pool cleanup interval
   if (poolCleanupIntervalId === null) {
-    console.log('Starting matchmaking pool cleanup system');
+    info('Starting matchmaking pool cleanup system');
     poolCleanupIntervalId = setInterval(cleanMatchmakingPool, POOL_CLEANUP_INTERVAL);
   }
 };
@@ -143,17 +162,17 @@ const startGlobalMatchmaking = () => {
  */
 const stopGlobalMatchmaking = () => {
   if (matchmakingIntervalId === null) {
-    console.log('Global matchmaking not running');
+    info('Global matchmaking not running');
     return;
   }
   
-  console.log('Stopping global matchmaking system');
+  info('Stopping global matchmaking system');
   clearInterval(matchmakingIntervalId);
   matchmakingIntervalId = null;
   
   // Also stop the pool cleanup interval
   if (poolCleanupIntervalId !== null) {
-    console.log('Stopping matchmaking pool cleanup system');
+    info('Stopping matchmaking pool cleanup system');
     clearInterval(poolCleanupIntervalId);
     poolCleanupIntervalId = null;
   }
@@ -168,7 +187,7 @@ const clearMatchmakingTimeouts = (userId) => {
   if (timeoutId) {
     clearTimeout(timeoutId);
     userTimeouts.delete(userId);
-    console.log(`Cleared timeout for user ${userId}`);
+    info(`Cleared timeout for user ${userId}`);
   }
 };
 

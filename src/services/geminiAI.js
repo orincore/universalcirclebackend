@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 
 // Configuration for Gemini API
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Updated API URL - Gemini 1.0 Pro is the stable version of the API
+// Updated to match the official API format from Google's docs
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent';
 
 /**

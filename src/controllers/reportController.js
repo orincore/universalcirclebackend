@@ -1,6 +1,7 @@
 const supabase = require('../config/database');
 const logger = require('../utils/logger');
 const axios = require('axios');
+const geminiAI = require('../services/geminiAI');
 
 // Valid report types
 const VALID_REPORT_TYPES = [
@@ -286,12 +287,8 @@ const triggerAIProcessing = async (reportId) => {
             }
           }
         } catch (err) {
-          // Safe error handling
-          const safeError = {
-            message: err.message || 'Unknown error',
-            name: err.name || 'UnknownError',
-            code: err.code
-          };
+          // Use shared safe error handling
+          const safeError = geminiAI.getSafeErrorDetails(err);
           logger.error(`Error in local AI processing for report ${reportId}: ${safeError.name} - ${safeError.message}`);
           
           // Add stack trace for debugging if available
@@ -304,12 +301,8 @@ const triggerAIProcessing = async (reportId) => {
       logger.info('🤖 Auto-moderation scheduled');
     }
   } catch (error) {
-    // Safe error handling
-    const safeError = {
-      message: error.message || 'Unknown error',
-      name: error.name || 'UnknownError',
-      code: error.code
-    };
+    // Use shared safe error handling
+    const safeError = geminiAI.getSafeErrorDetails(error);
     logger.error(`Error triggering AI processing for report ${reportId}: ${safeError.name} - ${safeError.message}`);
     
     // Don't throw error to prevent request failure

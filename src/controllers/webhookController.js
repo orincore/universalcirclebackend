@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const autoModeration = require('../services/autoModeration');
+const geminiAI = require('../services/geminiAI');
 
 /**
  * Process a newly submitted report with AI
@@ -36,13 +37,9 @@ const processNewReport = async (req, res) => {
     processReportAsync(reportId);
     
   } catch (error) {
-    // Safe error handling
-    const safeError = {
-      message: error.message,
-      name: error.name,
-      code: error.code
-    };
-    logger.error('Error in webhook processNewReport:', safeError);
+    // Use shared safe error handling
+    const safeError = geminiAI.getSafeErrorDetails(error);
+    logger.error(`Error in webhook processNewReport: ${safeError.name} - ${safeError.message}`);
     return res.status(500).json({
       success: false,
       message: 'Server error processing webhook'
@@ -78,12 +75,8 @@ const processReportAsync = async (reportId) => {
       }
     }
   } catch (error) {
-    // Safe error handling to avoid circular references
-    const safeError = {
-      message: error.message || 'Unknown error',
-      name: error.name || 'UnknownError',
-      code: error.code
-    };
+    // Use shared safe error handling
+    const safeError = geminiAI.getSafeErrorDetails(error);
     
     logger.error(`Error in processReportAsync for report ${reportId}: ${safeError.name} - ${safeError.message}`);
     

@@ -93,8 +93,8 @@ const calculateCompatibilityWithAI = async (user1, user2, criteria) => {
     // Only check if preferences match (optional)
     if (criteria.preference && criteria.preference !== user2.preference) {
       console.log(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
-      return 0;
-    }
+    return 0;
+  }
 
     // Check for at least 1 shared interest - quick filter before calling AI
     const user1Interests = user1.interests || [];
@@ -106,9 +106,9 @@ const calculateCompatibilityWithAI = async (user1, user2, criteria) => {
     
     if (sharedInterests.length === 0) {
       console.log(`No shared interests between ${user1.id} and ${user2.id}`);
-      return 0;
-    }
-    
+    return 0;
+  }
+
     // Create user profiles to send to Gemini
     const user1Profile = {
       age: calculateAge(user1.date_of_birth),
@@ -852,4 +852,4 @@ module.exports = {
   getPendingMatches,
   getMatchmakingStats,
   calculateCompatibilityWithAI  // Export for testing
-};
+}; 

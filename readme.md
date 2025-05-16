@@ -10,9 +10,31 @@ The backend includes viral content promotion algorithms that identify rapidly gr
 
 Socket.IO is used for real-time communications, supporting both private one-to-one messaging and group messaging. Users are authenticated on Socket.IO connections using their JWT tokens before participating in any chats. Messages are saved to Supabase tables, ensuring persistence across sessions. The system tracks online status of users in real-time, enabling clients to display accurate availability indicators.
 
-The backend implements a sophisticated matchmaking system based on mutual interests and preferences. Users can initiate matchmaking, which shows a "searching for user" status while the system finds compatible matches who are currently online. Once matched, both users receive an Accept/Reject prompt. If both accept, a private chat room is created. If rejected, the user returns to the matchmaking queue. The matching algorithm prioritizes shared interests, preference alignment (Dating/Friendship), and proximity based on location data.
+## AI-Powered Matchmaking System
 
-The backend includes a robust search API allowing users to find others by name or username. Search results can be filtered by various parameters including interests, age range, and location proximity. Users can send direct connection requests to search results and, once accepted, can initiate private messaging.
+The backend implements a sophisticated matchmaking system powered by Google's Gemini API for intelligent compatibility analysis. Instead of simple interest matching, the AI system conducts deep compatibility analysis considering multiple factors:
+
+- Shared interests and how they complement each other
+- Age proximity and preferences alignment
+- Personality compatibility based on bio text analysis
+- Gender and preference matching
+
+The matchmaking process works as follows:
+1. Users initiate matchmaking, which shows a "searching for user" status
+2. The system finds potential matches who are currently online
+3. Each potential match is scored by the Gemini AI on a scale of 0-100
+4. Users are matched with their highest compatibility scores
+5. Both users receive an Accept/Reject prompt with compatibility details
+6. If both accept, a private chat room is created
+7. If rejected, the user returns to the matchmaking queue
+
+The AI-powered system is designed to handle 10k+ concurrent users efficiently by:
+- Processing users in batches with parallel AI requests
+- Implementing rate limiting for API calls
+- Using a fallback mechanism to the original algorithm if AI experiences issues
+- Providing enhanced analytics on matchmaking effectiveness
+
+Users can view their match compatibility scores and receive insights into why they were matched, creating a more transparent and engaging experience.
 
 The platform provides comprehensive analytics APIs for platform administrators, offering detailed insights into user growth, activity patterns, content performance, and engagement metrics. These APIs track key performance indicators such as daily active users, content creation rates, viral post statistics, average session duration, and conversion rates. Admin dashboards can visualize trends over time and identify potential areas for feature improvement. Analytics data is processed and aggregated in real-time using data streaming architecture to ensure up-to-date reporting with minimal delay.
 
@@ -31,7 +53,7 @@ Additional features include:
 - User verification badges for trusted accounts
 - Advanced feed customization options
 
-The server environment variables are managed using a .env file. AWS S3 credentials, Supabase keys, and JWT secret keys are stored securely. The server is designed with middleware for JWT validation and with utility functions for token generation/verification and password hashing/comparison.
+The server environment variables are managed using a .env file. AWS S3 credentials, Supabase keys, JWT secret keys, and Gemini API key are stored securely. The server is designed with middleware for JWT validation and with utility functions for token generation/verification and password hashing/comparison.
 
 Overall, the backend is fully modular, secure, scalable, and optimized for cross-platform client applications, ensuring a seamless experience for mobile, desktop, and web users.
 

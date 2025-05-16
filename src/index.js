@@ -25,6 +25,9 @@ const messageRoutes = require('./routes/messageRoutes');
 const matchmakingRoutes = require('./routes/matchmakingRoutes');
 const postRoutes = require('./routes/postRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const adminMessageRoutes = require('./routes/adminMessageRoutes');
+const userMessageRoutes = require('./routes/userMessageRoutes');
 
 // Import middleware
 const { authenticate } = require('./middlewares/auth');
@@ -74,9 +77,12 @@ app.use('/api/interests', interestRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/messages/user', userMessageRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/messages', adminMessageRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

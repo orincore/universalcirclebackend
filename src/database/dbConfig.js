@@ -2,7 +2,7 @@
  * Database configuration for PostgreSQL connection pool
  */
 const { Pool } = require('pg');
-const logger = require('../utils/logger');
+const { info, error } = require('../utils/logger');
 
 // Create a connection pool using environment variables
 const pool = new Pool({
@@ -13,11 +13,11 @@ const pool = new Pool({
 // Test the connection
 pool.connect()
   .then(client => {
-    logger.info('PostgreSQL database connection established');
+    info('PostgreSQL database connection established');
     client.release();
   })
   .catch(err => {
-    logger.error('Error connecting to PostgreSQL database:', err);
+    error('Error connecting to PostgreSQL database:', err);
   });
 
 module.exports = {

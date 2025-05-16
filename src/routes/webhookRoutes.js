@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const webhookController = require('../controllers/webhookController');
 
-// Process a new report with AI
-router.post('/report-processing', webhookController.processNewReport);
+// Use the webhook controller routes
+router.use('/', webhookController);
 
 module.exports = router; 

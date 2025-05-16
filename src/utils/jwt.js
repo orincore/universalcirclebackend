@@ -11,7 +11,8 @@ const generateToken = (user) => {
   const payload = {
     userId: user.id,
     email: user.email,
-    username: user.username
+    username: user.username,
+    isAdmin: user.is_admin || user.isAdmin || false // Include admin status in token
   };
 
   return jwt.sign(

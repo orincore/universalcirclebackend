@@ -155,6 +155,28 @@ const submitReport = async (req, res) => {
       
     if (error) {
       logger.error('Error creating report:', error);
+      
+      // Log detailed error information
+      console.error('Error details:', {
+        error,
+        reportData
+      });
+      
+      // Try to query the constraints on the table to understand what values are allowed
+      try {
+        const { data: constraintInfo, error: constraintError } = await supabase
+          .from('information_schema.table_constraints')
+          .select('constraint_name')
+          .eq('table_name', 'reports')
+          .eq('constraint_type', 'CHECK');
+          
+        if (!constraintError && constraintInfo) {
+          console.log('Table constraints:', constraintInfo);
+        }
+      } catch (e) {
+        console.error('Error querying constraints:', e);
+      }
+      
       return res.status(500).json({
         success: false,
         message: 'Failed to create report'

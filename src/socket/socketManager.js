@@ -1119,6 +1119,21 @@ const initializeSocket = (io) => {
         
         console.log(`Finding match for user: ${userId}`);
         console.log('Match criteria:', JSON.stringify(criteria));
+        
+        // Extract preference from incoming criteria if available
+        const clientPreference = criteria.preferences?.chatType;
+        
+        // Handle preference mapping from client format to server format
+        if (clientPreference) {
+          // Update socket user preference with client preference (properly capitalized)
+          if (clientPreference.toLowerCase() === 'friendship') {
+            socket.user.preference = 'Friendship';
+          } else if (clientPreference.toLowerCase() === 'dating') {
+            socket.user.preference = 'Dating';
+          }
+          console.log(`Updated user preference from client request: ${socket.user.preference}`);
+        }
+        
         console.log(`User interests: ${JSON.stringify(socket.user.interests)}`);
         console.log(`User preference: ${socket.user.preference}`);
         
@@ -1149,7 +1164,7 @@ const initializeSocket = (io) => {
           connectedUsers.set(userId, socket.id);
         }
         
-        // Add user to matchmaking pool
+        // Add user to matchmaking pool with updated preference
         matchmakingPool.set(userId, {
           userId,
           socketId: socket.id,
@@ -1181,6 +1196,21 @@ const initializeSocket = (io) => {
       try {
         const userId = socket.user.id;
         console.log(`User ${userId} is looking for a random match with criteria:`, criteria);
+        
+        // Extract preference from incoming criteria if available
+        const clientPreference = criteria.preferences?.chatType;
+        
+        // Handle preference mapping from client format to server format
+        if (clientPreference) {
+          // Update socket user preference with client preference (properly capitalized)
+          if (clientPreference.toLowerCase() === 'friendship') {
+            socket.user.preference = 'Friendship';
+          } else if (clientPreference.toLowerCase() === 'dating') {
+            socket.user.preference = 'Dating';
+          }
+          console.log(`Updated user preference from client request: ${socket.user.preference}`);
+        }
+        
         console.log(`User preference: ${socket.user.preference}`);
         
         // Clear any existing matchmaking timeouts for this user
@@ -1212,7 +1242,7 @@ const initializeSocket = (io) => {
           connectedUsers.set(userId, socket.id);
         }
         
-        // Add user to matchmaking pool
+        // Add user to matchmaking pool with updated preference
         matchmakingPool.set(userId, {
           userId,
           socketId: socket.id,
@@ -2382,7 +2412,7 @@ const findMatchForUser = (socket) => {
       // Skip users who don't have matching preferences
       const otherUserPreference = otherUser.user ? otherUser.user.preference : null;
       if (!otherUserPreference || otherUserPreference !== userPreference) {
-        console.log(`Skipping user ${otherUserId} due to preference mismatch (User: ${userPreference}, Other: ${otherUserPreference})`);
+        console.log(`Skipping user ${otherUserId} due to preference mismatch: User wants ${userPreference}, Other user wants ${otherUserPreference || 'unknown'}`);
         continue;
       }
       

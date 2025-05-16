@@ -33,29 +33,30 @@ const getUserReportHistory = async (userId) => {
 
 /**
  * Get message content from database
- * @param {string} messageId - Message ID to retrieve
- * @returns {Promise<string|null>} Message content or null if not found
+ * @param {string} messageId - ID of the message to retrieve
+ * @returns {Promise<string>} Message content or empty string if not found
  */
 const getMessageContent = async (messageId) => {
   try {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('content, sender_id')
-      .eq('id', messageId)
-      .single();
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT content FROM messages WHERE id = $1',
+        [messageId]
+      );
       
-    if (error || !data) {
-      info('Error fetching message content:', error);
-      return { content: null, senderId: null };
+      if (result.rows.length === 0) {
+        info(`Message ${messageId} not found`);
+        return '';
+      }
+      
+      return result.rows[0].content;
+    } finally {
+      client.release();
     }
-    
-    return { 
-      content: data.content,
-      senderId: data.sender_id
-    };
   } catch (error) {
-    info('Error in getMessageContent:', error);
-    return { content: null, senderId: null };
+    info('Error fetching message content:', error);
+    return '';
   }
 };
 
@@ -176,161 +177,151 @@ const deleteInappropriateMessage = async (messageId) => {
 };
 
 /**
- * Process a report automatically using Gemini AI
- * @param {string} reportId - Report ID to process
- * @returns {Promise<Object>} Processing result
+ * Process a user report using the Gemini AI
+ * @param {Object} report - Report object from database
+ * @returns {Promise<Object>} Updated report status
  */
 const processReportWithAI = async (report) => {
   try {
-    const { message_id, reason, reported_by, reported_user_id } = report;
+    // Map the report fields to the correct column names
+    const reportData = {
+      id: report.id,
+      reporter_id: report.reporter_id, // Use reporter_id instead of reported_by
+      reported_user_id: report.reported_user_id,
+      reason: report.reason,
+      status: report.status,
+      content_type: report.content_type,
+      content_id: report.content_id,
+      comment: report.comment
+    };
 
-    info(`🤖 Processing report for message ${message_id} with Gemini AI`);
+    // Get the message content if this is a message report
+    let messageContent = '';
+    if (reportData.content_type === 'message' && reportData.content_id) {
+      messageContent = await getMessageContent(reportData.content_id);
+    }
 
-    // Get the message content
-    const client = await pool.connect();
-    let messageContent;
-    let messageDeleted = false;
+    // Construct prompt for AI
+    const prompt = `
+      You are a content moderator for a messaging app. You need to evaluate if the following message violates our community guidelines.
+      
+      Message: "${messageContent}"
+      
+      User Report Reason: "${reportData.reason}"
+      
+      Based on this information, classify this message as one of the following:
+      - INAPPROPRIATE (clear violation that should be removed)
+      - BORDERLINE (potentially problematic but not clear violation)
+      - ACCEPTABLE (no violation, false report)
+      
+      Also rate your confidence level from 0.0 to 1.0.
+      Return your response in the following JSON format only:
+      {
+        "classification": "CLASSIFICATION",
+        "confidence": CONFIDENCE_SCORE,
+        "explanation": "Brief explanation of your decision"
+      }
+    `;
 
+    // Process with Gemini AI
+    const response = await geminiAI.generateContent(prompt);
+    const responseText = response.text().trim();
+    
+    let aiDecision;
     try {
-      const result = await client.query(
-        'SELECT content FROM messages WHERE id = $1',
-        [message_id]
-      );
+      // Extract JSON from the AI's response
+      const jsonStr = responseText.replace(/```json|```/g, '').trim();
+      aiDecision = JSON.parse(jsonStr);
+    } catch (error) {
+      info('Error parsing AI response:', error);
+      return updateReportStatus(reportData.id, 'PENDING_REVIEW', 'Error processing with AI');
+    }
 
-      if (result.rows.length === 0) {
-        info(`❌ Message ${message_id} not found for AI processing`);
-        // Update report status to indicate message not found
-        await updateReportStatus(report.id, 'resolved', 'Message not found');
-        return { ...report, status: 'resolved', resolution_notes: 'Message not found' };
+    // Logic based on AI decision
+    if (aiDecision.classification === 'INAPPROPRIATE' && aiDecision.confidence >= 0.85) {
+      // High confidence inappropriate content - take action automatically
+      if (reportData.content_type === 'message' && reportData.content_id) {
+        await deleteInappropriateMessage(reportData.content_id);
       }
-
-      messageContent = result.rows[0].content;
-
-      // Get reporting user's previous reports
-      const previousReportsResult = await client.query(
-        `SELECT COUNT(*) as total_reports, 
-         SUM(CASE WHEN status = 'resolved' AND resolution_notes LIKE '%confirmed inappropriate%' THEN 1 ELSE 0 END) as confirmed_reports
-         FROM reports WHERE reported_by = $1`,
-        [reported_by]
-      );
-
-      const userReportHistory = previousReportsResult.rows[0];
       
-      // Get reported user's previous violations
-      const userViolationsResult = await client.query(
-        `SELECT COUNT(*) as total_violations
-         FROM reports 
-         WHERE reported_user_id = $1 
-         AND status = 'resolved' 
-         AND resolution_notes LIKE '%confirmed inappropriate%'`,
-        [reported_user_id]
-      );
-      
-      const userViolationHistory = userViolationsResult.rows[0];
-      
-      // Analyze the message
-      const analysis = await geminiAI.analyzeMessageContent(messageContent);
-      info(`🤖 AI Analysis: ${analysis.classification}, Confidence: ${analysis.confidence}`);
-
-      let status = 'pending';
-      let resolutionNotes = '';
-      let actionTaken = 'None';
-
-      // Determine actions based on analysis
-      if (analysis.classification === 'INAPPROPRIATE' && analysis.confidence >= 0.7) {
-        // High confidence inappropriate content - delete message and resolve report
-        messageDeleted = await deleteInappropriateMessage(message_id);
-        status = 'resolved';
-        actionTaken = messageDeleted ? 'Message deleted' : 'Failed to delete message';
-        resolutionNotes = `AI confirmed inappropriate content (${analysis.confidence.toFixed(2)} confidence). ${actionTaken}. Violated: ${analysis.violatedPolicies.join(', ')}`;
-        
-        // Check if user should be reviewed for ban based on violation history
-        if (userViolationHistory.total_violations >= 2) {
-          resolutionNotes += ` ⚠️ User has ${userViolationHistory.total_violations + 1} confirmed violations - account review recommended.`;
-        }
-      } 
-      else if ((analysis.classification === 'INAPPROPRIATE' && analysis.confidence >= 0.5) || 
-              (analysis.classification === 'BORDERLINE' && analysis.confidence >= 0.8)) {
-        // Moderate confidence inappropriate or high confidence borderline - flag for human review
-        status = 'pending';
-        resolutionNotes = `AI suggests review (${analysis.confidence.toFixed(2)} confidence). Possible issues: ${analysis.explanation}`;
-      } 
-      else {
-        // Content seems acceptable - resolve report
-        status = 'resolved';
-        resolutionNotes = `AI found no violations (${analysis.confidence.toFixed(2)} confidence). Message appears to comply with guidelines.`;
-        
-        // Check if reporting user has a history of false reports
-        if (userReportHistory.total_reports > 5 && userReportHistory.confirmed_reports / userReportHistory.total_reports < 0.2) {
-          resolutionNotes += ` Note: Reporting user has low accuracy rate (${userReportHistory.confirmed_reports}/${userReportHistory.total_reports} confirmed).`;
-        }
+      // Check user history
+      const userHistory = await getUserReportHistory(reportData.reported_user_id);
+      if (userHistory.length >= 3) {
+        // This user has been reported multiple times - consider banning
+        await banUser(reportData.reported_user_id);
+        return updateReportStatus(
+          reportData.id, 
+          'RESOLVED', 
+          `Auto-resolved by Gemini AI: ${aiDecision.explanation}. User banned due to multiple violations.`,
+          'Gemini AI'  // Set resolved_by to Gemini AI
+        );
       }
-
-      // Update report status
-      await updateReportStatus(report.id, status, resolutionNotes);
       
-      // Return the updated report
-      return { 
-        ...report, 
-        status, 
-        resolution_notes: resolutionNotes, 
-        ai_analysis: analysis,
-        message_deleted: messageDeleted
-      };
-    } finally {
-      client.release();
+      return updateReportStatus(
+        reportData.id, 
+        'RESOLVED', 
+        `Auto-resolved by Gemini AI: ${aiDecision.explanation}`,
+        'Gemini AI'  // Set resolved_by to Gemini AI
+      );
+    } else if (aiDecision.classification === 'ACCEPTABLE' && aiDecision.confidence >= 0.9) {
+      // High confidence that this is acceptable content
+      return updateReportStatus(
+        reportData.id, 
+        'REJECTED', 
+        `Rejected by Gemini AI: ${aiDecision.explanation}`,
+        'Gemini AI'  // Set resolved_by to Gemini AI
+      );
+    } else {
+      // Borderline cases or lower confidence - mark for human review
+      return updateReportStatus(
+        reportData.id, 
+        'PENDING_REVIEW', 
+        `AI Assessment: ${aiDecision.classification} (${Math.round(aiDecision.confidence * 100)}% confidence). ${aiDecision.explanation}`
+      );
     }
   } catch (error) {
-    info(`❌ Error processing report with AI: ${error.message}`);
-    return { ...report, ai_error: error.message };
+    info('Error in processReportWithAI:', error);
+    return updateReportStatus(report.id, 'PENDING_REVIEW', `Error during AI processing: ${error.message}`);
   }
 };
 
 /**
- * Update report status and add to activity log
+ * Update a report's status and admin comment
  * @param {string} reportId - Report ID to update
- * @param {string} status - New status
- * @param {string} comment - Admin comment
- * @returns {Promise<boolean>} Success status
+ * @param {string} status - New status value
+ * @param {string} adminComment - Admin comment to add
+ * @param {string} resolvedBy - Who resolved the report (optional)
+ * @returns {Promise<Object>} Updated report
  */
-const updateReportStatus = async (reportId, status, comment) => {
+const updateReportStatus = async (reportId, status, adminComment, resolvedBy = null) => {
   try {
-    // Update report status
-    const { error } = await supabase
+    const updateData = {
+      status: status,
+      admin_comment: adminComment,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Only set resolved_by if provided
+    if (resolvedBy) {
+      updateData.resolved_by = resolvedBy;
+    }
+    
+    const { data, error } = await supabase
       .from('reports')
-      .update({
-        status: status,
-        admin_comment: comment,
-        updated_at: new Date(),
-        resolved_by: status === 'pending' ? null : GEMINI_AI_USER_ID // Set Gemini AI as resolver if not pending
-      })
-      .eq('id', reportId);
+      .update(updateData)
+      .eq('id', reportId)
+      .select();
       
     if (error) {
       info('Error updating report status:', error);
-      return false;
+      return null;
     }
     
-    // Add to activity log
-    const { error: logError } = await supabase
-      .from('admin_activity_log')
-      .insert({
-        admin_id: GEMINI_AI_USER_ID, // Use Gemini AI ID instead of null
-        action: `report_${status}`,
-        details: `Report ${reportId} ${status} by Gemini AI: ${comment}`,
-        created_at: new Date(),
-        resource_type: 'report',
-        resource_id: reportId
-      });
-      
-    if (logError) {
-      info('Error logging admin activity:', logError);
-    }
-    
-    return true;
+    info(`Report ${reportId} updated to status: ${status}`);
+    return data[0] || null;
   } catch (error) {
     info('Error in updateReportStatus:', error);
-    return false;
+    return null;
   }
 };
 

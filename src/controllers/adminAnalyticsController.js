@@ -549,31 +549,8 @@ const getRecentActivity = async (req, res) => {
       });
     }
     
-    // Get recent content reports
-    const { data: recentReports, error: reportsError } = await supabase
-      .from('reports')
-      .select(`
-        id,
-        report_type,
-        content_type,
-        content_id,
-        reporter:reporter_id(id, username),
-        created_at,
-        status
-      `)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    
-    if (reportsError) {
-      logger.error('Error fetching recent reports:', reportsError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to fetch recent reports'
-      });
-    }
-    
-    // Combine and format activities
-    const activities = [
+    // Initialize activities array with available data
+    let activities = [
       ...newUsers.map(user => ({
         id: `user-${user.id}`,
         type: 'registration',
@@ -587,20 +564,47 @@ const getRecentActivity = async (req, res) => {
         description: `New match created between ${match.user1.username} and ${match.user2.username}`,
         timestamp: match.created_at,
         data: { matchId: match.id, status: match.status }
-      })),
-      ...recentReports.map(report => ({
-        id: `report-${report.id}`,
-        type: 'report',
-        description: `${report.reporter.username} reported ${report.content_type} for ${report.report_type}`,
-        timestamp: report.created_at,
-        data: { 
-          reportId: report.id, 
-          type: report.report_type, 
-          contentType: report.content_type,
-          status: report.status
-        }
       }))
     ];
+    
+    try {
+      // Try to get recent content reports (this may fail if the table doesn't exist)
+      const { data: recentReports, error: reportsError } = await supabase
+        .from('reports')
+        .select(`
+          id,
+          report_type,
+          content_type,
+          content_id,
+          reporter:reporter_id(id, username),
+          created_at,
+          status
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (!reportsError && recentReports) {
+        // Add reports to activities if query was successful
+        activities = [
+          ...activities,
+          ...recentReports.map(report => ({
+            id: `report-${report.id}`,
+            type: 'report',
+            description: `${report.reporter.username} reported ${report.content_type} for ${report.report_type}`,
+            timestamp: report.created_at,
+            data: { 
+              reportId: report.id, 
+              type: report.report_type, 
+              contentType: report.content_type,
+              status: report.status
+            }
+          }))
+        ];
+      }
+    } catch (reportError) {
+      // Just log the error but don't fail the entire request
+      logger.warn('Error fetching report data (table might not exist):', reportError);
+    }
     
     // Sort by timestamp (most recent first)
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -628,27 +632,7 @@ const getRecentActivity = async (req, res) => {
  */
 const getReportTypesSummary = async (req, res) => {
   try {
-    // Get time period (default to all time)
-    const days = req.query.days ? parseInt(req.query.days) : null;
-    let query = supabase.from('reports').select('report_type, status');
-    
-    if (days) {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      query = query.gte('created_at', startDate.toISOString());
-    }
-    
-    const { data: reports, error } = await query;
-    
-    if (error) {
-      logger.error('Error fetching report types:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to fetch report types'
-      });
-    }
-    
-    // Count report types
+    // Initialize default report types with zero counts
     const reportTypes = {
       'Inappropriate Content': 0,
       'Spam': 0,
@@ -657,36 +641,63 @@ const getReportTypesSummary = async (req, res) => {
       'Others': 0
     };
     
-    reports.forEach(report => {
-      const type = report.report_type;
-      if (reportTypes.hasOwnProperty(type)) {
-        reportTypes[type]++;
-      } else {
-        reportTypes['Others']++;
-      }
-    });
-    
-    // Count status types
+    // Initialize status counts
     const statusCounts = {
       'pending': 0,
       'resolved': 0,
       'dismissed': 0
     };
     
-    reports.forEach(report => {
-      const status = report.status || 'pending';
-      if (statusCounts.hasOwnProperty(status)) {
-        statusCounts[status]++;
+    let totalReports = 0;
+    let reports = [];
+    
+    try {
+      // Get time period (default to all time)
+      const days = req.query.days ? parseInt(req.query.days) : null;
+      let query = supabase.from('reports').select('report_type, status, created_at');
+      
+      if (days) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        query = query.gte('created_at', startDate.toISOString());
       }
-    });
+      
+      const { data, error } = await query;
+      
+      if (!error && data) {
+        reports = data;
+        totalReports = data.length;
+        
+        // Count report types
+        reports.forEach(report => {
+          const type = report.report_type;
+          if (reportTypes.hasOwnProperty(type)) {
+            reportTypes[type]++;
+          } else {
+            reportTypes['Others']++;
+          }
+        });
+        
+        // Count status types
+        reports.forEach(report => {
+          const status = report.status || 'pending';
+          if (statusCounts.hasOwnProperty(status)) {
+            statusCounts[status]++;
+          }
+        });
+      }
+    } catch (reportError) {
+      // Log the error but return default empty data
+      logger.warn('Error fetching reports data (table might not exist):', reportError);
+    }
     
     return res.status(200).json({
       success: true,
       data: {
         reportTypes: Object.entries(reportTypes).map(([type, count]) => ({ type, count })),
         statusCounts: Object.entries(statusCounts).map(([status, count]) => ({ status, count })),
-        totalReports: reports.length,
-        period: days ? `${days} days` : 'All time'
+        totalReports,
+        period: req.query.days ? `${req.query.days} days` : 'All time'
       }
     });
   } catch (error) {

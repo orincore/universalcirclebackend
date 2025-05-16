@@ -131,7 +131,7 @@ const deleteInappropriateMessage = async (messageId) => {
         .from('admin_activity_log')
         .insert({
           admin_id: GEMINI_AI_USER_ID,
-          action_type: 'delete_message',
+          action: 'delete_message',
           target_type: 'message',
           target_id: messageId,
           details: JSON.stringify({

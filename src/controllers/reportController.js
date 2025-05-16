@@ -101,33 +101,43 @@ const submitReport = async (req, res) => {
       });
     }
     
-    // Check if table exists and create it if needed
+    // Ensure reports table exists
     await ensureReportsTableExists();
     
-    // Prepare the report data
+    // Prepare the report data with proper field mappings
     const reportData = {
-      content_type: contentType,
-      content_id: contentId,
-      report_type: REPORT_TYPE_MAP[reportType] || 'other',
-      reason: reportType,
-      comment: comment || null,
-      reporter_id: req.user.id,
-      created_at: new Date(),
-      status: 'pending',
-      // Initialize other fields as NULL
-      details: null,
+      // Primary data from request
+      report_type: reportType,        // Use raw value without mapping
+      reason: reportType,             // Store original report type as reason
+      comment: comment || null,       // Store comment if provided
+      reporter_id: req.user.id,       // User making the report
+      content_type: contentType,      // Type of content being reported
+      content_id: contentId,          // ID of the content being reported
+      
+      // Status information
+      status: 'pending',              // Initial status
+      
+      // Timestamps
+      created_at: new Date(),         // Creation time
+      updated_at: null,               // No updates yet
+      
+      // Admin related fields (initially null)
       action_taken: null,
       admin_notes: null,
       resolved_by: null,
-      updated_at: null,
-      admin_comment: null
+      admin_comment: null,
+      
+      // Additional details
+      details: null
     };
     
-    // Set specific fields based on content type
+    // Set the appropriate reported ID field based on content type
     if (contentType === 'user') {
+      // When reporting a user, store the user's ID in reported_user_id
       reportData.reported_user_id = contentId;
       reportData.reported_post_id = null;
-    } else if (contentType === 'post') {
+    } else if (contentType === 'message' || contentType === 'post') {
+      // When reporting a message or post, store the content ID in reported_post_id
       reportData.reported_post_id = contentId;
       reportData.reported_user_id = null;
     } else {

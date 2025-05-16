@@ -1120,6 +1120,7 @@ const initializeSocket = (io) => {
         console.log(`Finding match for user: ${userId}`);
         console.log('Match criteria:', JSON.stringify(criteria));
         console.log(`User interests: ${JSON.stringify(socket.user.interests)}`);
+        console.log(`User preference: ${socket.user.preference}`);
         
         // Validate that user has interests
         if (!socket.user.interests || socket.user.interests.length === 0) {
@@ -1127,6 +1128,16 @@ const initializeSocket = (io) => {
           socket.emit('error', { 
             source: 'matchmaking',
             message: 'You need to add interests to your profile before matchmaking' 
+          });
+          return;
+        }
+        
+        // Validate that user has a preference set
+        if (!socket.user.preference) {
+          console.log(`User ${userId} has no preference set. Aborting match.`);
+          socket.emit('error', { 
+            source: 'matchmaking',
+            message: 'You need to set your preference (Dating or Friendship) before matchmaking' 
           });
           return;
         }
@@ -1150,7 +1161,9 @@ const initializeSocket = (io) => {
         });
         
         console.log(`Added user ${userId} to matchmaking pool. Pool size: ${matchmakingPool.size}`);
-        socket.emit('match:waiting', { message: 'Searching for a match...' });
+        socket.emit('match:waiting', { 
+          message: `Searching for a ${socket.user.preference} match with similar interests...` 
+        });
         
         // Find a match for this user
         findMatchForUser(socket);
@@ -1168,6 +1181,7 @@ const initializeSocket = (io) => {
       try {
         const userId = socket.user.id;
         console.log(`User ${userId} is looking for a random match with criteria:`, criteria);
+        console.log(`User preference: ${socket.user.preference}`);
         
         // Clear any existing matchmaking timeouts for this user
         clearMatchmakingTimeouts(userId);
@@ -1177,6 +1191,16 @@ const initializeSocket = (io) => {
           socket.emit('error', {
             source: 'findRandomMatch',
             message: 'You must have at least one interest defined in your profile'
+          });
+          return;
+        }
+        
+        // Validate that user has a preference set
+        if (!socket.user.preference) {
+          console.log(`User ${userId} has no preference set. Aborting match.`);
+          socket.emit('error', { 
+            source: 'findRandomMatch',
+            message: 'You need to set your preference (Dating or Friendship) before matchmaking' 
           });
           return;
         }
@@ -1201,7 +1225,7 @@ const initializeSocket = (io) => {
         
         console.log(`Added user ${userId} to matchmaking pool. Pool size: ${matchmakingPool.size}`);
         socket.emit('match:waiting', {
-          message: 'Looking for users with similar interests...'
+          message: `Looking for users with similar interests who also want ${socket.user.preference}...`
         });
         
         // Find a match for this user
@@ -2130,6 +2154,14 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
  * @param {array} sharedInterests - Array of shared interests
  */
 const notifyMatchFound = (user1, user2, sharedInterests) => {
+  // Verify both users have the same preference
+  if (user1.preference !== user2.preference) {
+    console.error(`Cannot match users with different preferences: ${user1.id} (${user1.preference}) and ${user2.id} (${user2.preference})`);
+    return null;
+  }
+
+  const preference = user1.preference || 'Unknown'; // Both should have the same preference
+  
   // Create a unique match ID using UUID
   const matchId = uuidv4();
   console.log(`Generated UUID match ID: ${matchId}`);
@@ -2139,6 +2171,7 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
     id: matchId,
     users: [user1.id, user2.id],
     sharedInterests,
+    preference,
     timestamp: new Date(),
     acceptances: {
       [user1.id]: false,
@@ -2146,12 +2179,12 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
     }
   });
   
-  console.log(`Match created: ${matchId} between ${user1.id} and ${user2.id} with ${sharedInterests.length} shared interests`);
+  console.log(`Match created: ${matchId} between ${user1.id} and ${user2.id} with ${sharedInterests.length} shared interests for ${preference}`);
   console.log(`Match data: ${JSON.stringify(activeMatches.get(matchId))}`);
   
   // Create properly formatted match data for Flutter client
-  const user1MatchData = createMatchData(user2, sharedInterests, matchId);
-  const user2MatchData = createMatchData(user1, sharedInterests, matchId);
+  const user1MatchData = createMatchData(user2, sharedInterests, matchId, preference);
+  const user2MatchData = createMatchData(user1, sharedInterests, matchId, preference);
   
   // Get socket IDs directly from the connectedUsers map
   const socket1Id = connectedUsers.get(user1.id);
@@ -2168,7 +2201,7 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
     const socket1 = ioInstance.sockets.sockets.get(socket1Id);
     if (socket1) {
       ioInstance.to(socket1Id).emit('match:found', { match: user1MatchData });
-      console.log(`Notified user ${user1.id} about match with ${user2.id} using match:found event`);
+      console.log(`Notified user ${user1.id} about ${preference} match with ${user2.id} using match:found event`);
       console.log(`Emitted data: ${JSON.stringify({ match: user1MatchData })}`);
     } else {
       console.error(`Failed to notify user ${user1.id}: Socket exists in map but is invalid`);
@@ -2233,7 +2266,7 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
 };
 
 // Function to create match data in format expected by Flutter client
-const createMatchData = (otherUser, sharedInterests, matchId) => {
+const createMatchData = (otherUser, sharedInterests, matchId, preference) => {
   // Sanitize user data to include only necessary fields
   const sanitizedUser = {
     id: otherUser.id,
@@ -2250,7 +2283,8 @@ const createMatchData = (otherUser, sharedInterests, matchId) => {
     user: sanitizedUser,
     matchingInterests: sharedInterests,
     createdAt: new Date().toISOString(),
-    isPending: true
+    isPending: true,
+    preference: preference || otherUser.preference || 'Unknown' // Include preference in match data
   };
 };
 
@@ -2279,6 +2313,7 @@ const findMatchForUser = (socket) => {
     matchmakingPool.set(userId, userPoolData);
     
     const userInterests = socket.user.interests || [];
+    const userPreference = socket.user.preference || null;
     
     if (userInterests.length === 0) {
       console.log(`User ${userId} has no interests. Cannot find match.`);
@@ -2292,13 +2327,25 @@ const findMatchForUser = (socket) => {
       return;
     }
     
-    console.log(`Finding match for user ${userId} with interests: ${userInterests.join(', ')}`);
+    if (!userPreference) {
+      console.log(`User ${userId} has no preference set. Cannot find match.`);
+      socket.emit('error', { 
+        source: 'findRandomMatch',
+        message: 'You need to set your preference (Dating or Friendship) before matchmaking' 
+      });
+      // Reset processing flag
+      userPoolData.isBeingProcessed = false;
+      matchmakingPool.set(userId, userPoolData);
+      return;
+    }
+    
+    console.log(`Finding match for user ${userId} with interests: ${userInterests.join(', ')} and preference: ${userPreference}`);
     
     // Debug: Log all users in matchmaking pool
     console.log(`Current matchmaking pool size: ${matchmakingPool.size}`);
     for (const [poolUserId, poolUser] of matchmakingPool.entries()) {
       if (poolUserId !== userId) {
-        console.log(`Pool user ${poolUserId} with interests: ${poolUser.interests ? poolUser.interests.join(', ') : 'none'}`);
+        console.log(`Pool user ${poolUserId} with interests: ${poolUser.interests ? poolUser.interests.join(', ') : 'none'} and preference: ${poolUser.user ? poolUser.user.preference : 'unknown'}`);
       }
     }
     
@@ -2332,6 +2379,13 @@ const findMatchForUser = (socket) => {
         continue;
       }
       
+      // Skip users who don't have matching preferences
+      const otherUserPreference = otherUser.user ? otherUser.user.preference : null;
+      if (!otherUserPreference || otherUserPreference !== userPreference) {
+        console.log(`Skipping user ${otherUserId} due to preference mismatch (User: ${userPreference}, Other: ${otherUserPreference})`);
+        continue;
+      }
+      
       const otherUserInterests = otherUser.interests || [];
       
       // Skip users with no interests
@@ -2350,7 +2404,7 @@ const findMatchForUser = (socket) => {
       
       // Only consider matches with at least one shared interest
       if (sharedInterests.length > 0) {
-        console.log(`Found ${sharedInterests.length} shared interests between users ${userId} and ${otherUserId}: ${sharedInterests.join(', ')}`);
+        console.log(`Found ${sharedInterests.length} shared interests between users ${userId} and ${otherUserId} with matching preference: ${userPreference}`);
         
         // Calculate compatibility score (higher with more shared interests)
         const userScore = sharedInterests.length / userInterests.length;
@@ -2364,18 +2418,19 @@ const findMatchForUser = (socket) => {
           socketId: otherUserSocketId,
           user: otherUser.user,
           sharedInterests,
-          score: combinedScore // Better scoring based on relative interest match
+          score: combinedScore, // Better scoring based on relative interest match
+          preference: otherUserPreference
         });
       }
     }
-    
+
     // Sort by score (highest first)
     potentialMatches.sort((a, b) => b.score - a.score);
     
     if (potentialMatches.length > 0) {
       // Get the best match
       const bestMatch = potentialMatches[0];
-      console.log(`Found best match for user ${userId}: ${bestMatch.userId} with score ${bestMatch.score.toFixed(2)} and ${bestMatch.sharedInterests.length} shared interests`);
+      console.log(`Found best match for user ${userId}: ${bestMatch.userId} with score ${bestMatch.score.toFixed(2)}, ${bestMatch.sharedInterests.length} shared interests, and matching preference: ${bestMatch.preference}`);
       
       // Generate a match ID
       const matchId = uuidv4();

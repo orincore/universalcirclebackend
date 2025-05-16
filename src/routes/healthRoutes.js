@@ -92,6 +92,28 @@ router.get('/detailed', authenticate, isAdmin, async (req, res) => {
   }
 });
 
+// Endpoint to get the latest real-time metrics
+router.get('/metrics', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { getHealthMetrics } = require('../services/healthMonitor');
+    
+    // Get current metrics
+    const metrics = await getHealthMetrics();
+    
+    return res.status(200).json({
+      success: true,
+      data: metrics,
+      message: 'For real-time updates, use WebSocket with the health:subscribe event'
+    });
+  } catch (error) {
+    console.error('Error fetching health metrics:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch health metrics'
+    });
+  }
+});
+
 /**
  * Get CPU usage percentage
  */

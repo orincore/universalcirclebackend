@@ -122,6 +122,8 @@ app.post('/api/messages/conversations', authenticate, async (req, res) => {
           user1_id: currentUserId,
           user2_id: userId,
           status: 'accepted',
+          compatibility_score: 100, // Add default compatibility score to prevent not-null constraint violation
+          shared_interests: [], // Add empty array for shared interests
           created_at: new Date(),
           updated_at: new Date(),
           accepted_at: new Date()

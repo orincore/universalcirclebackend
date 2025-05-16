@@ -267,7 +267,7 @@ server.listen(PORT, async () => {
   }
   
   // Start health monitoring
-  startHealthMonitoring();
+  startHealthMonitoring(io);
 });
 
 // Export for testing

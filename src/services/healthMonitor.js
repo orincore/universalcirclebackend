@@ -52,12 +52,17 @@ const getApiStatus = () => {
 };
 
 /**
- * Check websocket server health
+ * Get the current websocket server status
  * @param {object} io - Socket.IO instance
- * @returns {string} - Websocket status
+ * @returns {object} Websocket status data
  */
 const getWebsocketStatus = (io) => {
-  return io ? 'healthy' : 'unhealthy';
+  return {
+    status: io ? 'online' : 'unavailable',
+    connections: io ? io.sockets.sockets.size : 0,
+    rooms: io ? io.sockets.adapter.rooms.size : 0,
+    uptime: process.uptime()
+  };
 };
 
 /**
@@ -138,6 +143,7 @@ const getHealthMetrics = async () => {
 
 /**
  * Record health check data in the database
+ * @param {object} io - Socket.IO instance (optional)
  */
 const recordHealthCheck = async (io) => {
   try {
@@ -227,80 +233,85 @@ const startHealthMonitoring = (io) => {
   // Store reference to Socket.IO
   ioInstance = io;
   
-  // Register socket events for real-time monitoring
-  io.on('connection', (socket) => {
-    // Only register these events for authenticated sockets
-    if (socket.user) {
-      socket.on('health:subscribe', async () => {
-        try {
-          // Verify this is an admin user
-          const { data, error } = await supabase
-            .from('users')
-            .select('is_admin, role')
-            .eq('id', socket.user.id)
-            .single();
+  // Only register socket events if io is available
+  if (io) {
+    // Register socket events for real-time monitoring
+    io.on('connection', (socket) => {
+      // Only register these events for authenticated sockets
+      if (socket.user) {
+        socket.on('health:subscribe', async () => {
+          try {
+            // Verify this is an admin user
+            const { data, error } = await supabase
+              .from('users')
+              .select('is_admin, role')
+              .eq('id', socket.user.id)
+              .single();
+              
+            const isAdmin = data && (data.is_admin === true || data.role === 'admin');
             
-          const isAdmin = data && (data.is_admin === true || data.role === 'admin');
-          
-          if (error || !isAdmin) {
+            if (error || !isAdmin) {
+              socket.emit('error', {
+                source: 'health:subscribe',
+                message: 'Unauthorized. Admin privileges required.'
+              });
+              return;
+            }
+            
+            // Join admin-specific room for health updates
+            socket.join(`admin:${socket.user.id}`);
+            
+            // Register as health viewer
+            registerHealthViewer(socket.user.id);
+            
+            // Send immediate health update
+            const metrics = await getHealthMetrics();
+            socket.emit('health:update', metrics);
+            
+            // Confirm subscription
+            socket.emit('health:subscribed', {
+              message: 'Successfully subscribed to real-time health updates',
+              updateFrequency: REALTIME_UPDATE_INTERVAL
+            });
+            
+            logger.info(`Admin ${socket.user.id} subscribed to health updates`);
+          } catch (error) {
+            logger.error(`Health subscription error: ${error.message}`);
             socket.emit('error', {
               source: 'health:subscribe',
-              message: 'Unauthorized. Admin privileges required.'
+              message: 'Failed to subscribe to health updates'
             });
-            return;
           }
-          
-          // Join admin-specific room for health updates
-          socket.join(`admin:${socket.user.id}`);
-          
-          // Register as health viewer
-          registerHealthViewer(socket.user.id);
-          
-          // Send immediate health update
-          const metrics = await getHealthMetrics();
-          socket.emit('health:update', metrics);
-          
-          // Confirm subscription
-          socket.emit('health:subscribed', {
-            message: 'Successfully subscribed to real-time health updates',
-            updateFrequency: REALTIME_UPDATE_INTERVAL
-          });
-          
-          logger.info(`Admin ${socket.user.id} subscribed to health updates`);
-        } catch (error) {
-          logger.error(`Health subscription error: ${error.message}`);
-          socket.emit('error', {
-            source: 'health:subscribe',
-            message: 'Failed to subscribe to health updates'
-          });
-        }
-      });
-      
-      socket.on('health:unsubscribe', () => {
-        try {
-          // Leave admin-specific room
-          socket.leave(`admin:${socket.user.id}`);
-          
-          // Unregister as health viewer
+        });
+        
+        socket.on('health:unsubscribe', () => {
+          try {
+            // Leave admin-specific room
+            socket.leave(`admin:${socket.user.id}`);
+            
+            // Unregister as health viewer
+            unregisterHealthViewer(socket.user.id);
+            
+            // Confirm unsubscription
+            socket.emit('health:unsubscribed', {
+              message: 'Successfully unsubscribed from health updates'
+            });
+            
+            logger.info(`Admin ${socket.user.id} unsubscribed from health updates`);
+          } catch (error) {
+            logger.error(`Health unsubscription error: ${error.message}`);
+          }
+        });
+        
+        socket.on('disconnect', () => {
+          // Unregister from health updates on disconnect
           unregisterHealthViewer(socket.user.id);
-          
-          // Confirm unsubscription
-          socket.emit('health:unsubscribed', {
-            message: 'Successfully unsubscribed from health updates'
-          });
-          
-          logger.info(`Admin ${socket.user.id} unsubscribed from health updates`);
-        } catch (error) {
-          logger.error(`Health unsubscription error: ${error.message}`);
-        }
-      });
-      
-      socket.on('disconnect', () => {
-        // Unregister from health updates on disconnect
-        unregisterHealthViewer(socket.user.id);
-      });
-    }
-  });
+        });
+      }
+    });
+  } else {
+    logger.warn('Health monitoring started without Socket.IO - real-time updates disabled');
+  }
   
   // Perform initial health check
   recordHealthCheck(io);

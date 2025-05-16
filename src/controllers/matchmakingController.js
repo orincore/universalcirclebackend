@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.0-pro' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 // In-memory waiting queue for matchmaking
 // Use a Map for O(1) lookups by userId

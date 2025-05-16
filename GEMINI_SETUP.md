@@ -23,8 +23,8 @@ The Universal Circle platform uses Google's Gemini AI for content moderation and
    GEMINI_API_KEY=your_api_key_here
    ```
 2. Make sure you're using the **correct model name**:
-   - Use `gemini-1.0-pro` instead of `gemini-pro`
-   - The API endpoint should be `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent`
+   - The code now uses `gemini-2.0-flash` (the current recommended model)
+   - The API endpoint is `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`
 
 ### Step 4: Test the Connection
 
@@ -34,15 +34,15 @@ The Universal Circle platform uses Google's Gemini AI for content moderation and
 
 ### Common Issues
 
-- **404 Not Found Error**: Make sure you're using the correct model name (`gemini-1.0-pro`) and API endpoint path (`v1beta`)
+- **404 Not Found Error**: Make sure you're using an up-to-date model name. As of May 2025, `gemini-2.0-flash` is the recommended model.
 - **API Key Invalid**: Verify your API key is correct and hasn't expired
 - **Rate Limits**: Google applies usage limits to Gemini API keys. For production use, consider upgrading to a paid plan.
 
 ### Getting Help
 
 If you continue to experience issues with Gemini AI integration, check:
-1. [Google AI Official Documentation](https://ai.google.dev/docs)
-2. [Gemini API Reference](https://ai.google.dev/api/rest/v1beta/models)
+1. [Official Google Gemini API Documentation](https://ai.google.dev/gemini-api/docs/quickstart?lang=rest)
+2. [API Reference](https://ai.google.dev/api/)
 3. Contact the Universal Circle development team
 
 Remember to never commit API keys to version control. Always use environment variables or secure storage solutions for keeping API keys confidential. 

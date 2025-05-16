@@ -3,8 +3,8 @@ const logger = require('../utils/logger');
 
 // Configuration for Gemini API
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Updated to match the official API format from Google's docs
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent';
+// Updated to use the newest model version based on official docs: https://ai.google.dev/gemini-api/docs/quickstart?lang=rest
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 /**
  * Safely extract error details to avoid circular references

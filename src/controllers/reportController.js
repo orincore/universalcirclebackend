@@ -137,8 +137,30 @@ const submitReport = async (req, res) => {
       // When reporting a user, store the user's ID in reported_user_id
       reportData.reported_user_id = contentId;
       reportData.reported_post_id = null;
-    } else if (contentType === 'message' || contentType === 'post') {
-      // When reporting a message or post, store the content ID in reported_post_id
+    } else if (contentType === 'message') {
+      // For messages, we need to set reported_post_id since that's what the schema expects
+      // Previously we were looking for reported_message_id which doesn't exist
+      reportData.reported_post_id = contentId;
+      reportData.reported_user_id = null;
+      
+      // Add additional check to see if the message exists
+      const { data: messageExists, error: messageError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('id', contentId)
+        .single();
+        
+      if (messageError || !messageExists) {
+        logger.error(`Message with ID ${contentId} not found:`, messageError);
+        return res.status(404).json({
+          success: false,
+          message: `Message with ID ${contentId} not found`
+        });
+      }
+      
+      logger.info(`Reporting message: ${contentId}`);
+    } else if (contentType === 'post') {
+      // When reporting a post, store the content ID in reported_post_id
       reportData.reported_post_id = contentId;
       reportData.reported_user_id = null;
     } else {
@@ -160,52 +182,17 @@ const submitReport = async (req, res) => {
       // Log detailed error information
       console.error('Error details:', {
         error,
-        reportData
+        reportData,
+        code: error.code,
+        message: error.message,
+        details: error.details
       });
       
-      // Try direct SQL as a fallback
-      try {
-        logger.info('Attempting report creation with raw SQL');
-        
-        // Create a report using raw SQL with specific values that comply with constraints
-        const { data: sqlReport, error: sqlError } = await supabase.rpc(
-          'create_report',
-          {
-            p_content_type: contentType,
-            p_content_id: contentId,
-            p_report_type: 'abusive', // Use a known valid value
-            p_reason: reportType,
-            p_comment: comment || '',
-            p_reporter_id: req.user.id,
-            p_reported_user_id: contentType === 'user' ? contentId : null,
-            p_reported_post_id: (contentType === 'post' || contentType === 'message') ? contentId : null
-          }
-        );
-        
-        if (sqlError) {
-          logger.error('Error creating report with SQL:', sqlError);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to create report'
-          });
-        }
-        
-        logger.info(`New report submitted using SQL: ${reportType} for ${contentType} ${contentId} by user ${req.user.id}`);
-        
-        return res.status(201).json({
-          success: true,
-          message: 'Report submitted successfully',
-          data: {
-            reportId: sqlReport.id
-          }
-        });
-      } catch (sqlExecError) {
-        logger.error('Error executing SQL report creation:', sqlExecError);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to create report'
-        });
-      }
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create report',
+        details: error.message
+      });
     }
     
     logger.info(`New report submitted: ${reportType} for ${contentType} ${contentId} by user ${req.user.id}`);

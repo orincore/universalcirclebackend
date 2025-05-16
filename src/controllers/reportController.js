@@ -95,18 +95,30 @@ const submitReport = async (req, res) => {
     // Check if table exists and create it if needed
     await ensureReportsTableExists();
     
+    // Prepare the report data
+    const reportData = {
+      content_type: contentType,
+      content_id: contentId,
+      report_type: reportType,
+      comment: comment || null,
+      reporter_id: req.user.id,
+      created_at: new Date(),
+      status: 'pending'
+    };
+    
+    // Set specific fields based on content type
+    if (contentType === 'user') {
+      reportData.reported_user_id = contentId;
+    } else if (contentType === 'message') {
+      reportData.reported_message_id = contentId;
+    } else if (contentType === 'post') {
+      reportData.reported_post_id = contentId;
+    }
+    
     // Create the report
     const { data: report, error } = await supabase
       .from('reports')
-      .insert({
-        content_type: contentType,
-        content_id: contentId,
-        report_type: reportType,
-        comment: comment || null,
-        reporter_id: req.user.id,
-        created_at: new Date(),
-        status: 'pending'
-      })
+      .insert(reportData)
       .select()
       .single();
       

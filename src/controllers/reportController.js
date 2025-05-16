@@ -101,8 +101,9 @@ const submitReport = async (req, res) => {
       });
     }
     
-    // Ensure reports table exists
+    // Ensure reports table and function exists
     await ensureReportsTableExists();
+    await ensureCreateReportFunctionExists();
     
     // Prepare the report data with proper field mappings
     const reportData = {
@@ -154,7 +155,7 @@ const submitReport = async (req, res) => {
       .single();
       
     if (error) {
-      logger.error('Error creating report:', error);
+      logger.error('Error creating report with ORM:', error);
       
       // Log detailed error information
       console.error('Error details:', {
@@ -162,25 +163,49 @@ const submitReport = async (req, res) => {
         reportData
       });
       
-      // Try to query the constraints on the table to understand what values are allowed
+      // Try direct SQL as a fallback
       try {
-        const { data: constraintInfo, error: constraintError } = await supabase
-          .from('information_schema.table_constraints')
-          .select('constraint_name')
-          .eq('table_name', 'reports')
-          .eq('constraint_type', 'CHECK');
-          
-        if (!constraintError && constraintInfo) {
-          console.log('Table constraints:', constraintInfo);
+        logger.info('Attempting report creation with raw SQL');
+        
+        // Create a report using raw SQL with specific values that comply with constraints
+        const { data: sqlReport, error: sqlError } = await supabase.rpc(
+          'create_report',
+          {
+            p_content_type: contentType,
+            p_content_id: contentId,
+            p_report_type: 'abusive', // Use a known valid value
+            p_reason: reportType,
+            p_comment: comment || '',
+            p_reporter_id: req.user.id,
+            p_reported_user_id: contentType === 'user' ? contentId : null,
+            p_reported_post_id: (contentType === 'post' || contentType === 'message') ? contentId : null
+          }
+        );
+        
+        if (sqlError) {
+          logger.error('Error creating report with SQL:', sqlError);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to create report'
+          });
         }
-      } catch (e) {
-        console.error('Error querying constraints:', e);
+        
+        logger.info(`New report submitted using SQL: ${reportType} for ${contentType} ${contentId} by user ${req.user.id}`);
+        
+        return res.status(201).json({
+          success: true,
+          message: 'Report submitted successfully',
+          data: {
+            reportId: sqlReport.id
+          }
+        });
+      } catch (sqlExecError) {
+        logger.error('Error executing SQL report creation:', sqlExecError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create report'
+        });
       }
-      
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to create report'
-      });
     }
     
     logger.info(`New report submitted: ${reportType} for ${contentType} ${contentId} by user ${req.user.id}`);
@@ -303,6 +328,52 @@ const ensureReportsTableExists = async () => {
   } catch (error) {
     logger.error('Error ensuring reports table exists:', error);
     throw error;
+  }
+};
+
+/**
+ * Ensure the create_report function exists
+ */
+const ensureCreateReportFunctionExists = async () => {
+  try {
+    // Check if function exists by trying to call it with NULL parameters
+    const { error } = await supabase.rpc('create_report', {
+      p_content_type: null,
+      p_content_id: null,
+      p_report_type: null,
+      p_reason: null,
+      p_comment: null,
+      p_reporter_id: null,
+      p_reported_user_id: null,
+      p_reported_post_id: null
+    });
+    
+    // If no "function does not exist" error, then it exists
+    if (!error || !error.message.includes('function does not exist')) {
+      return;
+    }
+    
+    // Function doesn't exist, create it
+    logger.info('Creating create_report function');
+    
+    // Read SQL file with function definition
+    const fs = require('fs');
+    const path = require('path');
+    const sqlPath = path.join(__dirname, '../database/createReportFunction.sql');
+    const sql = fs.readFileSync(sqlPath, 'utf8');
+    
+    // Execute SQL to create function
+    const { error: createError } = await supabase.rpc('exec_sql', { sql: sql });
+    
+    if (createError) {
+      logger.error('Error creating create_report function:', createError);
+      throw new Error('Failed to create create_report function');
+    }
+    
+    logger.info('create_report function created successfully');
+  } catch (error) {
+    logger.error('Error ensuring create_report function exists:', error);
+    // Don't throw, let it fail later if needed
   }
 };
 

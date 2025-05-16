@@ -12,11 +12,17 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemi
  */
 const analyzeMessageContent = async (messageContent) => {
   try {
+    console.log('🤖 Starting Gemini AI content analysis');
+    
     if (!GEMINI_API_KEY) {
+      console.error('❌ Gemini API key not configured');
       logger.error('Gemini API key not configured');
       throw new Error('Gemini AI service not configured');
     }
 
+    console.log('🤖 Gemini API key is configured');
+    console.log('🤖 Preparing prompt for content analysis');
+    
     const prompt = `
       You are a content moderation AI for a social app. Analyze the following message and determine if it violates platform guidelines.
       
@@ -38,6 +44,7 @@ const analyzeMessageContent = async (messageContent) => {
       }
     `;
 
+    console.log('🤖 Sending request to Gemini API');
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
@@ -50,6 +57,8 @@ const analyzeMessageContent = async (messageContent) => {
         }
       }
     );
+    
+    console.log('🤖 Received response from Gemini API');
 
     // Extract the response text
     const generatedText = response.data.candidates[0].content.parts[0].text;
@@ -60,8 +69,11 @@ const analyzeMessageContent = async (messageContent) => {
     const jsonStr = generatedText.substring(startIndex, endIndex);
     
     // Parse and return the analysis
-    return JSON.parse(jsonStr);
+    const result = JSON.parse(jsonStr);
+    console.log('🤖 Successfully parsed Gemini response:', result.classification);
+    return result;
   } catch (error) {
+    console.error('❌ Error analyzing message with Gemini AI:', error);
     logger.error('Error analyzing message with Gemini AI:', error);
     throw new Error('Failed to analyze message content');
   }

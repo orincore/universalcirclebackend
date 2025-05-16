@@ -102,6 +102,8 @@ const banUser = async (userId, reason, duration) => {
  */
 const processReportWithAI = async (reportId) => {
   try {
+    console.log('🤖 Starting processReportWithAI for report:', reportId);
+    
     // Get report details
     const { data: report, error } = await supabase
       .from('reports')
@@ -110,6 +112,7 @@ const processReportWithAI = async (reportId) => {
       .single();
       
     if (error || !report) {
+      console.error('❌ Error fetching report:', error);
       logger.error(`Error fetching report ${reportId}:`, error);
       return {
         success: false,
@@ -117,8 +120,11 @@ const processReportWithAI = async (reportId) => {
       };
     }
     
+    console.log('🤖 Retrieved report:', report.id, 'content_type:', report.content_type);
+    
     // Only process message reports
     if (report.content_type !== 'message') {
+      console.log('❌ Skipping non-message report');
       return {
         success: false,
         message: 'Auto-moderation only processes message reports'
@@ -126,9 +132,11 @@ const processReportWithAI = async (reportId) => {
     }
     
     // Get message content
+    console.log('🤖 Fetching message content for:', report.content_id);
     const { content: messageContent, senderId } = await getMessageContent(report.content_id);
     
     if (!messageContent) {
+      console.log('❌ Message content not found');
       await updateReportStatus(reportId, 'rejected', 'Message not found in database - auto-rejected by Gemini AI');
       return {
         success: true,
@@ -137,11 +145,15 @@ const processReportWithAI = async (reportId) => {
       };
     }
     
+    console.log('🤖 Message content retrieved, analyzing with Gemini AI');
+    
     // Analyze message content with Gemini AI
     const contentAnalysis = await geminiAI.analyzeMessageContent(messageContent);
+    console.log('🤖 Gemini AI analysis complete:', contentAnalysis.classification);
     
     if (contentAnalysis.classification === 'ACCEPTABLE') {
       // Message is fine, reject the report
+      console.log('🤖 Content deemed acceptable, rejecting report');
       await updateReportStatus(reportId, 'rejected', `Auto-rejected by Gemini AI: ${contentAnalysis.explanation}`);
       return {
         success: true,
@@ -151,6 +163,7 @@ const processReportWithAI = async (reportId) => {
       };
     } else if (contentAnalysis.classification === 'BORDERLINE' && contentAnalysis.confidence < 0.7) {
       // Borderline case with low confidence, leave for human review
+      console.log('🤖 Borderline content with low confidence, marking for human review');
       await updateReportStatus(reportId, 'pending', `Marked for human review by Gemini AI: ${contentAnalysis.explanation}`);
       return {
         success: true,
@@ -160,10 +173,14 @@ const processReportWithAI = async (reportId) => {
       };
     } else {
       // Get user's report history
+      console.log('🤖 Content potentially violates guidelines, checking user history');
       const reportHistory = await getUserReportHistory(senderId);
+      console.log('🤖 User has', reportHistory.length, 'previous reports');
       
       // Evaluate if user should be banned based on history and current violation
+      console.log('🤖 Evaluating user with Gemini AI');
       const userEvaluation = await geminiAI.evaluateUserHistory(reportHistory, contentAnalysis);
+      console.log('🤖 User evaluation complete, action:', userEvaluation.action);
       
       if (userEvaluation.action === 'BANNED') {
         // Ban the user

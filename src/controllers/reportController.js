@@ -1,5 +1,6 @@
 const supabase = require('../config/database');
 const logger = require('../utils/logger');
+const axios = require('axios');
 
 // Valid report types
 const VALID_REPORT_TYPES = [
@@ -101,9 +102,8 @@ const submitReport = async (req, res) => {
       });
     }
     
-    // Ensure reports table and function exists
+    // Ensure reports table exists
     await ensureReportsTableExists();
-    await ensureCreateReportFunctionExists();
     
     // Prepare the report data with proper field mappings
     const reportData = {
@@ -197,6 +197,26 @@ const submitReport = async (req, res) => {
     
     logger.info(`New report submitted: ${reportType} for ${contentType} ${contentId} by user ${req.user.id}`);
     
+    // If this is a message report, trigger Gemini AI processing
+    if (contentType === 'message' && process.env.AI_MODERATION_ENABLED === 'true') {
+      try {
+        // Add debug logging
+        console.log('🤖 AI_MODERATION_ENABLED is set to:', process.env.AI_MODERATION_ENABLED);
+        console.log('🤖 Triggering AI processing for report:', report.id);
+        console.log('🤖 Processing mode:', process.env.AI_PROCESSING_MODE || 'not set');
+        
+        // Trigger webhook for AI processing asynchronously
+        triggerAIProcessing(report.id);
+      } catch (webhookError) {
+        logger.error('Error triggering AI processing:', webhookError);
+        // We don't fail the request if AI processing fails to trigger
+      }
+    } else {
+      // Add debug logging for when AI processing is skipped
+      console.log('❌ AI processing skipped. contentType:', contentType);
+      console.log('❌ AI_MODERATION_ENABLED:', process.env.AI_MODERATION_ENABLED);
+    }
+    
     return res.status(201).json({
       success: true,
       message: 'Report submitted successfully',
@@ -210,6 +230,55 @@ const submitReport = async (req, res) => {
       success: false,
       message: 'Server error while submitting report'
     });
+  }
+};
+
+/**
+ * Trigger AI processing for a report
+ * @param {string} reportId - Report ID to process
+ */
+const triggerAIProcessing = async (reportId) => {
+  try {
+    console.log('🤖 Inside triggerAIProcessing for report:', reportId);
+    
+    // Check if we should process in-process or via webhook
+    if (process.env.AI_PROCESSING_MODE === 'webhook') {
+      console.log('🤖 Using webhook mode for AI processing');
+      // Call webhook endpoint to trigger processing
+      await axios.post(
+        `${process.env.WEBHOOK_BASE_URL}/webhooks/report-processing`, 
+        { reportId },
+        { 
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-webhook-secret': process.env.WEBHOOK_SECRET 
+          } 
+        }
+      );
+      console.log('🤖 Webhook request sent successfully');
+    } else {
+      console.log('🤖 Using direct mode for AI processing');
+      // Process directly in the same process (less reliable but simpler)
+      const autoModeration = require('../services/autoModeration');
+      
+      console.log('🤖 Starting auto-moderation process');
+      // Run in the next tick to avoid blocking
+      setTimeout(async () => {
+        try {
+          console.log('🤖 Processing report asynchronously:', reportId);
+          const result = await autoModeration.processReportWithAI(reportId);
+          console.log('🤖 AI processing result:', result);
+        } catch (err) {
+          console.error('❌ Error in local AI processing:', err);
+          logger.error('Error in local AI processing:', err);
+        }
+      }, 0);
+      console.log('🤖 Auto-moderation scheduled');
+    }
+  } catch (error) {
+    console.error('❌ Error triggering AI processing:', error);
+    logger.error('Error triggering AI processing:', error);
+    throw error;
   }
 };
 

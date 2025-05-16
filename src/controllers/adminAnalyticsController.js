@@ -1,5 +1,5 @@
 const supabase = require('../config/database');
-const logger = require('../utils/logger');
+const { info, error, warn } = require('../utils/logger');
 
 /**
  * Get total users statistics with growth metrics
@@ -20,7 +20,7 @@ const getTotalUsers = async (req, res) => {
       .select('*', { count: 'exact', head: true });
     
     if (countError) {
-      logger.error('Error fetching total users count:', countError);
+      error('Error fetching total users count:', countError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch total users count'
@@ -34,7 +34,7 @@ const getTotalUsers = async (req, res) => {
       .gte('created_at', periodDate.toISOString());
     
     if (newUsersError) {
-      logger.error('Error fetching new users count:', newUsersError);
+      error('Error fetching new users count:', newUsersError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch new users count'
@@ -52,7 +52,7 @@ const getTotalUsers = async (req, res) => {
       .order('created_at', { ascending: true });
     
     if (growthError) {
-      logger.error('Error fetching user growth:', growthError);
+      error('Error fetching user growth:', growthError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch user growth data'
@@ -69,7 +69,7 @@ const getTotalUsers = async (req, res) => {
       .not('gender', 'is', null);
     
     if (genderError) {
-      logger.error('Error fetching gender demographics:', genderError);
+      error('Error fetching gender demographics:', genderError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch gender demographics'
@@ -92,7 +92,7 @@ const getTotalUsers = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getTotalUsers:', error);
+    error('Error in getTotalUsers:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching total users statistics'
@@ -119,7 +119,7 @@ const getUserActivity = async (req, res) => {
       .gte('last_login', startDate.toISOString());
     
     if (activeError) {
-      logger.error('Error fetching active users:', activeError);
+      error('Error fetching active users:', activeError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch active users'
@@ -133,7 +133,7 @@ const getUserActivity = async (req, res) => {
       .gte('created_at', startDate.toISOString());
     
     if (messageError) {
-      logger.error('Error fetching message activity:', messageError);
+      error('Error fetching message activity:', messageError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch message activity'
@@ -147,7 +147,7 @@ const getUserActivity = async (req, res) => {
       .gte('created_at', startDate.toISOString());
     
     if (matchError) {
-      logger.error('Error fetching match activity:', matchError);
+      error('Error fetching match activity:', matchError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch match activity'
@@ -186,7 +186,7 @@ const getUserActivity = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getUserActivity:', error);
+    error('Error in getUserActivity:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching user activity statistics'
@@ -224,7 +224,7 @@ const getDailyActiveUsers = async (req, res) => {
         .lt('last_login', nextDate.toISOString());
       
       if (dauError) {
-        logger.error(`Error fetching DAU for ${date.toISOString()}:`, dauError);
+        error(`Error fetching DAU for ${date.toISOString()}:`, dauError);
         continue;
       }
       
@@ -236,7 +236,7 @@ const getDailyActiveUsers = async (req, res) => {
         .lt('created_at', nextDate.toISOString());
       
       if (newUsersError) {
-        logger.error(`Error fetching new users for ${date.toISOString()}:`, newUsersError);
+        error(`Error fetching new users for ${date.toISOString()}:`, newUsersError);
         continue;
       }
       
@@ -271,7 +271,7 @@ const getDailyActiveUsers = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getDailyActiveUsers:', error);
+    error('Error in getDailyActiveUsers:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching daily active users'
@@ -298,7 +298,7 @@ const getMatchesCreated = async (req, res) => {
       .gte('created_at', startDate.toISOString());
     
     if (matchesError) {
-      logger.error('Error fetching matches:', matchesError);
+      error('Error fetching matches:', matchesError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch matches'
@@ -338,7 +338,7 @@ const getMatchesCreated = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getMatchesCreated:', error);
+    error('Error in getMatchesCreated:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching matches statistics'
@@ -365,7 +365,7 @@ const getMessagesSent = async (req, res) => {
       .gte('created_at', startDate.toISOString());
     
     if (messagesError) {
-      logger.error('Error fetching messages:', messagesError);
+      error('Error fetching messages:', messagesError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch messages'
@@ -412,7 +412,7 @@ const getMessagesSent = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getMessagesSent:', error);
+    error('Error in getMessagesSent:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching message statistics'
@@ -433,7 +433,7 @@ const getMatchSuccessRate = async (req, res) => {
       .select('status, compatibility_score');
     
     if (matchesError) {
-      logger.error('Error fetching match success rate:', matchesError);
+      error('Error fetching match success rate:', matchesError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch match success rate'
@@ -495,7 +495,7 @@ const getMatchSuccessRate = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getMatchSuccessRate:', error);
+    error('Error in getMatchSuccessRate:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching match success rate'
@@ -521,7 +521,7 @@ const getRecentActivity = async (req, res) => {
       .limit(limit);
     
     if (newUsersError) {
-      logger.error('Error fetching recent registrations:', newUsersError);
+      error('Error fetching recent registrations:', newUsersError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch recent registrations'
@@ -542,11 +542,32 @@ const getRecentActivity = async (req, res) => {
       .limit(limit);
     
     if (newMatchesError) {
-      logger.error('Error fetching recent matches:', newMatchesError);
+      error('Error fetching recent matches:', newMatchesError);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch recent matches'
       });
+    }
+
+    // Get recent admin activity logs, including Gemini AI actions
+    const { data: adminActivities, error: adminActivitiesError } = await supabase
+      .from('admin_activity_log')
+      .select(`
+        id,
+        admin_id,
+        action,
+        details,
+        created_at,
+        resource_type,
+        resource_id,
+        admin:admin_id(id, first_name, last_name, username, is_admin)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (adminActivitiesError) {
+      error('Error fetching admin activities:', adminActivitiesError);
+      // Don't return error, just continue without admin activities
     }
     
     // Initialize activities array with available data
@@ -566,6 +587,42 @@ const getRecentActivity = async (req, res) => {
         data: { matchId: match.id, status: match.status }
       }))
     ];
+
+    // Add admin activities if we got them successfully
+    if (adminActivities && adminActivities.length > 0) {
+      const formattedAdminActivities = adminActivities.map(activity => {
+        // Check if this is a Gemini AI action (using the fixed UUID)
+        const isGeminiAI = activity.admin_id === '00000000-0000-4000-a000-000000000001';
+        const adminName = isGeminiAI 
+          ? 'Gemini AI' 
+          : (activity.admin 
+            ? `${activity.admin.first_name} ${activity.admin.last_name}` 
+            : 'Unknown Admin');
+        
+        // Format the action name for display
+        let actionType = activity.action.replace(/_/g, ' ');
+        if (actionType.startsWith('report')) {
+          actionType = actionType.replace('report ', '');
+        }
+        
+        return {
+          id: `admin-${activity.id}`,
+          type: 'admin_action',
+          description: `${adminName} ${actionType} ${activity.resource_type || ''}: ${activity.details}`,
+          timestamp: activity.created_at,
+          data: { 
+            adminId: activity.admin_id,
+            action: activity.action,
+            resourceType: activity.resource_type,
+            resourceId: activity.resource_id,
+            isAI: isGeminiAI
+          }
+        };
+      });
+      
+      // Add to the activities array
+      activities = [...activities, ...formattedAdminActivities];
+    }
     
     try {
       // Try to get recent content reports (this may fail if the table doesn't exist)
@@ -576,34 +633,56 @@ const getRecentActivity = async (req, res) => {
           report_type,
           content_type,
           content_id,
-          reporter:reporter_id(id, username),
+          reporter:reported_by(id, username),
           created_at,
-          status
+          status,
+          resolved_by
         `)
         .order('created_at', { ascending: false })
         .limit(limit);
       
       if (!reportsError && recentReports) {
         // Add reports to activities if query was successful
-        activities = [
-          ...activities,
-          ...recentReports.map(report => ({
+        const reportActivities = await Promise.all(recentReports.map(async report => {
+          // Get the resolver's info if available
+          let resolverInfo = "Pending";
+          if (report.resolved_by) {
+            if (report.resolved_by === '00000000-0000-4000-a000-000000000001') {
+              resolverInfo = "Gemini AI";
+            } else {
+              const { data: resolver } = await supabase
+                .from('users')
+                .select('username, first_name, last_name')
+                .eq('id', report.resolved_by)
+                .single();
+              
+              if (resolver) {
+                resolverInfo = `${resolver.first_name} ${resolver.last_name}`;
+              }
+            }
+          }
+          
+          return {
             id: `report-${report.id}`,
             type: 'report',
-            description: `${report.reporter.username} reported ${report.content_type} for ${report.report_type}`,
+            description: `${report.reporter?.username || 'Anonymous'} reported ${report.content_type} for ${report.report_type}`,
             timestamp: report.created_at,
             data: { 
               reportId: report.id, 
               type: report.report_type, 
               contentType: report.content_type,
-              status: report.status
+              status: report.status,
+              resolvedBy: resolverInfo,
+              isAIResolved: report.resolved_by === '00000000-0000-4000-a000-000000000001'
             }
-          }))
-        ];
+          };
+        }));
+        
+        activities = [...activities, ...reportActivities];
       }
     } catch (reportError) {
       // Just log the error but don't fail the entire request
-      logger.warn('Error fetching report data (table might not exist):', reportError);
+      warn('Error fetching report data (table might not exist):', reportError);
     }
     
     // Sort by timestamp (most recent first)
@@ -617,7 +696,7 @@ const getRecentActivity = async (req, res) => {
       data: limitedActivities
     });
   } catch (error) {
-    logger.error('Error in getRecentActivity:', error);
+    error('Error in getRecentActivity:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching recent activity'
@@ -688,7 +767,7 @@ const getReportTypesSummary = async (req, res) => {
       }
     } catch (reportError) {
       // Log the error but return default empty data
-      logger.warn('Error fetching reports data (table might not exist):', reportError);
+      warn('Error fetching reports data (table might not exist):', reportError);
     }
     
     return res.status(200).json({
@@ -701,7 +780,7 @@ const getReportTypesSummary = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in getReportTypesSummary:', error);
+    error('Error in getReportTypesSummary:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching report types summary'

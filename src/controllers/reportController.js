@@ -100,6 +100,7 @@ const submitReport = async (req, res) => {
       content_type: contentType,
       content_id: contentId,
       report_type: reportType,
+      reason: reportType,
       comment: comment || null,
       reporter_id: req.user.id,
       created_at: new Date(),

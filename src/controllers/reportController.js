@@ -10,6 +10,15 @@ const VALID_REPORT_TYPES = [
   'Others'
 ];
 
+// Map user-friendly report types to database-compatible values
+const REPORT_TYPE_MAP = {
+  'Inappropriate Content': 'inappropriate',
+  'Spam': 'spam',
+  'Harassment': 'harassment',
+  'Impersonation': 'impersonation',
+  'Others': 'other'
+};
+
 // Valid content types
 const VALID_CONTENT_TYPES = [
   'message',
@@ -99,7 +108,7 @@ const submitReport = async (req, res) => {
     const reportData = {
       content_type: contentType,
       content_id: contentId,
-      report_type: reportType,
+      report_type: REPORT_TYPE_MAP[reportType] || 'other',
       reason: reportType,
       comment: comment || null,
       reporter_id: req.user.id,

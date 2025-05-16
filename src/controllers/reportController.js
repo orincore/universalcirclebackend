@@ -239,11 +239,11 @@ const submitReport = async (req, res) => {
  */
 const triggerAIProcessing = async (reportId) => {
   try {
-    console.log('🤖 Inside triggerAIProcessing for report:', reportId);
+    logger.info(`🤖 Inside triggerAIProcessing for report: ${reportId}`);
     
     // Check if we should process in-process or via webhook
     if (process.env.AI_PROCESSING_MODE === 'webhook') {
-      console.log('🤖 Using webhook mode for AI processing');
+      logger.info('🤖 Using webhook mode for AI processing');
       // Call webhook endpoint to trigger processing
       await axios.post(
         `${process.env.WEBHOOK_BASE_URL}/webhooks/report-processing`, 
@@ -255,29 +255,47 @@ const triggerAIProcessing = async (reportId) => {
           } 
         }
       );
-      console.log('🤖 Webhook request sent successfully');
+      logger.info('🤖 Webhook request sent successfully');
     } else {
-      console.log('🤖 Using direct mode for AI processing');
+      logger.info('🤖 Using direct mode for AI processing');
       // Process directly in the same process (less reliable but simpler)
       const autoModeration = require('../services/autoModeration');
       
-      console.log('🤖 Starting auto-moderation process');
+      logger.info('🤖 Starting auto-moderation process');
       // Run in the next tick to avoid blocking
       setTimeout(async () => {
         try {
-          console.log('🤖 Processing report asynchronously:', reportId);
+          logger.info(`🤖 Processing report asynchronously: ${reportId}`);
           const result = await autoModeration.processReportWithAI(reportId);
-          console.log('🤖 AI processing result:', result);
+          
+          // Safely log the result without circular references
+          const safeResult = {
+            success: result.success,
+            message: result.message,
+            action: result.action
+          };
+          
+          logger.info('🤖 AI processing result:', safeResult);
         } catch (err) {
-          console.error('❌ Error in local AI processing:', err);
-          logger.error('Error in local AI processing:', err);
+          // Safe error handling
+          const safeError = {
+            message: err.message,
+            name: err.name,
+            code: err.code
+          };
+          logger.error('Error in local AI processing:', safeError);
         }
       }, 0);
-      console.log('🤖 Auto-moderation scheduled');
+      logger.info('🤖 Auto-moderation scheduled');
     }
   } catch (error) {
-    console.error('❌ Error triggering AI processing:', error);
-    logger.error('Error triggering AI processing:', error);
+    // Safe error handling
+    const safeError = {
+      message: error.message,
+      name: error.name,
+      code: error.code
+    };
+    logger.error('Error triggering AI processing:', safeError);
     throw error;
   }
 };

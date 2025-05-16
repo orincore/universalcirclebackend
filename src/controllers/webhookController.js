@@ -36,7 +36,13 @@ const processNewReport = async (req, res) => {
     processReportAsync(reportId);
     
   } catch (error) {
-    logger.error('Error in webhook processNewReport:', error);
+    // Safe error handling
+    const safeError = {
+      message: error.message,
+      name: error.name,
+      code: error.code
+    };
+    logger.error('Error in webhook processNewReport:', safeError);
     return res.status(500).json({
       success: false,
       message: 'Server error processing webhook'
@@ -54,13 +60,26 @@ const processReportAsync = async (reportId) => {
     
     const result = await autoModeration.processReportWithAI(reportId);
     
+    // Safely log the result without circular references
+    const safeResult = {
+      success: result.success,
+      message: result.message,
+      action: result.action || 'unknown'
+    };
+    
     if (result.success) {
-      logger.info(`AI successfully processed report ${reportId}: ${result.message}`);
+      logger.info(`AI successfully processed report ${reportId}: ${safeResult.message}`);
     } else {
-      logger.error(`AI failed to process report ${reportId}: ${result.message}`);
+      logger.error(`AI failed to process report ${reportId}: ${safeResult.message}`);
     }
   } catch (error) {
-    logger.error(`Error in processReportAsync for report ${reportId}:`, error);
+    // Safe error handling to avoid circular references
+    const safeError = {
+      message: error.message || 'Unknown error',
+      name: error.name,
+      code: error.code
+    };
+    logger.error(`Error in processReportAsync for report ${reportId}:`, safeError);
   }
 };
 

@@ -1,27 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { adminLogin, adminProfile, validateAdminToken } = require('../controllers/adminAuthController');
-const { authenticate, isAdmin } = require('../middlewares/auth');
+const adminAuthController = require('../controllers/adminAuthController');
+const { authenticate } = require('../middlewares/auth');
+const { isAdmin } = require('../middlewares/admin');
 
 /**
  * @route   POST /api/admin/auth/login
  * @desc    Admin login
  * @access  Public
  */
-router.post('/login', adminLogin);
+router.post('/login', adminAuthController.adminLogin);
 
 /**
  * @route   GET /api/admin/auth/profile
  * @desc    Get admin profile
  * @access  Private (Admin only)
  */
-router.get('/profile', authenticate, isAdmin, adminProfile);
+router.get('/profile', authenticate, isAdmin, adminAuthController.adminProfile);
 
 /**
  * @route   GET /api/admin/auth/validate
  * @desc    Validate admin token
  * @access  Private (Admin only)
  */
-router.get('/validate', authenticate, isAdmin, validateAdminToken);
+router.get('/validate', authenticate, isAdmin, adminAuthController.validateAdminToken);
 
 module.exports = router; 

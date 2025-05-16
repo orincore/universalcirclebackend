@@ -45,6 +45,7 @@ const adminAnalyticsRoutes = require('./routes/adminAnalyticsRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const adminReportRoutes = require('./routes/adminReportRoutes');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
 // Initialize Express app
 const app = express();
@@ -102,6 +103,7 @@ app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api/admin/reports', adminReportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

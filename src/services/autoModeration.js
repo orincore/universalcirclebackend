@@ -114,21 +114,7 @@ const deleteInappropriateMessage = async (messageId) => {
   try {
     info(`🤖 Attempting to delete inappropriate message: ${messageId}`);
     
-    // First, get the message details
-    const { data: messageData, error: messageError } = await supabase
-      .from('messages')
-      .select('conversation_id, sender_id')
-      .eq('id', messageId)
-      .single();
-    
-    if (messageError || !messageData) {
-      info(`❌ Message ${messageId} not found for deletion: ${messageError?.message || 'No data'}`);
-      return false;
-    }
-    
-    const { conversation_id, sender_id } = messageData;
-    
-    // Delete the message
+    // Delete the message directly without trying to access conversation_id
     const { error: deleteError } = await supabase
       .from('messages')
       .delete()
@@ -139,42 +125,28 @@ const deleteInappropriateMessage = async (messageId) => {
       return false;
     }
     
-    // Create a system message explaining the deletion
-    const { error: systemMsgError } = await supabase
-      .from('messages')
-      .insert({
-        id: crypto.randomUUID(), // Generate UUID in JavaScript
-        conversation_id,
-        sender_id: GEMINI_AI_USER_ID,
-        content: '⚠️ A message was removed by our automated content moderation system for violating community guidelines.',
-        is_system_message: true,
-        created_at: new Date().toISOString()
-      });
-    
-    if (systemMsgError) {
-      info(`❌ Error creating system message: ${systemMsgError.message}`);
-      // Continue even if system message fails
-    }
-    
-    // Log the action to admin activity log
-    const { error: logError } = await supabase
-      .from('admin_activity_log')
-      .insert({
-        admin_id: GEMINI_AI_USER_ID,
-        action_type: 'delete_message',
-        target_type: 'message',
-        target_id: messageId,
-        details: JSON.stringify({
-          reason: 'Automated removal of inappropriate content',
-          conversation_id,
-          user_id: sender_id
-        }),
-        created_at: new Date().toISOString()
-      });
-    
-    if (logError) {
-      info(`❌ Error logging admin activity: ${logError.message}`);
-      // Continue even if logging fails
+    // Log the action to admin activity log if it exists
+    try {
+      const { error: logError } = await supabase
+        .from('admin_activity_log')
+        .insert({
+          admin_id: GEMINI_AI_USER_ID,
+          action_type: 'delete_message',
+          target_type: 'message',
+          target_id: messageId,
+          details: JSON.stringify({
+            reason: 'Automated removal of inappropriate content by Gemini AI'
+          }),
+          created_at: new Date().toISOString()
+        });
+      
+      if (logError) {
+        info(`❌ Error logging admin activity: ${logError.message}`);
+        // Continue even if logging fails
+      }
+    } catch (logError) {
+      // If the admin_activity_log table doesn't exist, just continue
+      info(`❌ Could not log to admin_activity_log: ${logError.message}`);
     }
     
     info(`✅ Successfully deleted inappropriate message: ${messageId}`);
@@ -197,7 +169,7 @@ const processReportWithAI = async (report) => {
       id: report.id,
       reporter_id: report.reporter_id, // Use reporter_id instead of reported_by
       reported_user_id: report.reported_user_id,
-      reason: report.reason,
+      reason: report.reason || 'No reason provided',
       status: report.status,
       content_type: report.content_type,
       content_id: report.content_id,
@@ -253,24 +225,26 @@ const processReportWithAI = async (report) => {
         await deleteInappropriateMessage(reportData.content_id);
       }
       
-      // Check user history
-      const userHistory = await getUserReportHistory(reportData.reported_user_id);
-      if (userHistory.length >= 3) {
-        // This user has been reported multiple times - consider banning
-        await banUser(reportData.reported_user_id);
-        return updateReportStatus(
-          reportData.id, 
-          'RESOLVED', 
-          `Auto-resolved by Gemini AI: ${aiDecision.explanation}. User banned due to multiple violations.`,
-          GEMINI_AI_USER_ID  // Use UUID instead of string "Gemini AI"
-        );
+      // Check user history - only if we have a valid reported_user_id
+      if (reportData.reported_user_id) {
+        const userHistory = await getUserReportHistory(reportData.reported_user_id);
+        if (userHistory.length >= 3) {
+          // This user has been reported multiple times - consider banning
+          await banUser(reportData.reported_user_id);
+          return updateReportStatus(
+            reportData.id, 
+            'RESOLVED', 
+            `Auto-resolved by Gemini AI: ${aiDecision.explanation}. User banned due to multiple violations.`,
+            GEMINI_AI_USER_ID
+          );
+        }
       }
       
       return updateReportStatus(
         reportData.id, 
         'RESOLVED', 
         `Auto-resolved by Gemini AI: ${aiDecision.explanation}`,
-        GEMINI_AI_USER_ID  // Use UUID instead of string "Gemini AI"
+        GEMINI_AI_USER_ID
       );
     } else if (aiDecision.classification === 'ACCEPTABLE' && aiDecision.confidence >= 0.9) {
       // High confidence that this is acceptable content
@@ -278,7 +252,7 @@ const processReportWithAI = async (report) => {
         reportData.id, 
         'REJECTED', 
         `Rejected by Gemini AI: ${aiDecision.explanation}`,
-        GEMINI_AI_USER_ID  // Use UUID instead of string "Gemini AI"
+        GEMINI_AI_USER_ID
       );
     } else {
       // Borderline cases or lower confidence - mark for human review
@@ -299,22 +273,37 @@ const processReportWithAI = async (report) => {
  * @param {string} reportId - Report ID to update
  * @param {string} status - New status value
  * @param {string} adminComment - Admin comment to add
- * @param {string} resolvedBy - Who resolved the report (optional)
+ * @param {string|null} resolvedBy - UUID of user/AI who resolved the report (optional)
  * @returns {Promise<Object>} Updated report
  */
 const updateReportStatus = async (reportId, status, adminComment, resolvedBy = null) => {
   try {
+    // Basic data validation
+    if (!reportId) {
+      info('Error: Missing report ID in updateReportStatus');
+      return null;
+    }
+
+    // Create the update data object
     const updateData = {
-      status: status,
-      admin_comment: adminComment,
+      status: status || 'PENDING_REVIEW',
+      admin_comment: adminComment || '',
       updated_at: new Date().toISOString()
     };
     
-    // Only set resolved_by if provided
+    // Only set resolved_by if provided and it's a valid UUID
     if (resolvedBy) {
-      updateData.resolved_by = resolvedBy;
+      // Validate UUID format (simple check, not comprehensive)
+      if (typeof resolvedBy === 'string' && 
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedBy)) {
+        updateData.resolved_by = resolvedBy;
+      } else {
+        info(`Warning: Invalid UUID format for resolvedBy: ${resolvedBy}`);
+        // Don't include resolvedBy if it's invalid
+      }
     }
     
+    // Execute the update
     const { data, error } = await supabase
       .from('reports')
       .update(updateData)

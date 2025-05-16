@@ -1,4 +1,7 @@
--- Function to check if table exists
+-- Drop existing function if it exists (to avoid parameter naming conflicts)
+DROP FUNCTION IF EXISTS check_table_exists(TEXT);
+
+-- Create our function with consistent parameter naming
 CREATE OR REPLACE FUNCTION check_table_exists(p_table_name TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE

@@ -32,7 +32,7 @@ BEGIN
     CREATE INDEX idx_reports_created_at ON reports(created_at);
     
     -- Create function to check if table exists
-    CREATE OR REPLACE FUNCTION check_table_exists(table_name TEXT)
+    CREATE OR REPLACE FUNCTION check_table_exists(p_table_name TEXT)
     RETURNS BOOLEAN
     LANGUAGE plpgsql
     AS $$
@@ -40,7 +40,7 @@ BEGIN
       RETURN EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name = table_name
+        AND table_name = p_table_name
       );
     END;
     $$;

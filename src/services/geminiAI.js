@@ -290,8 +290,75 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
   }
 };
 
+/**
+ * Generate content using Gemini AI
+ * @param {string} prompt - The prompt to send to Gemini
+ * @returns {Promise<Object>} Response with text method
+ */
+const generateContent = async (prompt) => {
+  try {
+    info('🤖 Starting Gemini AI content generation');
+    
+    if (!GEMINI_API_KEY) {
+      error('❌ Gemini API key not configured');
+      throw new Error('Gemini AI service not configured');
+    }
+
+    info('🤖 Sending request to Gemini API');
+    
+    try {
+      const response = await axios.post(
+        `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 500
+          }
+        }
+      );
+      
+      info('🤖 Received response from Gemini API');
+
+      // Check if response contains expected data
+      if (!response.data || !response.data.candidates || !response.data.candidates[0]?.content?.parts?.[0]?.text) {
+        error('❌ Unexpected Gemini API response format:', JSON.stringify(response.data));
+        throw new Error('Invalid response format from Gemini API');
+      }
+
+      // Extract the response text
+      const generatedText = response.data.candidates[0].content.parts[0].text;
+      
+      // Return an object with a text() method to match expected interface
+      return {
+        text: () => generatedText
+      };
+      
+    } catch (axiosError) {
+      // Handle Axios errors specifically to avoid circular references
+      const safeError = getSafeErrorDetails(axiosError);
+      error(`❌ Axios error calling Gemini API: ${safeError.name} - ${safeError.message}`);
+      
+      // Check if it's a 404 error indicating wrong endpoint
+      if (axiosError.response && axiosError.response.status === 404) {
+        error('❌ 404 error: API endpoint may be incorrect. Check GEMINI_API_URL value.');
+      }
+      
+      throw new Error(`Gemini API request failed: ${safeError.message}`);
+    }
+  } catch (error) {
+    // Handle all other errors
+    const safeError = getSafeErrorDetails(error);
+    error(`❌ Error generating content with Gemini AI: ${safeError.name} - ${safeError.message}`);
+    throw error;
+  }
+};
+
 module.exports = {
   analyzeMessageContent,
   evaluateUserHistory,
-  getSafeErrorDetails  // Export for reuse in other modules
+  getSafeErrorDetails,
+  generateContent  // Export the new function
 }; 

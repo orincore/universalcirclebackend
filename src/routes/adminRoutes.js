@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { 
   getAllUsers,
+  getAllUsersBulk,
   getUserById,
   updateUserAdminStatus,
   updateUserBanStatus,
@@ -22,6 +23,7 @@ router.use(isAdmin);
 
 // User management routes
 router.get('/users', getAllUsers);
+router.get('/users/bulk', getAllUsersBulk);
 router.get('/users/:userId', getUserById);
 router.patch('/users/:userId/admin', updateUserAdminStatus);
 router.patch('/users/:userId/ban', updateUserBanStatus);

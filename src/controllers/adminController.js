@@ -65,6 +65,69 @@ const getAllUsers = async (req, res) => {
 };
 
 /**
+ * Get all users with a higher page limit (for admin dashboard)
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const getAllUsersBulk = async (req, res) => {
+  try {
+    // Get pagination params with higher default limit
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100; // Default 100 users per page
+    const offset = (page - 1) * limit;
+    
+    // Get filters
+    const searchTerm = req.query.search || '';
+    const sortBy = req.query.sortBy || 'created_at';
+    const sortOrder = req.query.sortOrder === 'asc' ? true : false;
+    
+    // Build query
+    let query = supabase
+      .from('users')
+      .select('id, first_name, last_name, username, email, created_at, last_login, is_admin, is_banned', { count: 'exact' });
+    
+    // Apply search if provided
+    if (searchTerm) {
+      query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+    }
+    
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder });
+    
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+    
+    // Execute query
+    const { data, count, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching users in bulk:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch users'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      data,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        pages: Math.ceil(count / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error in getAllUsersBulk:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+/**
  * Get user details by ID
  * @param {object} req - Express request object
  * @param {object} res - Express response object
@@ -671,6 +734,7 @@ const updateSystemSettings = async (req, res) => {
 
 module.exports = {
   getAllUsers,
+  getAllUsersBulk,
   getUserById,
   updateUserAdminStatus,
   updateUserBanStatus,

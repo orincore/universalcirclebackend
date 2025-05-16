@@ -38,6 +38,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const adminMessageRoutes = require('./routes/adminMessageRoutes');
 const userMessageRoutes = require('./routes/userMessageRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const adminAnalyticsRoutes = require('./routes/adminAnalyticsRoutes');
 
 // Initialize Express app
 const app = express();
@@ -91,6 +92,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin/messages', adminMessageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/admin/analytics', adminAnalyticsRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

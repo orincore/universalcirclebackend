@@ -65,7 +65,7 @@ const getAllUsers = async (req, res) => {
 };
 
 /**
- * Get all users with a higher page limit (for admin dashboard)
+ * Get all users with a higher page limit (for admin dashboard with infinite scrolling)
  * @param {object} req - Express request object
  * @param {object} res - Express response object
  */
@@ -80,22 +80,50 @@ const getAllUsersBulk = async (req, res) => {
     const searchTerm = req.query.search || '';
     const sortBy = req.query.sortBy || 'created_at';
     const sortOrder = req.query.sortOrder === 'asc' ? true : false;
+    const lastId = req.query.lastId || null; // For cursor-based pagination
     
     // Build query
     let query = supabase
       .from('users')
-      .select('id, first_name, last_name, username, email, created_at, last_login, is_admin, is_banned', { count: 'exact' });
+      .select('id, first_name, last_name, username, email, created_at, last_login, is_admin, is_banned, profile_picture_url', { count: 'exact' });
     
     // Apply search if provided
     if (searchTerm) {
       query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
     }
     
+    // Apply cursor-based pagination if lastId is provided (for infinite scrolling)
+    if (lastId && sortBy === 'id') {
+      if (sortOrder) {
+        query = query.gt('id', lastId); // For ascending order, get IDs greater than lastId
+      } else {
+        query = query.lt('id', lastId); // For descending order, get IDs less than lastId
+      }
+    } else if (lastId && sortBy === 'created_at') {
+      // Get the created_at value for lastId to use as cursor
+      const { data: lastUser } = await supabase
+        .from('users')
+        .select('created_at')
+        .eq('id', lastId)
+        .single();
+        
+      if (lastUser) {
+        if (sortOrder) {
+          query = query.gt('created_at', lastUser.created_at);
+        } else {
+          query = query.lt('created_at', lastUser.created_at);
+        }
+      }
+    } else {
+      // Apply offset-based pagination as fallback
+      query = query.range(offset, offset + limit - 1);
+    }
+    
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder });
     
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1);
+    // Apply limit
+    query = query.limit(limit);
     
     // Execute query
     const { data, count, error } = await query;
@@ -108,6 +136,12 @@ const getAllUsersBulk = async (req, res) => {
       });
     }
     
+    // Check if there are more results
+    const hasMore = data.length === limit;
+    
+    // Get the last ID for cursor-based pagination
+    const nextCursor = data.length > 0 ? data[data.length - 1].id : null;
+    
     return res.status(200).json({
       success: true,
       data,
@@ -115,7 +149,9 @@ const getAllUsersBulk = async (req, res) => {
         page,
         limit,
         total: count,
-        pages: Math.ceil(count / limit)
+        pages: Math.ceil(count / limit),
+        hasMore,
+        nextCursor
       }
     });
   } catch (error) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reportController');
-const { authenticate } = require('../middleware/authMiddleware');
+const { authenticate } = require('../middlewares/auth');
 
 // All report routes require authentication
 router.use(authenticate);

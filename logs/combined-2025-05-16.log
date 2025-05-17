@@ -1,0 +1,1075 @@
+{"timestamp":"2025-05-16T14:24:33.119Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T14:24:33.120Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T14:24:33.122Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T14:24:33.123Z","level":"error","message":"(node:58527) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T14:24:34.729Z","level":"info","message":"Health check recorded successfully","cpuUsage":18,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T14:24:38.122Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:24:38.122Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:24:38.123Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:24:43.122Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:24:43.123Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:24:43.123Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:24:48.124Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:24:48.124Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:24:48.124Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:24:53.124Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:24:53.125Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:24:53.125Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:41:45.976Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T14:41:45.977Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T14:41:45.979Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T14:41:45.980Z","level":"error","message":"(node:60111) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T14:41:48.036Z","level":"info","message":"Health check recorded successfully","cpuUsage":34,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T14:41:50.979Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:41:50.980Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:41:50.980Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:41:55.980Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:41:55.986Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:41:55.987Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:42:00.983Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:42:00.984Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:42:00.985Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:42:05.984Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:42:05.992Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:42:05.992Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:43:45.386Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T14:43:45.387Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T14:43:45.390Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T14:43:45.390Z","level":"error","message":"(node:60422) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T14:43:47.538Z","level":"info","message":"Health check recorded successfully","cpuUsage":39,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T14:43:50.389Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:43:50.390Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:43:50.390Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:43:55.388Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:43:55.390Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:43:55.390Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:00.389Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:00.392Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:00.392Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:05.389Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:05.390Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:05.390Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:10.390Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:10.391Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:10.391Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:15.385Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:15.386Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:15.395Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:15.395Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:15.396Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:20.400Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:20.404Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:20.404Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:22.134Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T14:44:22.134Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T14:44:22.137Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T14:44:22.137Z","level":"error","message":"(node:60549) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T14:44:23.558Z","level":"info","message":"Health check recorded successfully","cpuUsage":37,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T14:44:27.146Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:27.152Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:27.152Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:32.147Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:32.151Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:32.152Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:37.158Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:37.159Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:37.159Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:42.160Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:42.167Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:42.168Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:44:47.161Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:44:47.161Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:44:47.161Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:50:28.610Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T14:50:28.611Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T14:50:28.613Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T14:50:28.614Z","level":"error","message":"(node:61073) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T14:50:30.239Z","level":"info","message":"Health check recorded successfully","cpuUsage":42,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T14:50:33.620Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:33.623Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:33.623Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:50:38.614Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:38.616Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:38.616Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:50:43.622Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:43.625Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:43.625Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:50:48.620Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:48.621Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:48.621Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:50:53.621Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:53.622Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:53.622Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:50:58.613Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:58.616Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:58.621Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:50:58.622Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:50:58.622Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:03.622Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:03.622Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:03.622Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:08.624Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:08.628Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:08.629Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:13.624Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:13.624Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:13.625Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:18.629Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:18.635Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:18.636Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:23.631Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:23.633Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:23.633Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:28.628Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:28.636Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:28.638Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:28.638Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:28.638Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:33.649Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:33.652Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:33.652Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:38.644Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:38.648Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:38.648Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:43.645Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:43.648Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:43.648Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:48.646Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:48.648Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:48.648Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:53.648Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:53.649Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:53.661Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:51:58.627Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:58.629Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:58.649Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:51:58.649Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:51:58.649Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:03.653Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:03.655Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:03.655Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:08.655Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:08.657Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:08.657Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:13.657Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:13.658Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:13.658Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:18.657Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:18.657Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:18.657Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:23.661Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:23.664Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:23.665Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:28.629Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:28.630Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:28.661Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:28.662Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:28.662Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:33.664Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:33.666Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:33.666Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:38.664Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:38.665Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:38.665Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:43.672Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:43.678Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:43.678Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:48.673Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:48.674Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:48.674Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:53.678Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:53.680Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:53.680Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:52:58.630Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:58.630Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:58.680Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:52:58.680Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:52:58.680Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:53:03.681Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:53:03.683Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:53:03.683Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:53:08.683Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:53:08.683Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:53:08.683Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:53:13.685Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:53:13.689Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:53:13.689Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:53:18.687Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:53:18.688Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:53:18.688Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T14:53:23.688Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T14:53:23.695Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T14:53:23.695Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:14.418Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T15:14:14.418Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T15:14:14.420Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T15:14:14.421Z","level":"error","message":"(node:63395) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T15:14:16.050Z","level":"info","message":"Health check recorded successfully","cpuUsage":33,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T15:14:19.421Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:19.422Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:19.423Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:24.420Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:24.422Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:24.423Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:29.422Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:29.425Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:29.425Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:34.426Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:34.429Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:34.429Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:39.427Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:39.428Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:39.428Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:44.420Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:44.424Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:44.427Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:44.428Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:44.428Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:49.429Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:49.431Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:49.431Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:54.430Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:54.430Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:54.431Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:14:59.432Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:14:59.434Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:14:59.434Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:04.433Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:04.434Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:04.434Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:09.434Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:09.436Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:09.436Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:14.422Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:14.423Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:14.434Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:14.434Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:14.434Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:19.437Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:19.443Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:19.443Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:24.445Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:24.449Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:24.449Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:29.447Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:29.449Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:29.449Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:34.449Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:34.450Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:34.450Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:39.450Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:39.452Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:39.461Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:44.428Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:44.430Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:44.450Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:44.451Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:44.451Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:49.453Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:49.457Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:49.457Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:54.457Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:54.459Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:54.460Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:15:59.459Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:15:59.461Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:15:59.462Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:04.462Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:04.463Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:04.463Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:09.462Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:09.463Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:09.464Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:14.434Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:14.436Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:14.462Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:14.463Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:14.463Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:19.468Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:19.502Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:19.503Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:24.468Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:24.469Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:24.469Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:29.470Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:29.471Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:29.471Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:34.472Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:34.473Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:34.474Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:39.474Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:39.479Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:39.479Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:44.436Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:44.442Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:44.475Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:44.475Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:44.476Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:49.477Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:49.478Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:49.479Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:54.478Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:54.480Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:54.480Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:16:59.479Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:16:59.481Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:16:59.481Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:04.480Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:04.481Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:04.482Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:09.482Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:09.484Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:09.484Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:14.437Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:14.443Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:14.483Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:14.484Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:14.484Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:19.486Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:19.491Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:19.491Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:24.489Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:24.493Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:24.494Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:29.493Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:29.496Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:29.496Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:34.494Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:34.495Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:34.495Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:39.499Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:39.500Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:39.500Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:44.438Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:44.438Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:44.499Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:44.499Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:44.499Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:49.500Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:49.501Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:49.501Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:54.502Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:54.505Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:54.505Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:17:59.503Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:17:59.503Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:17:59.503Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:04.504Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:04.505Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:04.505Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:09.505Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:09.506Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:09.506Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:14.439Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:14.440Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:14.506Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:14.506Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:14.506Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:19.506Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:19.507Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:19.507Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:24.508Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:24.510Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:24.510Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:29.509Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:29.511Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:29.511Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:34.511Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:34.512Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:34.512Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:39.511Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:39.512Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:39.512Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:44.440Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:44.441Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:44.512Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:44.512Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:44.513Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:49.514Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:49.515Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:49.515Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:54.515Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:54.516Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:54.516Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:18:59.517Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:18:59.518Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:18:59.518Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:04.518Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:04.521Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:04.521Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:09.520Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:09.522Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:09.522Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:14.440Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:14.441Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:14.521Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:14.521Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:14.521Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:16.053Z","level":"info","message":"Health check recorded successfully","cpuUsage":43,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T15:19:19.523Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:19.525Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:19.525Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:24.524Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:24.526Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:24.526Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:29.526Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:29.528Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:29.528Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:34.527Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:34.529Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:34.529Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:39.529Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:39.531Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:39.531Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:44.442Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:44.444Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:44.530Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:44.530Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:44.530Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:49.531Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:49.533Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:49.533Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:54.533Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:54.541Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:54.541Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:19:59.535Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:19:59.537Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:19:59.537Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:04.536Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:04.539Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:04.539Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:09.538Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:09.540Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:09.540Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:14.443Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:14.445Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:14.538Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:14.538Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:14.538Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:19.541Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:19.542Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:19.542Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:24.547Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:24.559Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:24.559Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:29.547Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:29.549Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:29.549Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:34.552Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:34.554Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:34.555Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:39.556Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:39.559Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:39.559Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:44.444Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:44.445Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:44.555Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:44.556Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:44.556Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:49.556Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:49.558Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:49.558Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:54.558Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:54.560Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:54.560Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:20:59.559Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:20:59.559Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:20:59.559Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:04.561Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:04.563Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:04.563Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:09.563Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:09.564Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:09.564Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:14.445Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:14.445Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:14.563Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:14.564Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:14.564Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:19.566Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:19.574Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:19.574Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:24.628Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:24.631Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:24.631Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:29.630Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:29.633Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:29.633Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:34.634Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:34.639Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:34.639Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:39.633Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:39.634Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:39.634Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:44.446Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:44.450Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:44.633Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:44.633Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:44.633Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:49.635Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:49.638Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:49.638Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:54.637Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:54.638Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:54.639Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:21:59.638Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:21:59.640Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:21:59.640Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:04.641Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:04.643Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:04.643Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:09.643Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:09.644Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:09.644Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:14.446Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:14.448Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:14.643Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:14.644Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:14.644Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:19.645Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:19.647Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:19.647Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:24.646Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:24.648Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:24.648Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:29.648Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:29.651Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:29.651Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:34.650Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:34.651Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:34.651Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:39.652Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:39.654Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:39.654Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:44.448Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:44.450Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:44.653Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:44.653Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:44.653Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:49.661Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:49.663Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:49.663Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:54.664Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:54.668Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:54.668Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:22:59.665Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:22:59.669Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:22:59.670Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:04.677Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:04.679Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:04.679Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:09.674Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:09.674Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:09.674Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:14.453Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:14.455Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:14.675Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:14.676Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:14.677Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:19.677Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:19.678Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:19.678Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:24.681Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:24.686Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:24.686Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:29.687Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:29.692Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:29.693Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:34.687Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:34.687Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:34.687Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:39.688Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:39.690Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:39.691Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:44.452Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:44.453Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:44.688Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:44.689Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:44.689Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:49.689Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:49.690Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:49.690Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:54.691Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:54.691Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:54.691Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:23:59.691Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:23:59.692Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:23:59.692Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:04.693Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:04.693Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:04.693Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:09.694Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:09.694Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:09.695Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:14.452Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:14.452Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:14.694Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:14.695Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:14.695Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:16.094Z","level":"info","message":"Health check recorded successfully","cpuUsage":28,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":"healthy","databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T15:24:19.695Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:19.695Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:19.695Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:24.697Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:24.697Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:24.697Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:29.697Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:29.699Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:29.699Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:34.698Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:34.700Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:34.701Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:39.701Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:39.702Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:39.702Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:44.453Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:44.454Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:44.702Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:44.703Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:44.703Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:49.703Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:49.703Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:49.704Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:54.707Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:54.709Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:54.710Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:24:59.712Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:24:59.714Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:24:59.714Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:04.720Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:04.720Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:04.720Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:09.726Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:09.726Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:09.727Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:14.474Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:14.475Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:14.737Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:14.737Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:14.737Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:19.742Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:19.746Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:19.746Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:24.747Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:24.751Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:24.751Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:29.749Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:29.750Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:29.750Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:34.751Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:34.752Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:34.752Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:39.754Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:39.755Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:39.762Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T15:25:44.485Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:44.485Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:44.755Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T15:25:44.755Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T15:25:44.755Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T16:41:55.248Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T16:41:55.249Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T16:41:55.251Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T16:41:55.251Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T16:41:55.251Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T16:41:55.286Z","level":"error","message":"(node:71233) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T16:41:55.842Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T16:42:12.713Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T16:42:12.713Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T16:42:12.715Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T16:42:12.715Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T16:42:12.715Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T16:42:12.742Z","level":"error","message":"(node:71291) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T16:42:13.159Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T17:05:12.943Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T17:05:12.944Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T17:05:12.946Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T17:05:12.946Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T17:05:12.946Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T17:05:12.982Z","level":"error","message":"(node:72912) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T17:05:14.140Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T17:05:14.140Z","level":"info","message":"All migrations completed successfully!"}
+{"timestamp":"2025-05-16T17:05:14.140Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-16T17:05:15.260Z","level":"info","message":"Health check recorded successfully","cpuUsage":12,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.664079291},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T17:05:17.946Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:05:17.947Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:05:17.947Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:15:18.231Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T17:15:18.231Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T17:15:18.233Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T17:15:18.233Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T17:15:18.234Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T17:15:18.267Z","level":"error","message":"(node:73661) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T17:15:19.366Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T17:15:19.366Z","level":"info","message":"All migrations completed successfully!"}
+{"timestamp":"2025-05-16T17:15:19.366Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-16T17:15:20.461Z","level":"info","message":"Health check recorded successfully","cpuUsage":22,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.604867334},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T17:45:53.036Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T17:45:53.036Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T17:45:53.038Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T17:45:53.038Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T17:45:53.039Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T17:45:53.075Z","level":"error","message":"(node:75918) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T17:45:54.170Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T17:45:54.170Z","level":"info","message":"All migrations completed successfully!"}
+{"timestamp":"2025-05-16T17:45:54.170Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-16T17:45:55.291Z","level":"info","message":"Health check recorded successfully","cpuUsage":19,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.644441792},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T17:45:58.038Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:45:58.039Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:45:58.039Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:03.041Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:03.043Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:03.043Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:08.043Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:08.043Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:08.043Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:13.044Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:13.045Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:13.045Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:18.045Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:18.045Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:18.045Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:23.040Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:23.041Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:23.046Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:23.046Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:23.046Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:28.048Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:28.049Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:28.049Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:33.048Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:33.049Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:33.049Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:38.049Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:38.050Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:38.050Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:43.051Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:43.051Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:43.051Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:48.051Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:48.051Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:48.051Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:53.042Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:53.042Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:53.052Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:53.052Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:53.052Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:46:58.053Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:46:58.060Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:46:58.061Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:03.054Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:03.055Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:03.055Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:08.055Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:08.055Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:08.055Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:13.057Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:13.062Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:13.063Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:18.059Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:18.059Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:18.059Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:23.042Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:23.042Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:23.060Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:23.060Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:23.060Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:28.061Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:28.062Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:28.063Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:33.062Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:33.062Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:33.062Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:38.064Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:38.064Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:38.064Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:43.065Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:43.065Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:43.065Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:48.065Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:48.065Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:48.065Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:53.043Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:53.046Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:53.066Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:53.067Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:53.067Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:47:58.067Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:47:58.067Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:47:58.067Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:03.070Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:03.073Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:03.073Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:08.069Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:08.069Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:08.069Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:13.071Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:13.072Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:13.072Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:18.073Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:18.074Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:18.074Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:23.045Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:23.046Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:23.074Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:23.074Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:23.074Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:28.074Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:28.075Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:28.075Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:33.076Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:33.076Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:33.076Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:38.076Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:38.076Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:38.076Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:43.077Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:43.078Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:43.078Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:48.077Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:48.078Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:48.078Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:53.044Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:53.044Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:53.078Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:53.078Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:53.078Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:48:58.079Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:48:58.080Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:48:58.080Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:03.081Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:03.082Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:03.082Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:08.082Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:08.083Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:08.083Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:13.083Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:13.084Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:13.084Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:18.084Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:18.084Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:18.084Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:23.045Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:23.046Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:23.085Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:23.085Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:23.085Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:28.084Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:28.085Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:28.085Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:33.085Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:33.085Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:33.085Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:38.087Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:38.087Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:38.087Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:43.087Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:43.087Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:43.087Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:48.089Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:49:48.089Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:49:48.089Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:49:56.874Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T17:49:56.874Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T17:49:56.876Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T17:49:56.877Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T17:49:56.877Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T17:49:56.916Z","level":"error","message":"(node:76358) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T17:49:58.065Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T17:49:58.065Z","level":"info","message":"All migrations completed successfully!"}
+{"timestamp":"2025-05-16T17:49:58.065Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-16T17:49:59.181Z","level":"info","message":"Health check recorded successfully","cpuUsage":54,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.7755845},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-16T17:50:01.890Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:01.935Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:01.935Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:06.885Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:06.885Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:06.885Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:11.886Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:11.886Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:11.886Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:16.890Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:16.892Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:16.892Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:21.890Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:21.890Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:21.890Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:26.875Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:26.877Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:26.893Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:26.893Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:26.893Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:31.896Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:31.898Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:31.903Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:36.897Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:36.897Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:36.898Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:41.902Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:41.903Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:41.903Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:46.902Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:46.902Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:46.902Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:51.904Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:51.904Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:51.904Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:50:56.876Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:56.876Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:56.904Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:50:56.905Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:50:56.905Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:01.908Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:01.910Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:01.910Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:06.910Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:06.913Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:06.913Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:11.912Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:11.914Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:11.914Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:16.920Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:16.930Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:16.930Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:21.920Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:21.920Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:21.920Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:26.876Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:26.877Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:26.921Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:26.921Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:26.921Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:31.923Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:31.925Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:31.925Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:36.923Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:36.923Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:36.924Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:41.925Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:41.927Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:41.927Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:46.929Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:46.931Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:46.931Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:51.928Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:51.930Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:51.930Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:51:56.877Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:56.877Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:56.928Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:51:56.930Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:51:56.930Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:01.930Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:01.932Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:01.932Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:06.931Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:06.932Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:06.932Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:11.932Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:11.933Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:11.933Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:16.933Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:16.935Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:16.935Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:21.939Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:21.947Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:21.947Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:26.881Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:26.884Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:26.937Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:26.937Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:26.937Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:31.938Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:31.939Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:31.939Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:36.939Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:36.941Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:36.941Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:41.941Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:41.942Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:41.942Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:46.941Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:46.943Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:46.943Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:51.942Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:51.944Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:51.944Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:52:56.880Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:56.881Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:56.943Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:52:56.943Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:52:56.944Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:01.946Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:01.947Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:01.948Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:06.946Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:06.947Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:06.948Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:11.948Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:11.953Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:11.953Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:16.950Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:16.952Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:16.952Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:21.953Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:21.958Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:21.958Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:26.882Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:26.884Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:26.951Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:26.952Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:26.952Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:31.953Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:31.956Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:31.956Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:36.953Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:36.954Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:36.954Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:41.954Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:41.956Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:41.958Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:46.956Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:46.959Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:46.959Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:51.958Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:51.963Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:51.963Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:53:56.886Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:56.892Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:56.958Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:53:56.958Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:53:56.958Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:02.071Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:02.083Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:02.084Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:07.045Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:07.054Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:07.055Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:12.042Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:12.047Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:12.048Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:17.045Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:17.046Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:17.046Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:22.047Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:22.052Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:22.052Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:26.886Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:26.887Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:27.048Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:27.048Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:27.048Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T17:54:32.049Z","level":"info","message":"Running matchmaking pool cleanup. Current pool size: 0"}
+{"timestamp":"2025-05-16T17:54:32.050Z","level":"info","message":"Matchmaking pool cleanup completed. Removed 0 users. New pool size: 0"}
+{"timestamp":"2025-05-16T17:54:32.050Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-16T20:19:54.953Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-16T20:19:54.954Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-16T20:19:54.956Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-16T20:19:54.956Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-16T20:19:54.956Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-16T20:19:54.987Z","level":"error","message":"(node:88638) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-16T20:19:54.991Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-16T20:19:56.020Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-16T20:19:56.020Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-16T20:19:56.020Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-16T20:19:57.107Z","level":"info","message":"Health check recorded successfully","cpuUsage":35,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.614890125},"databaseStatus":"healthy"}

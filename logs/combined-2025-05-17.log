@@ -1,0 +1,156 @@
+{"timestamp":"2025-05-17T14:23:09.452Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T14:23:09.453Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T14:23:09.455Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T14:23:09.455Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T14:23:09.455Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T14:23:09.482Z","level":"error","message":"(node:27027) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T14:23:09.485Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T14:23:10.366Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T14:23:10.366Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T14:23:10.366Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T14:23:11.509Z","level":"info","message":"Health check recorded successfully","cpuUsage":36,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.578730083},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:28:08.676Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T14:28:08.677Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T14:28:08.679Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T14:28:08.680Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T14:28:08.680Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T14:28:08.723Z","level":"error","message":"(node:27375) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T14:28:08.727Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T14:28:08.875Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T14:28:08.875Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T14:28:08.875Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T14:28:10.039Z","level":"info","message":"Health check recorded successfully","cpuUsage":51,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.552985291},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:29:03.716Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:29:28.855Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T14:30:03.849Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:31:03.870Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:31:09.008Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T14:31:09.008Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T14:31:09.011Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T14:31:09.011Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T14:31:09.011Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T14:31:09.044Z","level":"error","message":"(node:27736) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T14:31:09.048Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T14:31:09.200Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T14:31:09.200Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T14:31:09.200Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T14:31:10.356Z","level":"info","message":"Health check recorded successfully","cpuUsage":34,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1.824513209},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:32:04.072Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:33:04.088Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:34:04.105Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:35:04.151Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:36:04.183Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:36:12.223Z","level":"info","message":"Health check recorded successfully","cpuUsage":41,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":301.8415805},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:36:18.828Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T14:37:04.881Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:37:11.494Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T14:37:11.494Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T14:37:11.501Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T14:37:11.502Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T14:37:11.502Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T14:37:11.536Z","level":"error","message":"(node:28330) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T14:37:11.540Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T14:37:12.087Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T14:37:12.088Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T14:37:12.088Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T14:37:13.198Z","level":"info","message":"Health check recorded successfully","cpuUsage":35,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":3.119130875},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:37:15.707Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T14:38:01.582Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:39:01.581Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:41:00.511Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T14:41:00.512Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T14:41:00.516Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T14:41:00.516Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T14:41:00.517Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T14:41:00.570Z","level":"error","message":"(node:28801) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T14:41:00.574Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T14:41:00.995Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T14:41:00.995Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T14:41:00.995Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T14:41:02.113Z","level":"info","message":"Health check recorded successfully","cpuUsage":33,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.4732555},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:41:02.377Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T14:41:18.367Z","level":"info","message":"DEBUG - getUserDetails called with params: {\"userId\":\"2e0bc60b-42da-46a8-9bcd-b7682921fdbe\",\"requestingUserId\":\"2e0bc60b-42da-46a8-9bcd-b7682921fdbe\",\"isAdmin\":true}"}
+{"timestamp":"2025-05-17T14:41:18.368Z","level":"info","message":"DEBUG - Attempting to fetch user data with ID: 2e0bc60b-42da-46a8-9bcd-b7682921fdbe"}
+{"timestamp":"2025-05-17T14:41:18.403Z","level":"info","message":"DEBUG - Query result: {\"user\":{\"id\":\"2e0bc60b-42da-46a8-9bcd-b7682921fdbe\",\"first_name\":\"Orincore\",\"last_name\":\"CIrcle\",\"username\":\"orincore\",\"email\":\"orincore@circle.com\",\"phone_number\":\"+911234567890\",\"password\":\"$2b$10$kOrRmsWw9uCC8OJ4m5.9a.kRIyMajEPN8x.svmjMVv7pD6JNWQ8UO\",\"date_of_birth\":\"2004-01-27\",\"gender\":\"male\",\"preference\":\"Friendship\",\"location\":{\"latitude\":37.785834,\"longitude\":-122.406417},\"interests\":[\"Hiking\",\"Travel\",\"Cooking\",\"Foodie\"],\"profile_picture_url\":\"https://circlepost.s3.ap-south-1.amazonaws.com/profile-pictures/2e0bc60b-42da-46a8-9bcd-b7682921fdbe/1745687585941.jpeg\",\"bio\":\"I am good\",\"is_online\":true,\"last_active\":\"2025-05-17T14:25:24.944+00:00\",\"last_login\":\"2025-05-17T14:41:02.321+00:00\",\"created_at\":\"2025-04-26T17:12:34.188+00:00\",\"updated_at\":\"2025-05-17T12:35:25.904+00:00\",\"current_match_id\":\"563b8ac2-87ef-46c9-84ac-e046d8cd97c8\",\"is_admin\":true,\"is_banned\":false,\"ban_reason\":null,\"banned_at\":null,\"admin_login_count\":17},\"error\":null}"}
+{"timestamp":"2025-05-17T14:41:28.215Z","level":"error","message":"Error updating user ban/suspend status: {\"code\":\"PGRST204\",\"details\":null,\"hint\":null,\"message\":\"Could not find the 'is_suspended' column of 'users' in the schema cache\"}"}
+{"timestamp":"2025-05-17T14:42:00.534Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:43:01.483Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:43:20.520Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T14:43:20.521Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T14:43:20.525Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T14:43:20.526Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T14:43:20.526Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T14:43:20.604Z","level":"error","message":"(node:29106) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T14:43:20.614Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T14:43:21.732Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T14:43:21.733Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T14:43:21.734Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T14:43:22.890Z","level":"info","message":"Health check recorded successfully","cpuUsage":78,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":3.391773875},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T14:43:24.472Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T14:43:43.088Z","level":"error","message":"Error logging admin activity: {}"}
+{"timestamp":"2025-05-17T14:43:59.154Z","level":"error","message":"Error logging admin activity: {}"}
+{"timestamp":"2025-05-17T14:44:00.538Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T14:46:01.947Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:13:58.250Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T15:13:58.251Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T15:13:58.253Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T15:13:58.253Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T15:13:58.253Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T15:13:58.282Z","level":"error","message":"(node:30292) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T15:13:58.285Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T15:13:58.892Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T15:13:58.892Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T15:13:58.892Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T15:14:00.011Z","level":"info","message":"Health check recorded successfully","cpuUsage":20,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.223737875},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T15:14:03.252Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:14:05.430Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T15:15:03.266Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:16:03.281Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:17:03.301Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:34:38.163Z","level":"info","message":"Health check recorded successfully","cpuUsage":75,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1239.371942334},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T15:44:38.791Z","level":"info","message":"Health check recorded successfully","cpuUsage":27,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1840.597536834},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T15:45:01.434Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:49:39.338Z","level":"info","message":"Health check recorded successfully","cpuUsage":24,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2140.599316917},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T15:51:01.561Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T15:59:23.596Z","level":"info","message":"Health check recorded successfully","cpuUsage":54,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2725.455474292},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T16:18:01.910Z","level":"info","message":"Health check recorded successfully","cpuUsage":32,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":3843.3118825},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T16:23:27.220Z","level":"info","message":"Health check recorded successfully","cpuUsage":12,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":4168.527040625},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T16:57:11.736Z","level":"info","message":"Health check recorded successfully","cpuUsage":49,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":6193.871276459},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T16:57:11.757Z","level":"info","message":"Health check recorded successfully","cpuUsage":10,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":5205.735622542},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T17:14:49.661Z","level":"info","message":"Health check recorded successfully","cpuUsage":56,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":7251.693452875},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T17:18:03.259Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T17:35:03.644Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T17:35:05.689Z","level":"info","message":"Health check recorded successfully","cpuUsage":48,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":8467.300689084},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T17:51:11.634Z","level":"info","message":"Health check recorded successfully","cpuUsage":18,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":9433.919979542},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T18:07:59.555Z","level":"info","message":"Health check recorded successfully","cpuUsage":67,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":10441.756381834},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T18:19:04.545Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:19:06.112Z","level":"info","message":"Health check recorded successfully","cpuUsage":54,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":11108.320565459},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T18:26:43.865Z","level":"info","message":"Health check recorded successfully","cpuUsage":100,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":11565.324455625},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T18:27:01.510Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:28:01.526Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:29:01.537Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:30:01.556Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:31:01.568Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:31:43.467Z","level":"info","message":"Health check recorded successfully","cpuUsage":48,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":11865.314170792},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T18:32:01.580Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:33:01.611Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:34:01.625Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:37:37.064Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-17T18:37:37.064Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-17T18:37:37.066Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-17T18:37:37.067Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-17T18:37:37.067Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-17T18:37:37.094Z","level":"error","message":"(node:31261) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-17T18:37:37.096Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-17T18:37:37.228Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-17T18:37:37.228Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-17T18:37:37.229Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-17T18:37:38.315Z","level":"info","message":"Health check recorded successfully","cpuUsage":13,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1.714972},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-17T18:37:46.519Z","level":"info","message":"Admin login successful: orincore (2e0bc60b-42da-46a8-9bcd-b7682921fdbe)"}
+{"timestamp":"2025-05-17T18:38:02.072Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}
+{"timestamp":"2025-05-17T18:38:19.084Z","level":"info","message":"DEBUG - getUserDetails called with params: {\"userId\":\"2e0bc60b-42da-46a8-9bcd-b7682921fdbe\",\"requestingUserId\":\"2e0bc60b-42da-46a8-9bcd-b7682921fdbe\",\"isAdmin\":true}"}
+{"timestamp":"2025-05-17T18:38:19.086Z","level":"info","message":"DEBUG - Attempting to fetch user data with ID: 2e0bc60b-42da-46a8-9bcd-b7682921fdbe"}
+{"timestamp":"2025-05-17T18:38:19.116Z","level":"info","message":"DEBUG - Query result: {\"user\":{\"id\":\"2e0bc60b-42da-46a8-9bcd-b7682921fdbe\",\"first_name\":\"Orincore\",\"last_name\":\"CIrcle\",\"username\":\"orincore\",\"email\":\"orincore@circle.com\",\"phone_number\":\"+911234567890\",\"password\":\"$2b$10$kOrRmsWw9uCC8OJ4m5.9a.kRIyMajEPN8x.svmjMVv7pD6JNWQ8UO\",\"date_of_birth\":\"2004-01-27\",\"gender\":\"male\",\"preference\":\"Friendship\",\"location\":{\"latitude\":37.785834,\"longitude\":-122.406417},\"interests\":[\"Hiking\",\"Travel\",\"Cooking\",\"Foodie\"],\"profile_picture_url\":\"https://circlepost.s3.ap-south-1.amazonaws.com/profile-pictures/2e0bc60b-42da-46a8-9bcd-b7682921fdbe/1745687585941.jpeg\",\"bio\":\"Updated bio for testing\",\"is_online\":true,\"last_active\":\"2025-05-17T18:36:56.039+00:00\",\"last_login\":\"2025-05-17T18:37:46.491+00:00\",\"created_at\":\"2025-04-26T17:12:34.188+00:00\",\"updated_at\":\"2025-05-17T14:41:37.526+00:00\",\"current_match_id\":\"563b8ac2-87ef-46c9-84ac-e046d8cd97c8\",\"is_admin\":true,\"is_banned\":false,\"ban_reason\":null,\"banned_at\":null,\"admin_login_count\":22},\"error\":null}"}
+{"timestamp":"2025-05-17T18:38:43.980Z","level":"error","message":"Error logging admin activity: {}"}
+{"timestamp":"2025-05-17T18:38:53.567Z","level":"error","message":"Error logging admin activity: {}"}
+{"timestamp":"2025-05-17T18:39:02.087Z","level":"info","message":"Not enough users in matchmaking pool (0). Need at least 2 users."}

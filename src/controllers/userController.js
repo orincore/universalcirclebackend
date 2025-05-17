@@ -395,7 +395,7 @@ const updateUserDetails = async (req, res) => {
 };
 
 /**
- * Ban or suspend a user
+ * Ban or unban a user
  * @param {object} req - Express request object
  * @param {object} res - Express response object
  */
@@ -403,27 +403,27 @@ const banOrSuspendUser = async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // Only admins can ban/suspend users
+    // Only admins can ban/unban users
     if (!req.user.is_admin) {
       return res.status(403).json({
         success: false,
-        message: 'Only administrators can ban or suspend users'
+        message: 'Only administrators can ban or unban users'
       });
     }
     
-    const { action, reason, duration } = req.body;
+    const { action, reason } = req.body;
     
-    if (!action || !['ban', 'suspend', 'unban'].includes(action)) {
+    if (!action || !['ban', 'unban'].includes(action)) {
       return res.status(400).json({
         success: false,
-        message: 'Valid action (ban, suspend, or unban) is required'
+        message: 'Valid action (ban or unban) is required'
       });
     }
     
-    if ((action === 'ban' || action === 'suspend') && !reason) {
+    if (action === 'ban' && !reason) {
       return res.status(400).json({
         success: false, 
-        message: 'Reason is required for ban or suspend actions'
+        message: 'Reason is required for ban action'
       });
     }
     
@@ -432,41 +432,12 @@ const banOrSuspendUser = async (req, res) => {
     
     if (action === 'ban') {
       updateObj.is_banned = true;
-      updateObj.is_suspended = false;
       updateObj.ban_reason = reason;
       updateObj.banned_at = new Date();
-      updateObj.suspension_end_date = null;
-    } else if (action === 'suspend') {
-      updateObj.is_suspended = true;
-      updateObj.is_banned = false;
-      updateObj.suspension_reason = reason;
-      updateObj.suspended_at = new Date();
-      
-      // Calculate suspension end date
-      if (duration) {
-        const days = parseInt(duration);
-        if (!isNaN(days) && days > 0) {
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + days);
-          updateObj.suspension_end_date = endDate;
-        } else {
-          return res.status(400).json({
-            success: false,
-            message: 'Duration must be a positive number of days'
-          });
-        }
-      } else {
-        // Default to 7 days if no duration specified
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 7);
-        updateObj.suspension_end_date = endDate;
-      }
     } else if (action === 'unban') {
       updateObj.is_banned = false;
-      updateObj.is_suspended = false;
       updateObj.ban_reason = null;
-      updateObj.suspension_reason = null;
-      updateObj.suspension_end_date = null;
+      updateObj.banned_at = null;
     }
     
     // Update user in database
@@ -474,11 +445,11 @@ const banOrSuspendUser = async (req, res) => {
       .from('users')
       .update(updateObj)
       .eq('id', userId)
-      .select('id, username, is_banned, is_suspended, ban_reason, suspension_reason, suspension_end_date')
+      .select('id, username, is_banned, ban_reason, banned_at')
       .single();
     
     if (error) {
-      console.error('Error updating user ban/suspend status:', error);
+      console.error('Error updating user ban status:', error);
       return res.status(500).json({
         success: false,
         message: 'Failed to update user status'
@@ -486,7 +457,7 @@ const banOrSuspendUser = async (req, res) => {
     }
     
     // Create admin activity log
-    const adminActionText = action === 'ban' ? 'banned' : (action === 'suspend' ? 'suspended' : 'unbanned');
+    const adminActionText = action === 'ban' ? 'banned' : 'unbanned';
     const { error: logError } = await supabase
       .from('admin_activities')
       .insert({
@@ -504,11 +475,11 @@ const banOrSuspendUser = async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: `User ${action === 'ban' ? 'banned' : (action === 'suspend' ? 'suspended' : 'unbanned')} successfully`,
+      message: `User ${action === 'ban' ? 'banned' : 'unbanned'} successfully`,
       data: updatedUser
     });
   } catch (error) {
-    console.error('Ban/suspend user error:', error);
+    console.error('Ban user error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while updating user status'

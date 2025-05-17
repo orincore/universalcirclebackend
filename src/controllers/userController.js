@@ -110,28 +110,60 @@ const getUserDetails = async (req, res) => {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
     
+    console.log('DEBUG - getUserDetails called with params:', { 
+      userId,
+      requestingUserId,
+      isAdmin: req.user.is_admin
+    });
+    
     // Check if requesting user is an admin or the user themselves
     const isAdminOrSelf = req.user.is_admin || requestingUserId === userId;
     
     if (!userId) {
+      console.log('DEBUG - userId is undefined or null');
       return res.status(400).json({
         success: false,
         message: 'User ID is required'
       });
     }
 
-    // Fetch basic user data
+    // First fetch just the basic user without joins
+    console.log('DEBUG - Attempting to fetch user data with ID:', userId);
     const { data: user, error } = await supabase
       .from('users')
-      .select('*, locations(id, country, city, latitude, longitude)')
+      .select('*')
       .eq('id', userId)
       .single();
 
+    console.log('DEBUG - Query result:', { user, error });
+
     if (error || !user) {
+      console.log('DEBUG - User not found or error occurred:', error);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
+    }
+    
+    // Add location data separately if needed
+    let locationData = null;
+    try {
+      const { data: location, error: locationError } = await supabase
+        .from('locations')
+        .select('id, country, city, latitude, longitude')
+        .eq('user_id', userId)
+        .single();
+        
+      if (!locationError && location) {
+        locationData = location;
+      }
+    } catch (locationErr) {
+      console.log('DEBUG - Error fetching location:', locationErr);
+      // Just log, don't fail the request
+    }
+    
+    if (locationData) {
+      user.location = locationData;
     }
     
     // Remove sensitive data if not admin or self
@@ -505,4 +537,4 @@ module.exports = {
   getUserDetails,
   updateUserDetails,
   banOrSuspendUser
-}; 
+};

@@ -70,6 +70,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Add request tracking for monitoring high-traffic endpoints
+const requestStats = {};
+app.use((req, res, next) => {
+  const endpoint = `${req.method} ${req.path}`;
+  requestStats[endpoint] = (requestStats[endpoint] || 0) + 1;
+  
+  // Log every 100 requests to identify hotspots
+  if (Object.values(requestStats).reduce((a, b) => a + b, 0) % 100 === 0) {
+    logger.info('REQUEST STATS:', requestStats);
+  }
+  next();
+});
+
 // Make io instance and connectedUsers available to all route handlers
 app.use((req, res, next) => {
   req.io = io;
@@ -77,17 +90,30 @@ app.use((req, res, next) => {
   next();
 });
 
-// Apply rate limiting
-const limiter = rateLimit({
+// Apply different rate limiting based on endpoint types
+// Global rate limiter (more permissive)
+const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 300, // Increased from 100 to 300
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  message: 'Too many requests from this IP, please try again later.'
 });
-app.use(limiter);
 
-// API Routes
-app.use('/api/auth', authRoutes);
+// Stricter rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Stricter limit for auth endpoints
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many auth attempts from this IP, please try again later.'
+});
+
+// Apply limiters to different routes
+app.use('/', globalLimiter); // Default global limiter
+
+// API Routes with appropriate limiters
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/interests', interestRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', userRoutes);
@@ -97,7 +123,7 @@ app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/admin/auth', authLimiter, adminAuthRoutes);
 app.use('/api/admin/messages', adminMessageRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api/admin/reports', adminReportRoutes);

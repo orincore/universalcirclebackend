@@ -199,6 +199,52 @@ const initializeSocket = (io) => {
   // Store reference to io instance
   ioInstance = io;
   
+  // Configure Socket.IO for better performance
+  io.engine.pingTimeout = 60000; // Increase ping timeout to 60 seconds (default is 20s)
+  io.engine.pingInterval = 25000; // Increase ping interval to 25 seconds (default is 10s)
+  
+  // Add connection limit per IP
+  const connectionsByIP = new Map();
+  const MAX_CONNECTIONS_PER_IP = 10; // Adjust as needed
+  
+  // Connection rate limiting
+  io.use((socket, next) => {
+    try {
+      const clientIP = socket.handshake.address || 'unknown';
+      
+      // Track connections per IP
+      if (!connectionsByIP.has(clientIP)) {
+        connectionsByIP.set(clientIP, 0);
+      }
+      
+      const currentCount = connectionsByIP.get(clientIP);
+      
+      // Check if IP has exceeded limit
+      if (currentCount >= MAX_CONNECTIONS_PER_IP) {
+        warn(`Connection from ${clientIP} rejected: too many connections (${currentCount})`);
+        return next(new Error('Too many connections from this IP address'));
+      }
+      
+      // Increment connection count
+      connectionsByIP.set(clientIP, currentCount + 1);
+      
+      // When connection is closed, decrement count
+      socket.on('disconnect', () => {
+        const newCount = connectionsByIP.get(clientIP) - 1;
+        if (newCount <= 0) {
+          connectionsByIP.delete(clientIP);
+        } else {
+          connectionsByIP.set(clientIP, newCount);
+        }
+      });
+      
+      next();
+    } catch (err) {
+      error('Error in connection limiter:', err);
+      next();
+    }
+  });
+  
   // Start the global matchmaking system
   startGlobalMatchmaking();
   

@@ -6,6 +6,46 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Updated to use the newest model version based on official docs: https://ai.google.dev/gemini-api/docs/quickstart?lang=rest
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
+// Configure retry settings
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+
+/**
+ * Make API call with exponential backoff for handling rate limits
+ * @param {Object} config - Axios request configuration
+ * @param {Number} retryCount - Current retry attempt (internal use)
+ * @param {Number} delay - Current delay in milliseconds (internal use)
+ * @returns {Promise<Object>} API response
+ */
+const makeApiCallWithRetry = async (config, retryCount = 0, delay = INITIAL_RETRY_DELAY) => {
+  try {
+    return await axios(config);
+  } catch (error) {
+    // Check if error is a rate limit (429) or server error (5xx)
+    const isRateLimitError = error.response && error.response.status === 429;
+    const isServerError = error.response && error.response.status >= 500 && error.response.status < 600;
+    
+    // Only retry for rate limit or server errors, and if we haven't exceeded max retries
+    if ((isRateLimitError || isServerError) && retryCount < MAX_RETRIES) {
+      // Calculate exponential backoff with jitter
+      const jitter = Math.random() * 0.3 + 0.85; // Random value between 0.85-1.15
+      const nextDelay = delay * 2 * jitter;
+      
+      // Log the retry
+      warn(`Gemini API request failed with ${error.response?.status || 'unknown error'}. Retrying in ${Math.round(nextDelay)}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      
+      // Wait for the calculated delay
+      await new Promise(resolve => setTimeout(resolve, nextDelay));
+      
+      // Retry the request with incremented retry count and updated delay
+      return makeApiCallWithRetry(config, retryCount + 1, nextDelay);
+    }
+    
+    // If we've exhausted retries or it's not a retryable error, throw the error
+    throw error;
+  }
+};
+
 /**
  * Safely extract error details to avoid circular references
  * @param {Error} error - The error object
@@ -75,9 +115,10 @@ const analyzeMessageContent = async (messageContent) => {
     info('🤖 Sending request to Gemini API');
     
     try {
-      const response = await axios.post(
-        `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-        {
+      const requestConfig = {
+        method: 'post',
+        url: `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+        data: {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,
@@ -86,7 +127,10 @@ const analyzeMessageContent = async (messageContent) => {
             maxOutputTokens: 500
           }
         }
-      );
+      };
+      
+      // Use the retry function instead of direct axios call
+      const response = await makeApiCallWithRetry(requestConfig);
       
       info('🤖 Received response from Gemini API');
 
@@ -219,9 +263,10 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
     `;
 
     try {
-      const response = await axios.post(
-        `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-        {
+      const requestConfig = {
+        method: 'post',
+        url: `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+        data: {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,
@@ -230,7 +275,10 @@ const evaluateUserHistory = async (reportHistory, messageAnalysis) => {
             maxOutputTokens: 500
           }
         }
-      );
+      };
+      
+      // Use the retry function instead of direct axios call
+      const response = await makeApiCallWithRetry(requestConfig);
 
       // Check if response contains expected data
       if (!response.data || !response.data.candidates || !response.data.candidates[0]?.content?.parts?.[0]?.text) {

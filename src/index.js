@@ -56,6 +56,20 @@ const io = socketIO(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
+  },
+  // Improve reliability with better transport and timeout settings
+  transports: ['websocket', 'polling'],  // Prefer WebSocket but fallback to polling
+  allowUpgrades: true,                   // Allow transport upgrades
+  connectTimeout: 45000,                 // Longer connection timeout (45 seconds)
+  maxHttpBufferSize: 1e6,                // 1 MB max HTTP buffer size
+  pingInterval: 15000,                   // Keep reasonable ping interval
+  pingTimeout: 30000,                    // Reasonable ping timeout
+  // Reconnection is mainly handled on the client, but server supports it
+  cookie: {
+    name: "io",                         
+    httpOnly: true,
+    sameSite: "strict",
+    maxAge: 86400000                     // 24 hours
   }
 });
 

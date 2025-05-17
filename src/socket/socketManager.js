@@ -199,18 +199,54 @@ const initializeSocket = (io) => {
   // Store reference to io instance
   ioInstance = io;
   
-  // Configure Socket.IO for better performance
-  io.engine.pingTimeout = 60000; // Increase ping timeout to 60 seconds (default is 20s)
-  io.engine.pingInterval = 25000; // Increase ping interval to 25 seconds (default is 10s)
+  // Configure Socket.IO for better performance and reliability with optimal settings
+  // More frequent pings help maintain connection but not too frequent to overload
+  io.engine.pingTimeout = 30000; // 30 seconds (reduced from 60s)
+  io.engine.pingInterval = 15000; // 15 seconds (reduced from 25s)
   
-  // Add connection limit per IP
+  // Increase max HTTP buffer size to handle larger payloads
+  io.engine.maxHttpBufferSize = 1e6; // 1 MB
+  
+  // Add connection tracking and limiting per IP
   const connectionsByIP = new Map();
-  const MAX_CONNECTIONS_PER_IP = 10; // Adjust as needed
+  const MAX_CONNECTIONS_PER_IP = 15; // Increased from 10
+  const connectionTimes = new Map(); // Track connection times for debugging
+  
+  // Enable socket.io debugging in development environments
+  if (process.env.NODE_ENV === 'development') {
+    io.engine.on('connection_error', (err) => {
+      error(`Socket.IO connection error: ${err.code} - ${err.message}`);
+    });
+  }
+  
+  // Heartbeat mechanism to detect zombie connections
+  setInterval(() => {
+    const now = Date.now();
+    // Check each connected socket every 30 seconds
+    io.sockets.sockets.forEach((socket) => {
+      if (socket.user && socket.user.id) {
+        // Send a small heartbeat packet
+        try {
+          socket.emit('heartbeat', { time: now });
+          socket.lastHeartbeat = now;
+        } catch (err) {
+          // If emitting fails, the socket might be dead
+          error(`Failed to send heartbeat to ${socket.user.id}: ${err.message}`);
+          try {
+            socket.disconnect(true);
+          } catch (e) {
+            // Ignore errors during forced disconnect
+          }
+        }
+      }
+    });
+  }, 30000);
   
   // Connection rate limiting
   io.use((socket, next) => {
     try {
       const clientIP = socket.handshake.address || 'unknown';
+      const now = Date.now();
       
       // Track connections per IP
       if (!connectionsByIP.has(clientIP)) {
@@ -228,6 +264,17 @@ const initializeSocket = (io) => {
       // Increment connection count
       connectionsByIP.set(clientIP, currentCount + 1);
       
+      // Record connection time for debugging
+      if (!connectionTimes.has(clientIP)) {
+        connectionTimes.set(clientIP, []);
+      }
+      connectionTimes.get(clientIP).push(now);
+      
+      // Limit connection history 
+      if (connectionTimes.get(clientIP).length > 100) {
+        connectionTimes.get(clientIP).shift();
+      }
+      
       // When connection is closed, decrement count
       socket.on('disconnect', () => {
         const newCount = connectionsByIP.get(clientIP) - 1;
@@ -240,8 +287,8 @@ const initializeSocket = (io) => {
       
       next();
     } catch (err) {
-      error('Error in connection limiter:', err);
-      next();
+      error(`Error in connection limiter: ${err.message}`);
+      next(); // Continue despite error
     }
   });
   
@@ -302,95 +349,235 @@ const initializeSocket = (io) => {
     });
     
     // Handle private messages
-    socket.on('message:send', async (data) => {
+    socket.on('message:send', async (data, callback) => {
       try {
         const { receiverId, content, mediaUrl } = data;
         const senderId = socket.user.id;
         
         // Validate required fields
         if (!receiverId || !content) {
-          socket.emit('error', {
-            message: 'Receiver ID and content are required'
-          });
+          const error = { message: 'Receiver ID and content are required' };
+          socket.emit('error', error);
+          if (typeof callback === 'function') callback({ success: false, error });
           return;
         }
+        
+        // Add a timeout for database operations to avoid hanging
+        const dbTimeout = setTimeout(() => {
+          const timeoutError = { message: 'Database operation timed out' };
+          socket.emit('error', timeoutError);
+          if (typeof callback === 'function') callback({ success: false, error: timeoutError });
+        }, 8000); // 8 second timeout
         
         // Create message in database
-        const { data: message, error } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: senderId,
-            receiver_id: receiverId,
-            content,
-            media_url: mediaUrl || null,
-            is_read: false,
-            created_at: new Date(),
-            updated_at: new Date()
-          })
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('Error creating message:', error);
-          socket.emit('error', {
-            message: 'Failed to send message'
+        try {
+          const { data: message, error } = await supabase
+            .from('messages')
+            .insert({
+              sender_id: senderId,
+              receiver_id: receiverId,
+              content,
+              media_url: mediaUrl || null,
+              is_read: false,
+              created_at: new Date(),
+              updated_at: new Date()
+            })
+            .select()
+            .single();
+          
+          // Clear the timeout since we got a response
+          clearTimeout(dbTimeout);
+          
+          if (error) {
+            console.error('Error creating message:', error);
+            const dbError = { message: 'Failed to send message', details: error.message };
+            socket.emit('error', dbError);
+            if (typeof callback === 'function') callback({ success: false, error: dbError });
+            return;
+          }
+          
+          // Add sender info to the message object
+          message.sender = {
+            id: socket.user.id,
+            firstName: socket.user.first_name,
+            lastName: socket.user.last_name,
+            username: socket.user.username,
+            profilePictureUrl: socket.user.profile_picture_url
+          };
+          
+          // Get the receiver's current online status
+          const isReceiverOnline = connectedUsers.has(receiverId);
+          
+          // Emit message to sender with delivery status info
+          socket.emit('message:sent', {
+            ...message,
+            deliveryStatus: isReceiverOnline ? 'delivered' : 'sent',
+            timestamp: new Date().toISOString()
           });
-          return;
-        }
-        
-        // Add sender info to the message object
-        message.sender = {
-          id: socket.user.id,
-          firstName: socket.user.first_name,
-          lastName: socket.user.last_name,
-          username: socket.user.username,
-          profilePictureUrl: socket.user.profile_picture_url
-        };
-        
-        // Emit message to sender
-        socket.emit('message:sent', message);
-        
-        // Emit message to receiver if online
-        const receiverSocketId = connectedUsers.get(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit('message:received', message);
+          
+          // Execute callback if provided
+          if (typeof callback === 'function') {
+            callback({ 
+              success: true, 
+              message: { 
+                id: message.id,
+                deliveryStatus: isReceiverOnline ? 'delivered' : 'sent'
+              }
+            });
+          }
+          
+          // Emit message to receiver if online
+          const receiverSocketId = connectedUsers.get(receiverId);
+          if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+              // Send with acknowledgment to confirm delivery
+              receiverSocket.emit('message:received', message, (ack) => {
+                if (ack && ack.received) {
+                  // Update sender with confirmation that message was actually delivered
+                  socket.emit('message:delivered', {
+                    messageId: message.id,
+                    deliveredAt: new Date().toISOString()
+                  });
+                }
+              });
+            } else {
+              // Socket ID exists but socket is invalid, clean up
+              connectedUsers.delete(receiverId);
+            }
+          }
+        } catch (dbError) {
+          // Clear the timeout
+          clearTimeout(dbTimeout);
+          throw dbError; // Re-throw to be caught by outer try/catch
         }
       } catch (error) {
         console.error('Message send error:', error);
-        socket.emit('error', {
-          message: 'Server error while sending message'
-        });
+        const serverError = { message: 'Server error while sending message', details: error.message };
+        socket.emit('error', serverError);
+        if (typeof callback === 'function') callback({ success: false, error: serverError });
       }
     });
     
     // Handle messages in match rooms
-    socket.on('match:message', (data) => {
+    socket.on('match:message', (data, callback) => {
       try {
         const { matchId, message } = data;
         const userId = socket.user.id;
         
-        console.log(`User ${userId} sending message in match room ${matchId}: ${message}`);
+        if (!matchId || !message) {
+          const error = { message: 'Match ID and message content are required' };
+          socket.emit('error', { source: 'match:message', ...error });
+          if (typeof callback === 'function') callback({ success: false, error });
+          return;
+        }
         
-        // Emit the message to the match room
-        socket.to(matchId).emit('match:message', {
+        // Generate a message ID for tracking
+        const messageId = uuidv4();
+        const timestamp = new Date().toISOString();
+        
+        // Prepare the message object
+        const messageObject = {
+          id: messageId,
           senderId: userId,
           senderName: socket.user.username || 'User',
           message,
-          timestamp: new Date().toISOString()
+          timestamp
+        };
+        
+        // Check if socket is in the room
+        if (!socket.rooms.has(matchId)) {
+          // Auto-join the room if not already in it
+          socket.join(matchId);
+          info(`User ${userId} auto-joined match room ${matchId}`);
+        }
+        
+        // Get room members count for delivery status
+        const room = io.sockets.adapter.rooms.get(matchId);
+        const roomSize = room ? room.size : 1; // Count includes the sender
+        const wasDelivered = roomSize > 1; // Delivered if more than just the sender
+        
+        // Add to in-memory store or database here if needed for persistence
+        
+        // Emit the message to the match room
+        socket.to(matchId).emit('match:message', messageObject);
+        
+        // Send confirmation to sender with delivery info
+        socket.emit('match:messageSent', {
+          ...messageObject,
+          matchId,
+          deliveryStatus: wasDelivered ? 'delivered' : 'sent',
+          recipientCount: Math.max(0, roomSize - 1) // Number of recipients
         });
         
-        // Send confirmation to sender
-        socket.emit('match:messageSent', {
-          matchId,
-          message,
-          timestamp: new Date().toISOString()
-        });
+        // Provide callback response if client is listening for it
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            messageId,
+            deliveryStatus: wasDelivered ? 'delivered' : 'sent',
+            recipientCount: Math.max(0, roomSize - 1)
+          });
+        }
       } catch (error) {
         console.error('Error sending match message:', error);
-        socket.emit('error', {
+        const errorData = { 
           source: 'match:message',
-          message: 'Failed to send message'
-        });
+          message: 'Failed to send message', 
+          details: error.message 
+        };
+        socket.emit('error', errorData);
+        
+        if (typeof callback === 'function') {
+          callback({ success: false, error: errorData });
+        }
+      }
+    });
+
+    // Add reconnection handling
+    socket.on('reconnect:check', async () => {
+      try {
+        const userId = socket.user.id;
+        info(`Reconnection check for user ${userId}`);
+        
+        // Check if user is in any active matches
+        const { data: userMatches, error: matchError } = await supabase
+          .from('matches')
+          .select('id, user1_id, user2_id, status')
+          .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+          .eq('status', 'accepted');
+          
+        if (matchError) {
+          error(`Error checking active matches for reconnecting user ${userId}: ${matchError.message}`);
+          return;
+        }
+        
+        // Rejoin all active match rooms
+        if (userMatches && userMatches.length > 0) {
+          for (const match of userMatches) {
+            socket.join(match.id);
+            info(`User ${userId} rejoined match room ${match.id} after reconnect`);
+            
+            // Notify the room that user has reconnected
+            socket.to(match.id).emit('user:reconnected', {
+              userId,
+              username: socket.user.username,
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+          // Send the active matches back to the user
+          socket.emit('reconnect:matches', { matches: userMatches });
+        }
+        
+        // Update connection status
+        updateUserOnlineStatus(userId, true);
+        
+        // Refresh connectedUsers map
+        connectedUsers.set(userId, socket.id);
+        
+      } catch (err) {
+        error(`Error handling reconnection for user ${socket.user.id}: ${err.message}`);
       }
     });
 

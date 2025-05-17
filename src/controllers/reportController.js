@@ -487,8 +487,224 @@ const ensureCreateReportFunctionExists = async () => {
   }
 };
 
+/**
+ * Get detailed report analytics for a user
+ * Including who reported them, message reports, resolution details, and report rate
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const getUserReportAnalytics = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.id;
+    
+    // Only admins or the user themselves can access this data
+    const isAdminOrSelf = req.user.is_admin || requestingUserId === userId;
+    
+    if (!isAdminOrSelf) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to access this information'
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    // Check if user exists
+    const { data: userExists, error: userError } = await supabase
+      .from('users')
+      .select('id, username, first_name, last_name')
+      .eq('id', userId)
+      .single();
+      
+    if (userError || !userExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Fetch reports against this user
+    const { data: reportsAgainstUser, error: reportsError } = await supabase
+      .from('reports')
+      .select(`
+        id, 
+        reason, 
+        comment, 
+        status, 
+        created_at, 
+        updated_at,
+        action_taken,
+        admin_notes,
+        admin_comment,
+        reporter:reporter_id(id, username, first_name, last_name),
+        resolver:resolved_by(id, username, first_name, last_name),
+        content_type,
+        content_id
+      `)
+      .eq('reported_user_id', userId)
+      .order('created_at', { ascending: false });
+      
+    if (reportsError) {
+      logger.error('Error fetching reports against user:', reportsError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch reports against user'
+      });
+    }
+    
+    // Fetch message reports related to this user's messages
+    const { data: userMessages, error: messagesError } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('sender_id', userId);
+      
+    if (messagesError) {
+      logger.error('Error fetching user messages:', messagesError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch user messages'
+      });
+    }
+    
+    // If user has messages, fetch reports for those messages
+    let messageReports = [];
+    if (userMessages && userMessages.length > 0) {
+      const messageIds = userMessages.map(msg => msg.id);
+      
+      // Fetch reports for these messages
+      const { data: reports, error: msgReportsError } = await supabase
+        .from('reports')
+        .select(`
+          id, 
+          reason, 
+          comment, 
+          status, 
+          created_at, 
+          updated_at,
+          action_taken,
+          admin_notes,
+          admin_comment,
+          reporter:reporter_id(id, username, first_name, last_name),
+          resolver:resolved_by(id, username, first_name, last_name),
+          content_id
+        `)
+        .eq('content_type', 'message')
+        .in('content_id', messageIds)
+        .order('created_at', { ascending: false });
+        
+      if (msgReportsError) {
+        logger.error('Error fetching message reports:', msgReportsError);
+      } else {
+        // For each message report, fetch the actual message content
+        const messageReportsWithContent = await Promise.all(
+          reports.map(async (report) => {
+            const { data: message, error: msgError } = await supabase
+              .from('messages')
+              .select('id, content, created_at')
+              .eq('id', report.content_id)
+              .single();
+              
+            return {
+              ...report,
+              message: !msgError ? message : { id: report.content_id, content: 'Message not found' }
+            };
+          })
+        );
+        
+        messageReports = messageReportsWithContent;
+      }
+    }
+    
+    // Calculate report statistics
+    // Total reports against user
+    const totalDirectReports = reportsAgainstUser.length;
+    const totalMessageReports = messageReports.length;
+    const totalReports = totalDirectReports + totalMessageReports;
+    
+    // Reports by status
+    const resolvedDirectReports = reportsAgainstUser.filter(r => 
+      r.status === 'resolved' || r.status === 'RESOLVED' || r.status === 'action_taken' || r.status === 'ACTION_TAKEN'
+    ).length;
+    
+    const resolvedMessageReports = messageReports.filter(r => 
+      r.status === 'resolved' || r.status === 'RESOLVED' || r.status === 'action_taken' || r.status === 'ACTION_TAKEN'
+    ).length;
+    
+    const totalResolvedReports = resolvedDirectReports + resolvedMessageReports;
+    
+    // Calculate report rate - percentage of reports that were valid/resolved
+    const reportRate = totalReports > 0 ? (totalResolvedReports / totalReports) * 100 : 0;
+    
+    // Calculate risk level
+    let riskLevel = 'LOW';
+    if (totalResolvedReports >= 5 || reportRate >= 70) {
+      riskLevel = 'CRITICAL';
+    } else if (totalResolvedReports >= 3 || reportRate >= 50) {
+      riskLevel = 'HIGH';
+    } else if (totalResolvedReports >= 1 || reportRate >= 30) {
+      riskLevel = 'MEDIUM';
+    }
+    
+    // Get reports by user (reports made by this user)
+    const { data: reportsByUser, error: reportsByUserError } = await supabase
+      .from('reports')
+      .select(`
+        id, 
+        reason, 
+        comment, 
+        status, 
+        created_at, 
+        content_type,
+        content_id,
+        reported_user_id,
+        reported_user:reported_user_id(id, username, first_name, last_name)
+      `)
+      .eq('reporter_id', userId)
+      .order('created_at', { ascending: false });
+      
+    if (reportsByUserError) {
+      logger.error('Error fetching reports by user:', reportsByUserError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch reports by user'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      data: {
+        user: userExists,
+        statistics: {
+          total_reports: totalReports,
+          direct_reports: totalDirectReports,
+          message_reports: totalMessageReports,
+          resolved_reports: totalResolvedReports,
+          report_rate: Math.round(reportRate),
+          risk_level: riskLevel
+        },
+        reports_against_user: reportsAgainstUser,
+        message_reports: messageReports,
+        reports_by_user: reportsByUser
+      }
+    });
+  } catch (error) {
+    logger.error('Error in getUserReportAnalytics:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching user report analytics'
+    });
+  }
+};
+
 module.exports = {
   submitReport,
   getUserReports,
+  getUserReportAnalytics,
   VALID_REPORT_TYPES
 }; 

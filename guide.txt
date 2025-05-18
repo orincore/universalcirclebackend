@@ -1,4 +1,4 @@
-All docs
+All docs of API
 
 Let's analyze your backend for message-related API endpoints and socket events:
 

@@ -324,6 +324,24 @@ const initializeSocket = (io) => {
   // Start the global matchmaking system
   startGlobalMatchmaking();
   
+  // Global socket activity middleware to prevent connection staleness
+  io.use((socket, next) => {
+    const originalEmit = socket.emit;
+    
+    // Override the emit method to track activity
+    socket.emit = function() {
+      // Call the original emit method
+      originalEmit.apply(socket, arguments);
+      
+      // Update activity timestamp for any socket communication
+      if (socket.connectionStability) {
+        socket.connectionStability.lastActivityTime = Date.now();
+      }
+    };
+    
+    next();
+  });
+  
   // Socket.IO middleware for authentication
   io.use(async (socket, next) => {
     try {
@@ -374,6 +392,152 @@ const initializeSocket = (io) => {
     // Initialize socket's active conversations
     socket.activeConversations = new Set();
     
+    // Initialize message sequence counter
+    socket.messageSequence = 0;
+    
+    // Initialize pending messages map
+    socket.pendingMessages = new Map();
+    
+    // Initialize connection stability monitoring
+    socket.connectionStability = {
+      lastMessageTime: Date.now(),
+      messagesSinceReconnect: 0,
+      lastPingResponse: Date.now(),
+      connectionHealth: 100, // 0-100 scale
+      missedPings: 0
+    };
+    
+    // Add connection stability monitoring
+    const monitorInterval = setInterval(() => {
+      try {
+        const now = Date.now();
+        
+        // Check if connection is healthy
+        if (socket.connectionStability) {
+          // Check message frequency
+          const timeSinceLastMessage = now - socket.connectionStability.lastMessageTime;
+          
+          // If we've sent messages but haven't had activity in a while, check connection
+          if (socket.connectionStability.messagesSinceReconnect > 0 && 
+              timeSinceLastMessage > 30000) { // 30 seconds
+            
+            // Send ping to check connection
+            socket.emit('ping:check', { time: now }, (response) => {
+              if (response) {
+                socket.connectionStability.lastPingResponse = now;
+                socket.connectionStability.missedPings = 0;
+              }
+            });
+            
+            // If no ping response for a while, connection might be unhealthy
+            const timeSinceLastPing = now - socket.connectionStability.lastPingResponse;
+            if (timeSinceLastPing > 45000) { // 45 seconds
+              socket.connectionStability.missedPings++;
+              socket.connectionStability.connectionHealth = Math.max(0, 
+                socket.connectionStability.connectionHealth - 20);
+              
+              // If health is critically low, attempt reconnection
+              if (socket.connectionStability.connectionHealth < 30) {
+                console.log(`Connection health critical for ${socket.user.id}, attempting reconnect`);
+                socket.emit('connection:refresh');
+                
+                // Reset health after reconnect attempt
+                socket.connectionStability.connectionHealth = 60;
+                
+                // Resend any pending messages
+                if (socket.pendingMessages && socket.pendingMessages.size > 0) {
+                  console.log(`Resending ${socket.pendingMessages.size} pending messages for ${socket.user.id}`);
+                  
+                  // Wait a short delay for connection to stabilize
+                  setTimeout(() => {
+                    // Sort by sequence for ordered delivery
+                    const pendingArray = Array.from(socket.pendingMessages.entries())
+                      .sort((a, b) => a[1].sequence - b[1].sequence);
+                    
+                    // Resend each pending message
+                    for (const [tempId, msgData] of pendingArray) {
+                      socket.emit('message:resend', {
+                        tempId,
+                        receiverId: msgData.receiverId,
+                        content: msgData.content,
+                        mediaUrl: msgData.mediaUrl || null,
+                        sequence: msgData.sequence
+                      });
+                    }
+                  }, 1000);
+                }
+              }
+            } else {
+              // Connection responded to ping, improve health
+              socket.connectionStability.connectionHealth = Math.min(100, 
+                socket.connectionStability.connectionHealth + 10);
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Error in connection monitor for ${socket.user?.id}:`, err);
+      }
+    }, 15000); // Check every 15 seconds
+    
+    // Clear interval on disconnect
+    socket.on('disconnect', () => {
+      clearInterval(monitorInterval);
+    });
+    
+    // Add ping response handler
+    socket.on('ping:response', (data) => {
+      socket.connectionStability.lastPingResponse = Date.now();
+      socket.connectionStability.missedPings = 0;
+      socket.connectionStability.connectionHealth = Math.min(100, 
+        socket.connectionStability.connectionHealth + 10);
+    });
+    
+    // Handle message resend requests from client
+    socket.on('message:resendRequest', async (data) => {
+      try {
+        const { conversationId, lastMessageId, limit = 10 } = data;
+        const userId = socket.user.id;
+        
+        // Query for messages after the last received one
+        let query = supabase.from('messages')
+          .select('*')
+          .or(`and(sender_id.eq.${userId},receiver_id.eq.${conversationId}),and(sender_id.eq.${conversationId},receiver_id.eq.${userId})`)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+          
+        // If a specific message ID was provided, get messages after it
+        if (lastMessageId) {
+          // Get the message timestamp first
+          const { data: lastMessage } = await supabase
+            .from('messages')
+            .select('created_at')
+            .eq('id', lastMessageId)
+            .single();
+            
+          if (lastMessage) {
+            query = query.gt('created_at', lastMessage.created_at);
+          }
+        }
+        
+        const { data: messages, error } = await query;
+        
+        if (error) {
+          console.error('Error fetching missed messages:', error);
+          return;
+        }
+        
+        // Send missed messages back to client
+        if (messages && messages.length > 0) {
+          socket.emit('message:missedBatch', {
+            messages,
+            conversationId
+          });
+        }
+      } catch (err) {
+        console.error('Error handling resend request:', err);
+      }
+    });
+    
     // Track client-side reconnection attempts
     socket.on('client:reconnect', () => {
       // Re-establish connection information
@@ -385,6 +549,15 @@ const initializeSocket = (io) => {
         socket.activeConversations.forEach(userId => {
           socket.emit('conversation:active', { userId });
         });
+      }
+      
+      // Reset connection stability metrics
+      if (socket.connectionStability) {
+        socket.connectionStability.lastMessageTime = Date.now();
+        socket.connectionStability.messagesSinceReconnect = 0;
+        socket.connectionStability.lastPingResponse = Date.now();
+        socket.connectionStability.connectionHealth = 100;
+        socket.connectionStability.missedPings = 0;
       }
     });
     
@@ -464,6 +637,35 @@ const initializeSocket = (io) => {
           return;
         }
         
+        // Create ordered message sequence tracking
+        if (!socket.messageSequence) {
+          socket.messageSequence = 0;
+        }
+        const currentSequence = ++socket.messageSequence;
+        
+        // Add to active conversations if not already added
+        if (!socket.activeConversations) {
+          socket.activeConversations = new Set();
+        }
+        socket.activeConversations.add(receiverId);
+        
+        // Store pending messages to prevent loss on connection issues
+        if (!socket.pendingMessages) {
+          socket.pendingMessages = new Map();
+        }
+        
+        // Generate a temporary ID for the message until confirmed by server
+        const tempMessageId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        
+        // Store in pending messages
+        socket.pendingMessages.set(tempMessageId, {
+          receiverId,
+          content,
+          mediaUrl,
+          createdAt: new Date(),
+          sequence: currentSequence
+        });
+        
         // Add a timeout for database operations to avoid hanging
         const dbTimeout = setTimeout(() => {
           const timeoutError = { message: 'Database operation timed out' };
@@ -482,13 +684,17 @@ const initializeSocket = (io) => {
               media_url: mediaUrl || null,
               is_read: false,
               created_at: new Date(),
-              updated_at: new Date()
+              updated_at: new Date(),
+              sequence: currentSequence // Store sequence for ordering
             })
             .select()
             .single();
           
           // Clear the timeout since we got a response
           clearTimeout(dbTimeout);
+          
+          // Remove from pending messages
+          socket.pendingMessages.delete(tempMessageId);
           
           if (error) {
             console.error('Error creating message:', error);
@@ -513,9 +719,18 @@ const initializeSocket = (io) => {
           // Emit message to sender with delivery status info
           socket.emit('message:sent', {
             ...message,
+            tempId: tempMessageId, // Include temp ID for client reference
             deliveryStatus: isReceiverOnline ? 'delivered' : 'sent',
             timestamp: new Date().toISOString()
           });
+          
+          // Update connection health metrics
+          if (socket.connectionStability) {
+            socket.connectionStability.lastMessageTime = Date.now();
+            socket.connectionStability.messagesSinceReconnect++;
+            socket.connectionStability.connectionHealth = Math.min(100, 
+              socket.connectionStability.connectionHealth + 5);
+          }
           
           // Execute callback if provided
           if (typeof callback === 'function') {
@@ -523,6 +738,7 @@ const initializeSocket = (io) => {
               success: true, 
               message: { 
                 id: message.id,
+                tempId: tempMessageId, // Include temp ID for client reference
                 deliveryStatus: isReceiverOnline ? 'delivered' : 'sent'
               }
             });
@@ -533,16 +749,31 @@ const initializeSocket = (io) => {
           if (receiverSocketId) {
             const receiverSocket = io.sockets.sockets.get(receiverSocketId);
             if (receiverSocket) {
+              // Add to receiver's active conversations
+              if (!receiverSocket.activeConversations) {
+                receiverSocket.activeConversations = new Set();
+              }
+              receiverSocket.activeConversations.add(senderId);
+              
               // Send with acknowledgment to confirm delivery
               receiverSocket.emit('message:received', message, (ack) => {
                 if (ack && ack.received) {
                   // Update sender with confirmation that message was actually delivered
                   socket.emit('message:delivered', {
                     messageId: message.id,
+                    tempId: tempMessageId,
                     deliveredAt: new Date().toISOString()
                   });
                 }
               });
+              
+              // Update receiver's connection health metrics
+              if (receiverSocket.connectionStability) {
+                receiverSocket.connectionStability.lastMessageTime = Date.now();
+                receiverSocket.connectionStability.messagesSinceReconnect++;
+                receiverSocket.connectionStability.connectionHealth = Math.min(100, 
+                  receiverSocket.connectionStability.connectionHealth + 5);
+              }
             } else {
               // Socket ID exists but socket is invalid, clean up
               connectedUsers.delete(receiverId);

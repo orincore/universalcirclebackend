@@ -1,15 +1,5 @@
-All docs of API
 
-Let's analyze your backend for message-related API endpoints and socket events:
-
-Search files...
-
-Search files...
-
-Read file: src/routes/messageRoutes.js
-Based on my analysis of your backend code, here's a comprehensive overview of all message-related API endpoints and socket events:
-
-## REST API Endpoints
+## REST API Endpoints for Circle
 
 ### Message Endpoints (`/api/messages`)
 1. **Send Message** - `POST /api/messages`

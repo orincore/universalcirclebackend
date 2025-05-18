@@ -1,0 +1,156 @@
+
+
+Let's analyze your backend for message-related API endpoints and socket events:
+
+Search files...
+
+Search files...
+
+Read file: src/routes/messageRoutes.js
+Based on my analysis of your backend code, here's a comprehensive overview of all message-related API endpoints and socket events:
+
+## REST API Endpoints
+
+### Message Endpoints (`/api/messages`)
+1. **Send Message** - `POST /api/messages`
+   - Sends a new message to another user
+   - Requires authentication
+
+2. **Get Conversation** - `GET /api/messages/conversation/:userId`
+   - Retrieves messages between current user and specified user
+   - Requires authentication
+
+3. **Get All Conversations** - `GET /api/messages/conversations`
+   - Retrieves all conversations for the current user
+   - Requires authentication
+
+4. **Get Media Upload URL** - `POST /api/messages/media-upload-url`
+   - Gets a pre-signed URL for uploading message media
+   - Requires authentication
+
+5. **Delete Conversation** - `DELETE /api/messages/conversation/:userId`
+   - Deletes entire conversation with specified user
+   - Requires authentication
+
+### User Message Endpoints (`/api/user-messages`)
+1. **Delete Own Message** - `DELETE /api/user-messages/:messageId`
+   - Allows a user to delete their own message
+   - Requires authentication
+
+### Admin Message Endpoints (`/api/admin/messages`)
+1. **Get Reported Messages** - `GET /api/admin/messages/reports/:reportId/messages`
+   - Retrieves reported messages for a specific report
+   - Requires admin authentication
+
+2. **Delete Message (Admin)** - `DELETE /api/admin/messages/:messageId`
+   - Allows admin to delete any message
+   - Requires admin authentication
+
+3. **Delete Conversation (Admin)** - Related to admin functions for deleting conversations
+   - Requires admin authentication
+
+## Socket Events
+
+### Client-to-Server Events (Emitted by Client)
+
+1. **`message:send`**
+   - Sends a real-time message to another user
+   - Payload: `{ receiverId, content, mediaUrl? }`
+   - Can include optional callback for delivery confirmation
+
+2. **`message:markAllRead`**
+   - Marks all messages from a specific user as read
+   - Payload: `{ senderId }`
+
+3. **`message:edit`**
+   - Edits an existing message
+   - Payload: `{ messageId, content }`
+
+4. **`message:delete`**
+   - Deletes a message
+   - Payload: `{ messageId, forEveryone }`
+   - `forEveryone`: boolean, true to delete for all users
+
+5. **`message:react`**
+   - Adds a reaction to a message
+   - Payload: `{ messageId, reaction }`
+
+6. **`match:message`**
+   - Sends a message in a match room
+   - Payload: `{ matchId, message }`
+
+7. **`match:editMessage`**
+   - Edits a message in a match room
+   - Payload: `{ matchId, messageId, content }`
+
+8. **`match:deleteMessage`**
+   - Deletes a message in a match room
+   - Payload: `{ matchId, messageId }`
+
+9. **`match:reactToMessage`**
+   - Adds a reaction to a message in a match room
+   - Payload: `{ matchId, messageId, reaction }`
+
+10. **`match:replyToMessage`**
+    - Replies to a message in a match room
+    - Payload: `{ matchId, replyToMessageId, replyToContent, message }`
+
+### Server-to-Client Events (Received by Client)
+
+1. **`message:received`**
+   - Notifies when a new message is received
+   - Payload: message object with details
+
+2. **`message:delivered`**
+   - Confirms message delivery
+   - Payload: `{ messageId, deliveredAt }`
+
+3. **`message:edited`**
+   - Notifies when a message has been edited
+   - Payload: `{ messageId, conversationId, content, updatedAt }`
+
+4. **`message:editConfirmed`**
+   - Confirms message edit
+   - Payload: `{ messageId, conversationId, content, updatedAt }`
+
+5. **`message:deleted`**
+   - Notifies when a message has been deleted
+   - Payload: `{ messageId, conversationId, deletedBy, deletedForEveryone }`
+
+6. **`message:deleteConfirmed`**
+   - Confirms message deletion
+   - Payload: `{ messageId, conversationId, deletedForEveryone }`
+
+7. **`match:message`**
+   - Receives message in a match room
+   - Payload: message object with details
+
+8. **`match:messageSent`**
+   - Confirms match message was sent
+   - Payload: `{ messageId, matchId, message, timestamp, deliveryStatus, recipientCount }`
+
+9. **`match:messageEdited`**
+   - Notifies when a match message has been edited
+   - Payload: `{ messageId, senderId, senderName, content, editedAt }`
+
+10. **`match:messageEditConfirmed`**
+    - Confirms match message edit
+    - Payload: `{ messageId, matchId, content, editedAt }`
+
+11. **`match:messageDeleted`**
+    - Notifies when a match message has been deleted
+    - Payload: `{ messageId, deletedBy, deletedAt }`
+
+12. **`match:messageDeleteConfirmed`**
+    - Confirms match message deletion
+    - Payload: `{ messageId, matchId, deletedAt }`
+
+13. **`match:messageReaction`**
+    - Notifies when someone reacts to a match message
+    - Payload: `{ messageId, userId, reaction, timestamp }`
+
+14. **`match:reactionConfirmed`**
+    - Confirms match message reaction
+    - Payload: `{ messageId, matchId, reaction, timestamp }`
+
+This comprehensive overview should cover all the message-related functionalities in your backend. The system supports both individual conversations and match-based group chats, with rich features like message editing, deletion, reactions, and replies.

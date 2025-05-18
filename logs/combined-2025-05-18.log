@@ -1,0 +1,11 @@
+{"timestamp":"2025-05-18T19:23:52.380Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-18T19:23:52.380Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-18T19:23:52.382Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-18T19:23:52.383Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-18T19:23:52.383Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-18T19:23:52.413Z","level":"error","message":"(node:7659) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-18T19:23:52.415Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-18T19:23:52.957Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-18T19:23:52.957Z","level":"error","message":"Migration process failed:"}
+{"timestamp":"2025-05-18T19:23:52.957Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-18T19:23:54.083Z","level":"info","message":"Health check recorded successfully","cpuUsage":20,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.23320075},"databaseStatus":"healthy"}

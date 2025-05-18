@@ -219,28 +219,57 @@ const initializeSocket = (io) => {
     });
   }
   
-  // Heartbeat mechanism to detect zombie connections
-  setInterval(() => {
+  // IMPROVED: Heartbeat mechanism for more reliable connections
+  // This prevents sockets from becoming "zombie" connections
+  // and ensures typing indicators and messages stay live
+  const heartbeatInterval = setInterval(() => {
     const now = Date.now();
-    // Check each connected socket every 30 seconds
+    // Check each connected socket more frequently (every 15 seconds)
     io.sockets.sockets.forEach((socket) => {
       if (socket.user && socket.user.id) {
-        // Send a small heartbeat packet
+        // Send a heartbeat packet with timestamp
         try {
           socket.emit('heartbeat', { time: now });
-          socket.lastHeartbeat = now;
+          
+          // Track heartbeat response
+          if (!socket.lastHeartbeat || now - socket.lastHeartbeat > 45000) {
+            // If no heartbeat for 45 seconds, send a ping to check connection
+            socket.emit('ping', { time: now }, (response) => {
+              if (response) {
+                socket.lastHeartbeat = now;
+              }
+            });
+          }
+          
+          // Update user's active status every minute
+          if (!socket.lastStatusUpdate || now - socket.lastStatusUpdate > 60000) {
+            updateUserOnlineStatus(socket.user.id, true);
+            socket.lastStatusUpdate = now;
+          }
         } catch (err) {
           // If emitting fails, the socket might be dead
           error(`Failed to send heartbeat to ${socket.user.id}: ${err.message}`);
           try {
-            socket.disconnect(true);
+            // Don't disconnect immediately, try reconnection strategy
+            socket.emit('reconnect');
           } catch (e) {
-            // Ignore errors during forced disconnect
+            // If reconnection attempt fails, disconnect
+            try {
+              socket.disconnect(true);
+            } catch (disconnectErr) {
+              // Ignore errors during forced disconnect
+            }
           }
         }
       }
     });
-  }, 30000);
+  }, 15000); // More frequent heartbeats (15 seconds)
+  
+  // Clean up interval on process exit
+  process.on('SIGINT', () => {
+    clearInterval(heartbeatInterval);
+    process.exit(0);
+  });
   
   // Connection rate limiting
   io.use((socket, next) => {
@@ -341,6 +370,79 @@ const initializeSocket = (io) => {
     
     // Update user's online status in database
     updateUserOnlineStatus(socket.user.id, true);
+    
+    // Initialize socket's active conversations
+    socket.activeConversations = new Set();
+    
+    // Track client-side reconnection attempts
+    socket.on('client:reconnect', () => {
+      // Re-establish connection information
+      connectedUsers.set(socket.user.id, socket.id);
+      updateUserOnlineStatus(socket.user.id, true);
+      // Re-initialize active conversations
+      // This helps ensure typing indicators work correctly after reconnection
+      if (socket.activeConversations && socket.activeConversations.size > 0) {
+        socket.activeConversations.forEach(userId => {
+          socket.emit('conversation:active', { userId });
+        });
+      }
+    });
+    
+    // NEW: Handle conversation initialization to ensure typing indicators work
+    // before the first message is sent
+    socket.on('conversation:init', async (data) => {
+      try {
+        const { userId } = data;
+        if (!userId) return;
+        
+        // Add this user to active conversations
+        if (!socket.activeConversations) {
+          socket.activeConversations = new Set();
+        }
+        socket.activeConversations.add(userId);
+        
+        // Fetch any existing conversation
+        const { data: messages, error } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`and(sender_id.eq.${socket.user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${socket.user.id})`)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        // If no messages exist yet, we need to pre-initialize for typing indicators
+        // This solves the issue with typing indicators not working before the first message
+        if (!messages || messages.length === 0) {
+          // Notify the other user that this user has started a conversation
+          const receiverSocketId = connectedUsers.get(userId);
+          if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+              // Add to the receiver's active conversations as well
+              if (!receiverSocket.activeConversations) {
+                receiverSocket.activeConversations = new Set();
+              }
+              receiverSocket.activeConversations.add(socket.user.id);
+              
+              // Alert the receiver that a conversation has been initialized
+              receiverSocket.emit('conversation:init', {
+                userId: socket.user.id,
+                username: socket.user.username,
+                profilePictureUrl: socket.user.profile_picture_url
+              });
+            }
+          }
+        }
+        
+        // Acknowledge successful initialization
+        socket.emit('conversation:ready', { userId });
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+        socket.emit('error', {
+          source: 'conversation',
+          message: 'Failed to initialize conversation'
+        });
+      }
+    });
     
     // Emit online status to other users
     io.emit('user:status', {
@@ -1251,23 +1353,84 @@ const initializeSocket = (io) => {
         
         // For private chat
         if (receiverId) {
+          // Add to active conversations if not already added
+          if (!socket.activeConversations) {
+            socket.activeConversations = new Set();
+          }
+          socket.activeConversations.add(receiverId);
+          
+          // Ensure the user is actually in our connected users before attempting to emit
           const receiverSocketId = connectedUsers.get(receiverId);
           if (receiverSocketId) {
-            io.to(receiverSocketId).emit('typing:start', {
-              userId,
-              timestamp: new Date().toISOString()
-            });
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+              // Add to receiver's active conversations as well
+              if (!receiverSocket.activeConversations) {
+                receiverSocket.activeConversations = new Set();
+              }
+              receiverSocket.activeConversations.add(userId);
+              
+              // Store last typing time to prevent flooding
+              const now = Date.now();
+              if (!socket.lastTypingEmit || now - socket.lastTypingEmit > 1000) {
+                io.to(receiverSocketId).emit('typing:start', {
+                  userId,
+                  username: socket.user.username,
+                  timestamp: new Date().toISOString()
+                });
+                socket.lastTypingEmit = now;
+              }
+              
+              // Set a timeout to automatically send typing:stop if not refreshed
+              if (socket.typingTimeout) {
+                clearTimeout(socket.typingTimeout);
+              }
+              
+              socket.typingTimeout = setTimeout(() => {
+                // Auto-stop typing after 5 seconds of no typing activity
+                io.to(receiverSocketId).emit('typing:stop', {
+                  userId,
+                  timestamp: new Date().toISOString()
+                });
+                socket.isTyping = false;
+              }, 5000);
+              
+              socket.isTyping = true;
+            } else {
+              // Socket ID exists but socket is invalid, clean up
+              connectedUsers.delete(receiverId);
+            }
           }
         }
         
         // For match chat
         if (matchId) {
-          socket.to(matchId).emit('match:typing', {
-            userId,
-            username: socket.user.username,
-            isTyping: true,
-            timestamp: new Date().toISOString()
-          });
+          // Store last typing time to prevent flooding
+          const now = Date.now();
+          if (!socket.lastMatchTypingEmit || now - socket.lastMatchTypingEmit > 1000) {
+            socket.to(matchId).emit('match:typing', {
+              userId,
+              username: socket.user.username,
+              isTyping: true,
+              timestamp: new Date().toISOString()
+            });
+            socket.lastMatchTypingEmit = now;
+          }
+          
+          // Set a timeout to automatically send typing:stop if not refreshed
+          if (socket.matchTypingTimeout) {
+            clearTimeout(socket.matchTypingTimeout);
+          }
+          
+          socket.matchTypingTimeout = setTimeout(() => {
+            // Auto-stop typing after 5 seconds of inactivity
+            socket.to(matchId).emit('match:typing', {
+              userId,
+              username: socket.user.username,
+              isTyping: false,
+              timestamp: new Date().toISOString()
+            });
+          }, 5000);
         }
       } catch (error) {
         console.error('Error in typing indicator:', error);
@@ -1279,6 +1442,11 @@ const initializeSocket = (io) => {
         const { receiverId, matchId } = data;
         const userId = socket.user.id;
         
+        // Clear any typing timeouts
+        if (socket.typingTimeout) {
+          clearTimeout(socket.typingTimeout);
+        }
+        
         // For private chat
         if (receiverId) {
           const receiverSocketId = connectedUsers.get(receiverId);
@@ -1288,10 +1456,15 @@ const initializeSocket = (io) => {
               timestamp: new Date().toISOString()
             });
           }
+          socket.isTyping = false;
         }
         
         // For match chat
         if (matchId) {
+          if (socket.matchTypingTimeout) {
+            clearTimeout(socket.matchTypingTimeout);
+          }
+          
           socket.to(matchId).emit('match:typing', {
             userId,
             username: socket.user.username,
@@ -2290,6 +2463,99 @@ const initializeSocket = (io) => {
         });
       }
     });
+    
+    // Handle client disconnection
+    socket.on('disconnect', async (reason) => {
+      try {
+        info(`User disconnected: ${socket.user.id} (${socket.user.username}), reason: ${reason}`);
+        
+        // Only update status after a grace period to allow for short reconnects
+        const disconnectTimeout = setTimeout(async () => {
+          // Check if user is still connected via a different socket
+          const isUserStillConnected = Array.from(io.sockets.sockets.values()).some(
+            s => s.user && s.user.id === socket.user.id && s.id !== socket.id
+          );
+          
+          if (!isUserStillConnected) {
+            // Update user's online status in database
+            await updateUserOnlineStatus(socket.user.id, false);
+            
+            // Notify other users of offline status
+            io.emit('user:status', {
+              userId: socket.user.id,
+              online: false,
+              lastSeen: new Date().toISOString()
+            });
+            
+            // Remove from connected users map
+            if (connectedUsers.get(socket.user.id) === socket.id) {
+              connectedUsers.delete(socket.user.id);
+            }
+            
+            // Clean up any active matches and conversations
+            cleanupUserMatches(socket.user.id);
+          }
+        }, 5000); // Wait 5 seconds before marking as offline
+        
+        // Store disconnect timeout in a global map to allow cancellation on reconnect
+        if (!global.disconnectTimeouts) {
+          global.disconnectTimeouts = new Map();
+        }
+        global.disconnectTimeouts.set(socket.user.id, disconnectTimeout);
+      } catch (error) {
+        console.error('Error handling disconnect:', error);
+      }
+    });
+    
+    // Handle explicit client shutdown/logout
+    socket.on('client:logout', async () => {
+      try {
+        // Immediate status update on explicit logout
+        await updateUserOnlineStatus(socket.user.id, false);
+        
+        // Remove from connected users map
+        connectedUsers.delete(socket.user.id);
+        
+        // Clear any active disconnect timeout
+        if (global.disconnectTimeouts && global.disconnectTimeouts.has(socket.user.id)) {
+          clearTimeout(global.disconnectTimeouts.get(socket.user.id));
+          global.disconnectTimeouts.delete(socket.user.id);
+        }
+        
+        // Emit offline status to other users
+        io.emit('user:status', {
+          userId: socket.user.id,
+          online: false,
+          lastSeen: new Date().toISOString()
+        });
+        
+        // Disconnect the socket
+        socket.disconnect(true);
+      } catch (error) {
+        console.error('Error during logout:', error);
+      }
+    });
+    
+    // Handle reconnection cancellation
+    socket.on('client:reconnected', () => {
+      // Clear any pending disconnect timeout
+      if (global.disconnectTimeouts && global.disconnectTimeouts.has(socket.user.id)) {
+        clearTimeout(global.disconnectTimeouts.get(socket.user.id));
+        global.disconnectTimeouts.delete(socket.user.id);
+      }
+      
+      // Update user status
+      updateUserOnlineStatus(socket.user.id, true);
+      
+      // Re-add to connected users map
+      connectedUsers.set(socket.user.id, socket.id);
+      
+      // Re-emit online status to other users
+      io.emit('user:status', {
+        userId: socket.user.id,
+        online: true
+      });
+    });
   });
 };
 
@@ -2972,21 +3238,97 @@ const notifyConversationDeleted = (currentUserId, otherUserId) => {
   }
 };
 
+/**
+ * Clean up any active matches and conversations for a disconnected user
+ * @param {string} userId - ID of the disconnected user
+ */
+const cleanupUserMatches = (userId) => {
+  try {
+    // Remove user from matchmaking pool
+    if (matchmakingPool.has(userId)) {
+      matchmakingPool.delete(userId);
+      info(`Removed disconnected user ${userId} from matchmaking pool`);
+    }
+    
+    // Clean up any active matches
+    for (const [matchId, matchData] of activeMatches.entries()) {
+      if (matchData.users.includes(userId)) {
+        // Notify other user in the match
+        const otherUserId = matchData.users.find(id => id !== userId);
+        if (otherUserId) {
+          const otherUserSocketId = connectedUsers.get(otherUserId);
+          if (otherUserSocketId) {
+            ioInstance.to(otherUserSocketId).emit('match:userLeft', {
+              matchId,
+              userId,
+              reason: 'disconnected'
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    error(`Error cleaning up matches for user ${userId}: ${error.message}`);
+  }
+};
+
+// Export essential functions
 module.exports = {
   initializeSocket,
-  notifyMatchFound,
-  connectedUsers,
-  userTimeouts,
-  clearMatchmakingTimeouts,
-  matchmakingPool,
-  activeMatches,
-  findMatchForUser,
-  createMatchInDatabase,
-  MATCH_ACCEPTANCE_TIMEOUT,
-  startGlobalMatchmaking,
-  stopGlobalMatchmaking,
-  findMatchesForAllUsers,
   notifyMessageDeletion,
   notifyBulkMessageDeletion,
   notifyConversationDeleted
-}; 
+};
+
+/**
+ * CLIENT IMPLEMENTATION GUIDANCE
+ * 
+ * To implement reliable messaging like Instagram, your front-end should:
+ * 
+ * 1. Always initialize conversations before sending messages or typing indicators:
+ *    - Emit 'conversation:init' with { userId: otherPersonId }
+ *    - Listen for 'conversation:ready' before enabling typing/messaging
+ * 
+ * 2. Handle reconnections automatically:
+ *    - Listen for 'disconnect' events and initiate reconnection
+ *    - After reconnection, emit 'client:reconnected' to restore status
+ *    - Re-initialize active conversations
+ * 
+ * 3. For typing indicators:
+ *    - Only emit 'typing:start' when user starts typing, throttle calls (1 per second max)
+ *    - Emit 'typing:stop' when user explicitly stops typing or message is sent
+ *    - Trust the server's auto-timeout after 5 seconds of inactivity
+ * 
+ * 4. Maintain heartbeat:
+ *    - Listen for 'heartbeat' events from server and respond to 'ping' events
+ *    - Implement exponential backoff for reconnection attempts on disconnect
+ *    - If disconnected for more than 1 minute, fetch messages since last received
+ * 
+ * 5. Enable all chat features from the start:
+ *    - Typing indicators
+ *    - Message delivery status
+ *    - Read receipts
+ *    - Message reactions
+ * 
+ * 6. Sample reconnection implementation:
+ *    ```javascript
+ *    let reconnectAttempts = 0;
+ *    socket.on('disconnect', () => {
+ *      const timeout = Math.min(1000 * (2 ** reconnectAttempts), 30000);
+ *      setTimeout(() => {
+ *        socket.connect();
+ *        reconnectAttempts++;
+ *      }, timeout);
+ *    });
+ *    
+ *    socket.on('connect', () => {
+ *      reconnectAttempts = 0;
+ *      socket.emit('client:reconnected');
+ *      
+ *      // Re-initialize active conversations
+ *      activeConversations.forEach(userId => {
+ *        socket.emit('conversation:init', { userId });
+ *      });
+ *    });
+ *    ```
+ */ 

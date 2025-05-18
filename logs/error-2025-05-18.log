@@ -1,0 +1,3 @@
+{"timestamp":"2025-05-18T19:23:52.413Z","level":"error","message":"(node:7659) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-18T19:23:52.415Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-18T19:23:52.957Z","level":"error","message":"Migration process failed:"}

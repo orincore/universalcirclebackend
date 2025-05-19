@@ -2777,6 +2777,316 @@ const initializeSocket = (io) => {
         online: true
       });
     });
+
+    // Initialize chat features for the socket
+    socket.chatFeatures = {
+      activeConversations: new Set(),
+      typingStatus: new Map(),
+      messageQueue: new Map(),
+      lastMessageTime: Date.now(),
+      isTyping: false
+    };
+
+    // Handle message sending with real-time delivery
+    socket.on('message:send', async (data, callback) => {
+      try {
+        const { receiverId, content, mediaUrl } = data;
+        const senderId = socket.user.id;
+
+        // Validate required fields
+        if (!receiverId || !content) {
+          const error = { message: 'Receiver ID and content are required' };
+          socket.emit('error', error);
+          if (typeof callback === 'function') callback({ success: false, error });
+          return;
+        }
+
+        // Create ordered message sequence tracking
+        if (!socket.messageSequence) {
+          socket.messageSequence = 0;
+        }
+        const currentSequence = ++socket.messageSequence;
+
+        // Add to active conversations
+        socket.chatFeatures.activeConversations.add(receiverId);
+
+        // Generate temporary ID for message tracking
+        const tempMessageId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+        // Store in message queue
+        socket.chatFeatures.messageQueue.set(tempMessageId, {
+          receiverId,
+          content,
+          mediaUrl,
+          sequence: currentSequence,
+          timestamp: Date.now()
+        });
+
+        // Create message in database
+        const { data: message, error } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content,
+            media_url: mediaUrl || null,
+            is_read: false,
+            created_at: new Date(),
+            updated_at: new Date(),
+            sequence: currentSequence
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating message:', error);
+          const dbError = { message: 'Failed to send message', details: error.message };
+          socket.emit('error', dbError);
+          if (typeof callback === 'function') callback({ success: false, error: dbError });
+          return;
+        }
+
+        // Add sender info to message
+        message.sender = {
+          id: socket.user.id,
+          firstName: socket.user.first_name,
+          lastName: socket.user.last_name,
+          username: socket.user.username,
+          profilePictureUrl: socket.user.profile_picture_url
+        };
+
+        // Get receiver's online status
+        const isReceiverOnline = connectedUsers.has(receiverId);
+
+        // Emit to sender with delivery status
+        socket.emit('message:sent', {
+          ...message,
+          tempId: tempMessageId,
+          deliveryStatus: isReceiverOnline ? 'delivered' : 'sent',
+          timestamp: new Date().toISOString()
+        });
+
+        // Update connection health
+        if (socket.connectionStability) {
+          socket.connectionStability.lastMessageTime = Date.now();
+          socket.connectionStability.messagesSinceReconnect++;
+          socket.connectionStability.connectionHealth = Math.min(100, 
+            socket.connectionStability.connectionHealth + 5);
+        }
+
+        // Emit to receiver if online
+        const receiverSocketId = connectedUsers.get(receiverId);
+        if (receiverSocketId) {
+          const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+          if (receiverSocket) {
+            // Add to receiver's active conversations
+            receiverSocket.chatFeatures.activeConversations.add(senderId);
+
+            // Send with acknowledgment
+            receiverSocket.emit('message:received', message, (ack) => {
+              if (ack && ack.received) {
+                // Update sender with delivery confirmation
+                socket.emit('message:delivered', {
+                  messageId: message.id,
+                  tempId: tempMessageId,
+                  deliveredAt: new Date().toISOString()
+                });
+
+                // Update message in database
+                supabase
+                  .from('messages')
+                  .update({ delivered_at: new Date() })
+                  .eq('id', message.id);
+              }
+            });
+
+            // Update receiver's connection health
+            if (receiverSocket.connectionStability) {
+              receiverSocket.connectionStability.lastMessageTime = Date.now();
+              receiverSocket.connectionStability.messagesSinceReconnect++;
+              receiverSocket.connectionStability.connectionHealth = Math.min(100, 
+                receiverSocket.connectionStability.connectionHealth + 5);
+            }
+          }
+        }
+
+        // Remove from message queue after successful delivery
+        socket.chatFeatures.messageQueue.delete(tempMessageId);
+
+        // Execute callback
+        if (typeof callback === 'function') {
+          callback({ 
+            success: true, 
+            message: { 
+              id: message.id,
+              tempId: tempMessageId,
+              deliveryStatus: isReceiverOnline ? 'delivered' : 'sent'
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Message send error:', error);
+        const serverError = { message: 'Server error while sending message', details: error.message };
+        socket.emit('error', serverError);
+        if (typeof callback === 'function') callback({ success: false, error: serverError });
+      }
+    });
+
+    // Enhanced typing indicator handling
+    socket.on('typing:start', (data) => {
+      try {
+        const { receiverId } = data;
+        const userId = socket.user.id;
+
+        // Add to active conversations
+        socket.chatFeatures.activeConversations.add(receiverId);
+        socket.chatFeatures.isTyping = true;
+
+        // Store typing status
+        socket.chatFeatures.typingStatus.set(receiverId, Date.now());
+
+        // Get receiver's socket
+        const receiverSocketId = connectedUsers.get(receiverId);
+        if (receiverSocketId) {
+          const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+          if (receiverSocket) {
+            // Add to receiver's active conversations
+            receiverSocket.chatFeatures.activeConversations.add(userId);
+
+            // Emit typing status
+            receiverSocket.emit('typing:start', {
+              userId,
+              username: socket.user.username,
+              timestamp: new Date().toISOString()
+            });
+
+            // Set auto-stop typing timeout
+            if (socket.typingTimeout) {
+              clearTimeout(socket.typingTimeout);
+            }
+
+            socket.typingTimeout = setTimeout(() => {
+              socket.emit('typing:stop', { receiverId });
+              socket.chatFeatures.isTyping = false;
+              socket.chatFeatures.typingStatus.delete(receiverId);
+            }, 5000);
+          }
+        }
+      } catch (error) {
+        console.error('Error in typing indicator:', error);
+      }
+    });
+
+    // Handle message read status
+    socket.on('message:read', async (data) => {
+      try {
+        const { messageId, conversationId } = data;
+        const userId = socket.user.id;
+
+        // Update message in database
+        const { data: updatedMessage, error } = await supabase
+          .from('messages')
+          .update({
+            is_read: true,
+            updated_at: new Date()
+          })
+          .eq('id', messageId)
+          .eq('receiver_id', userId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error marking message as read:', error);
+          return;
+        }
+
+        // Emit read receipt to sender
+        const senderSocketId = connectedUsers.get(updatedMessage.sender_id);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('message:read', {
+            messageId,
+            conversationId,
+            readAt: updatedMessage.updated_at,
+            readBy: userId
+          });
+        }
+      } catch (error) {
+        console.error('Error in message:read:', error);
+      }
+    });
+
+    // Handle conversation initialization
+    socket.on('conversation:init', async (data) => {
+      try {
+        const { userId } = data;
+        if (!userId) return;
+
+        // Add to active conversations
+        socket.chatFeatures.activeConversations.add(userId);
+
+        // Get receiver's socket
+        const receiverSocketId = connectedUsers.get(userId);
+        if (receiverSocketId) {
+          const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+          if (receiverSocket) {
+            // Add to receiver's active conversations
+            receiverSocket.chatFeatures.activeConversations.add(socket.user.id);
+
+            // Notify receiver
+            receiverSocket.emit('conversation:init', {
+              userId: socket.user.id,
+              username: socket.user.username,
+              profilePictureUrl: socket.user.profile_picture_url
+            });
+          }
+        }
+
+        // Acknowledge initialization
+        socket.emit('conversation:ready', { userId });
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+        socket.emit('error', {
+          source: 'conversation',
+          message: 'Failed to initialize conversation'
+        });
+      }
+    });
+
+    // Handle reconnection
+    socket.on('client:reconnect', () => {
+      // Re-establish connection information
+      connectedUsers.set(socket.user.id, socket.id);
+      updateUserOnlineStatus(socket.user.id, true);
+
+      // Re-initialize active conversations
+      if (socket.chatFeatures.activeConversations.size > 0) {
+        socket.chatFeatures.activeConversations.forEach(userId => {
+          socket.emit('conversation:init', { userId });
+        });
+      }
+
+      // Resend any pending messages
+      if (socket.chatFeatures.messageQueue.size > 0) {
+        socket.chatFeatures.messageQueue.forEach((msgData, tempId) => {
+          socket.emit('message:resend', {
+            tempId,
+            receiverId: msgData.receiverId,
+            content: msgData.content,
+            mediaUrl: msgData.mediaUrl,
+            sequence: msgData.sequence
+          });
+        });
+      }
+
+      // Reset connection metrics
+      if (socket.connectionStability) {
+        socket.connectionStability.lastMessageTime = Date.now();
+        socket.connectionStability.messagesSinceReconnect = 0;
+        socket.connectionStability.lastPingResponse = Date.now();
+        socket.connectionStability.connectionHealth = 100;
+        socket.connectionStability.missedPings = 0;
+      }
+    });
   });
 };
 

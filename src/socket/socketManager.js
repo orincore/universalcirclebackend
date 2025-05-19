@@ -2793,6 +2793,9 @@ const initializeSocket = (io) => {
         const { receiverId, content, mediaUrl } = data;
         const senderId = socket.user.id;
 
+        // Log request data for debugging
+        console.log(`Message send request from ${senderId} to ${receiverId}: ${content.substring(0, 30)}...`);
+
         // Validate required fields
         if (!receiverId || !content) {
           const error = { message: 'Receiver ID and content are required' };
@@ -2807,122 +2810,149 @@ const initializeSocket = (io) => {
         }
         const currentSequence = ++socket.messageSequence;
 
-        // Add to active conversations
-        socket.chatFeatures.activeConversations.add(receiverId);
+        // Add to active conversations if not already added
+        if (!socket.activeConversations) {
+          socket.activeConversations = new Set();
+        }
+        socket.activeConversations.add(receiverId);
 
-        // Generate temporary ID for message tracking
+        // Store pending messages to prevent loss on connection issues
+        if (!socket.pendingMessages) {
+          socket.pendingMessages = new Map();
+        }
+
+        // Generate a temporary ID for the message until confirmed by server
         const tempMessageId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-        // Store in message queue
-        socket.chatFeatures.messageQueue.set(tempMessageId, {
+        // Store in pending messages
+        socket.pendingMessages.set(tempMessageId, {
           receiverId,
           content,
           mediaUrl,
-          sequence: currentSequence,
-          timestamp: Date.now()
+          createdAt: new Date(),
+          sequence: currentSequence
         });
+
+        console.log(`Creating message in database: ${tempMessageId} (seq: ${currentSequence})`);
+
+        // Add a timeout for database operations to avoid hanging
+        const dbTimeout = setTimeout(() => {
+          const timeoutError = { message: 'Database operation timed out' };
+          console.error('Database timeout for message:', tempMessageId);
+          socket.emit('error', timeoutError);
+          if (typeof callback === 'function') callback({ success: false, error: timeoutError });
+        }, 8000); // 8 second timeout
 
         // Create message in database
-        const { data: message, error } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: senderId,
-            receiver_id: receiverId,
-            content,
-            media_url: mediaUrl || null,
-            is_read: false,
-            created_at: new Date(),
-            updated_at: new Date(),
-            sequence: currentSequence
-          })
-          .select()
-          .single();
+        try {
+          console.log(`Supabase insert for message from ${senderId} to ${receiverId}`);
+          
+          const { data: message, error } = await supabase
+            .from('messages')
+            .insert({
+              sender_id: senderId,
+              receiver_id: receiverId,
+              content,
+              media_url: mediaUrl || null,
+              is_read: false,
+              created_at: new Date(),
+              updated_at: new Date(),
+              sequence: currentSequence // Store sequence for ordering
+            })
+            .select()
+            .single();
 
-        if (error) {
-          console.error('Error creating message:', error);
-          const dbError = { message: 'Failed to send message', details: error.message };
-          socket.emit('error', dbError);
-          if (typeof callback === 'function') callback({ success: false, error: dbError });
-          return;
-        }
+          // Clear the timeout since we got a response
+          clearTimeout(dbTimeout);
 
-        // Add sender info to message
-        message.sender = {
-          id: socket.user.id,
-          firstName: socket.user.first_name,
-          lastName: socket.user.last_name,
-          username: socket.user.username,
-          profilePictureUrl: socket.user.profile_picture_url
-        };
+          // Remove from pending messages
+          socket.pendingMessages.delete(tempMessageId);
 
-        // Get receiver's online status
-        const isReceiverOnline = connectedUsers.has(receiverId);
-
-        // Emit to sender with delivery status
-        socket.emit('message:sent', {
-          ...message,
-          tempId: tempMessageId,
-          deliveryStatus: isReceiverOnline ? 'delivered' : 'sent',
-          timestamp: new Date().toISOString()
-        });
-
-        // Update connection health
-        if (socket.connectionStability) {
-          socket.connectionStability.lastMessageTime = Date.now();
-          socket.connectionStability.messagesSinceReconnect++;
-          socket.connectionStability.connectionHealth = Math.min(100, 
-            socket.connectionStability.connectionHealth + 5);
-        }
-
-        // Emit to receiver if online
-        const receiverSocketId = connectedUsers.get(receiverId);
-        if (receiverSocketId) {
-          const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-          if (receiverSocket) {
-            // Add to receiver's active conversations
-            receiverSocket.chatFeatures.activeConversations.add(senderId);
-
-            // Send with acknowledgment
-            receiverSocket.emit('message:received', message, (ack) => {
-              if (ack && ack.received) {
-                // Update sender with delivery confirmation
-                socket.emit('message:delivered', {
-                  messageId: message.id,
-                  tempId: tempMessageId,
-                  deliveredAt: new Date().toISOString()
-                });
-
-                // Update message in database
-                supabase
-                  .from('messages')
-                  .update({ delivered_at: new Date() })
-                  .eq('id', message.id);
-              }
-            });
-
-            // Update receiver's connection health
-            if (receiverSocket.connectionStability) {
-              receiverSocket.connectionStability.lastMessageTime = Date.now();
-              receiverSocket.connectionStability.messagesSinceReconnect++;
-              receiverSocket.connectionStability.connectionHealth = Math.min(100, 
-                receiverSocket.connectionStability.connectionHealth + 5);
-            }
+          if (error) {
+            console.error('Error creating message:', error);
+            const dbError = { message: 'Failed to send message', details: error.message };
+            socket.emit('error', dbError);
+            if (typeof callback === 'function') callback({ success: false, error: dbError });
+            return;
           }
-        }
 
-        // Remove from message queue after successful delivery
-        socket.chatFeatures.messageQueue.delete(tempMessageId);
+          console.log(`Message saved to DB: ${message.id} (temp: ${tempMessageId})`);
 
-        // Execute callback
-        if (typeof callback === 'function') {
-          callback({ 
-            success: true, 
-            message: { 
-              id: message.id,
-              tempId: tempMessageId,
-              deliveryStatus: isReceiverOnline ? 'delivered' : 'sent'
-            }
+          // Add sender info to the message object
+          message.sender = {
+            id: socket.user.id,
+            firstName: socket.user.first_name,
+            lastName: socket.user.last_name,
+            username: socket.user.username,
+            profilePictureUrl: socket.user.profile_picture_url
+          };
+
+          // Get the receiver's current online status
+          const isReceiverOnline = connectedUsers.has(receiverId);
+
+          // Emit to sender with delivery status
+          socket.emit('message:sent', {
+            ...message,
+            tempId: tempMessageId,
+            deliveryStatus: isReceiverOnline ? 'delivered' : 'sent',
+            timestamp: new Date().toISOString()
           });
+
+          // Update connection health
+          if (socket.connectionStability) {
+            socket.connectionStability.lastMessageTime = Date.now();
+            socket.connectionStability.messagesSinceReconnect++;
+            socket.connectionStability.connectionHealth = Math.min(100, 
+              socket.connectionStability.connectionHealth + 5);
+          }
+
+          // Emit to receiver if online
+          const receiverSocketId = connectedUsers.get(receiverId);
+          if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+              // Add to receiver's active conversations
+              receiverSocket.chatFeatures.activeConversations.add(senderId);
+
+              console.log(`Emitting message:received to ${receiverId}`);
+              
+              // Send with acknowledgment
+              receiverSocket.emit('message:received', message, (ack) => {
+                if (ack && ack.received) {
+                  // Update sender with delivery confirmation
+                  socket.emit('message:delivered', {
+                    messageId: message.id,
+                    tempId: tempMessageId,
+                    deliveredAt: new Date().toISOString()
+                  });
+
+                  // Update the message as delivered in the database
+                  supabase
+                    .from('messages')
+                    .update({ delivered_at: new Date() })
+                    .eq('id', message.id)
+                    .then(({ error }) => {
+                      if (error) console.error('Error updating delivered_at:', error);
+                    });
+                }
+              });
+
+              // Update receiver's connection health
+              if (receiverSocket.connectionStability) {
+                receiverSocket.connectionStability.lastMessageTime = Date.now();
+                receiverSocket.connectionStability.messagesSinceReconnect++;
+                receiverSocket.connectionStability.connectionHealth = Math.min(100, 
+                  receiverSocket.connectionStability.connectionHealth + 5);
+              }
+            }
+          } else {
+            console.log(`Receiver ${receiverId} not online, message stored in DB only`);
+          }
+        } catch (dbError) {
+          // Clear the timeout
+          clearTimeout(dbTimeout);
+          console.error('Database operation error:', dbError);
+          throw dbError; // Re-throw to be caught by outer try/catch
         }
       } catch (error) {
         console.error('Message send error:', error);

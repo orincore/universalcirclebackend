@@ -143,4 +143,3 @@
     - Confirms match message reaction
     - Payload: `{ messageId, matchId, reaction, timestamp }`
 
-This comprehensive overview should cover all the message-related functionalities in your backend. The system supports both individual conversations and match-based group chats, with rich features like message editing, deletion, reactions, and replies.

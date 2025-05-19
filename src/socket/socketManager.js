@@ -200,35 +200,22 @@ const initializeSocket = (io) => {
   ioInstance = io;
   
   // Configure Socket.IO for better performance and reliability with optimal settings
-  // More frequent pings help maintain connection but not too frequent to overload
-  io.engine.pingTimeout = 30000; // 30 seconds (reduced from 60s)
-  io.engine.pingInterval = 15000; // 15 seconds (reduced from 25s)
-  
-  // Increase max HTTP buffer size to handle larger payloads
+  io.engine.pingTimeout = 60000; // Increased to 60 seconds
+  io.engine.pingInterval = 25000; // Increased to 25 seconds
   io.engine.maxHttpBufferSize = 1e6; // 1 MB
   
   // Add connection tracking and limiting per IP
   const connectionsByIP = new Map();
-  const MAX_CONNECTIONS_PER_IP = 15; // Increased from 10
-  const connectionTimes = new Map(); // Track connection times for debugging
+  const MAX_CONNECTIONS_PER_IP = 15;
+  const connectionTimes = new Map();
   
-  // Enable socket.io debugging in development environments
-  if (process.env.NODE_ENV === 'development') {
-    io.engine.on('connection_error', (err) => {
-      error(`Socket.IO connection error: ${err.code} - ${err.message}`);
-    });
-  }
-  
-  // IMPROVED: Heartbeat mechanism for more reliable connections
-  // This prevents sockets from becoming "zombie" connections
-  // and ensures typing indicators and messages stay live
+  // Enhanced heartbeat mechanism for more reliable connections
   const heartbeatInterval = setInterval(() => {
     const now = Date.now();
-    // Check each connected socket more frequently (every 15 seconds)
     io.sockets.sockets.forEach((socket) => {
       if (socket.user && socket.user.id) {
-        // Send a heartbeat packet with timestamp
         try {
+          // Send heartbeat packet with timestamp
           socket.emit('heartbeat', { time: now });
           
           // Track heartbeat response
@@ -237,6 +224,11 @@ const initializeSocket = (io) => {
             socket.emit('ping', { time: now }, (response) => {
               if (response) {
                 socket.lastHeartbeat = now;
+                // Update connection health
+                if (socket.connectionStability) {
+                  socket.connectionStability.connectionHealth = Math.min(100, 
+                    socket.connectionStability.connectionHealth + 10);
+                }
               }
             });
           }
@@ -247,13 +239,12 @@ const initializeSocket = (io) => {
             socket.lastStatusUpdate = now;
           }
         } catch (err) {
-          // If emitting fails, the socket might be dead
           error(`Failed to send heartbeat to ${socket.user.id}: ${err.message}`);
           try {
-            // Don't disconnect immediately, try reconnection strategy
+            // Try reconnection strategy instead of immediate disconnect
             socket.emit('reconnect');
           } catch (e) {
-            // If reconnection attempt fails, disconnect
+            // Only disconnect if reconnection attempt fails
             try {
               socket.disconnect(true);
             } catch (disconnectErr) {
@@ -404,7 +395,8 @@ const initializeSocket = (io) => {
       messagesSinceReconnect: 0,
       lastPingResponse: Date.now(),
       connectionHealth: 100, // 0-100 scale
-      missedPings: 0
+      missedPings: 0,
+      lastActivityTime: Date.now()
     };
     
     // Add connection stability monitoring
@@ -426,6 +418,8 @@ const initializeSocket = (io) => {
               if (response) {
                 socket.connectionStability.lastPingResponse = now;
                 socket.connectionStability.missedPings = 0;
+                socket.connectionStability.connectionHealth = Math.min(100, 
+                  socket.connectionStability.connectionHealth + 10);
               }
             });
             
@@ -467,10 +461,6 @@ const initializeSocket = (io) => {
                   }, 1000);
                 }
               }
-            } else {
-              // Connection responded to ping, improve health
-              socket.connectionStability.connectionHealth = Math.min(100, 
-                socket.connectionStability.connectionHealth + 10);
             }
           }
         }
@@ -543,8 +533,8 @@ const initializeSocket = (io) => {
       // Re-establish connection information
       connectedUsers.set(socket.user.id, socket.id);
       updateUserOnlineStatus(socket.user.id, true);
+      
       // Re-initialize active conversations
-      // This helps ensure typing indicators work correctly after reconnection
       if (socket.activeConversations && socket.activeConversations.size > 0) {
         socket.activeConversations.forEach(userId => {
           socket.emit('conversation:active', { userId });

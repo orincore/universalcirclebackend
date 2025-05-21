@@ -71,10 +71,10 @@ const getUserProfile = async (req, res) => {
       });
     }
 
-    // Fetch user data
+    // Fetch complete user data
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, first_name, last_name, username, profile_picture_url, interests, preference, gender')
+      .select('*')
       .eq('id', userId)
       .single();
 
@@ -83,6 +83,20 @@ const getUserProfile = async (req, res) => {
         success: false,
         message: 'User not found'
       });
+    }
+
+    // Remove sensitive information
+    delete user.password;
+    delete user.reset_token;
+    
+    // Generate signed URL for voice bio if it exists
+    if (user.voice_bio_url) {
+      try {
+        const { generateSignedUrl } = require('../services/fileService');
+        user.voice_bio_url = await generateSignedUrl(user.voice_bio_url);
+      } catch (err) {
+        console.error('Error generating signed URL for voice bio:', err);
+      }
     }
 
     return res.status(200).json({

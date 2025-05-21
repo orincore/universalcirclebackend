@@ -385,8 +385,21 @@ const initializeSocket = (io) => {
     // Add user to connected users map
     connectedUsers.set(socket.user.id, socket.id);
     
-    // Update user's online status in database
+    // Update user's online status in database immediately
     updateUserOnlineStatus(socket.user.id, true);
+    
+    // Cancel any pending disconnection timeout for this user
+    if (global.disconnectTimeouts && global.disconnectTimeouts.has(socket.user.id)) {
+      clearTimeout(global.disconnectTimeouts.get(socket.user.id));
+      global.disconnectTimeouts.delete(socket.user.id);
+    }
+    
+    // Notify other users that this user is online
+    socket.broadcast.emit('user:status', {
+      userId: socket.user.id,
+      online: true,
+      lastSeen: new Date().toISOString()
+    });
     
     // Initialize socket's active conversations
     socket.activeConversations = new Set();
@@ -542,6 +555,19 @@ const initializeSocket = (io) => {
       connectedUsers.set(socket.user.id, socket.id);
       updateUserOnlineStatus(socket.user.id, true);
       
+      // Cancel any pending disconnection timeout for this user
+      if (global.disconnectTimeouts && global.disconnectTimeouts.has(socket.user.id)) {
+        clearTimeout(global.disconnectTimeouts.get(socket.user.id));
+        global.disconnectTimeouts.delete(socket.user.id);
+      }
+      
+      // Notify other users that this user is online
+      socket.broadcast.emit('user:status', {
+        userId: socket.user.id,
+        online: true,
+        lastSeen: new Date().toISOString()
+      });
+      
       // Re-initialize active conversations
       if (socket.activeConversations && socket.activeConversations.size > 0) {
         socket.activeConversations.forEach(userId => {
@@ -673,15 +699,15 @@ const initializeSocket = (io) => {
         
         // Create message in database
         try {
-          const { data: message, error } = await supabase
-            .from('messages')
-            .insert({
-              sender_id: senderId,
-              receiver_id: receiverId,
-              content,
-              media_url: mediaUrl || null,
-              is_read: false,
-              created_at: new Date(),
+        const { data: message, error } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content,
+            media_url: mediaUrl || null,
+            is_read: false,
+            created_at: new Date(),
               updated_at: new Date(),
               sequence: currentSequence // Store sequence for ordering
           })
@@ -693,7 +719,7 @@ const initializeSocket = (io) => {
           
           // Remove from pending messages
           socket.pendingMessages.delete(tempMessageId);
-          
+        
         if (error) {
           console.error('Error creating message:', error);
             const dbError = { message: 'Failed to send message', details: error.message };
@@ -1978,7 +2004,7 @@ const initializeSocket = (io) => {
           );
           
           if (!isUserStillConnected) {
-      // Update user's online status in database
+            // Update user's online status in database
             await updateUserOnlineStatus(socket.user.id, false);
             
             // Notify other users of offline status
@@ -1988,6 +2014,9 @@ const initializeSocket = (io) => {
               lastSeen: new Date().toISOString()
             });
             
+            // Log status change for monitoring
+            info(`User ${socket.user.id} (${socket.user.username}) marked as offline after disconnect`);
+            
             // Remove from connected users map
             if (connectedUsers.get(socket.user.id) === socket.id) {
               connectedUsers.delete(socket.user.id);
@@ -1995,6 +2024,9 @@ const initializeSocket = (io) => {
             
             // Clean up any active matches and conversations
             cleanupUserMatches(socket.user.id);
+          } else {
+            // User reconnected with a different socket
+            info(`User ${socket.user.id} (${socket.user.username}) reconnected with a different socket, staying online`);
           }
         }, 5000); // Wait 5 seconds before marking as offline
         
@@ -2046,7 +2078,7 @@ const initializeSocket = (io) => {
         });
       }
     });
-
+    
     socket.on('notification:readAll', async () => {
       try {
         const userId = socket.user.id;
@@ -2111,7 +2143,7 @@ const initializeSocket = (io) => {
         });
       }
     });
-
+    
     socket.on('notification:getCount', async () => {
       try {
         const userId = socket.user.id;
@@ -2164,11 +2196,11 @@ const initializeSocket = (io) => {
         });
       }
     });
-
+    
     // Get user's active streaks
     socket.on('streak:getAll', async () => {
       try {
-        const userId = socket.user.id;
+      const userId = socket.user.id;
         const { getUserActiveStreaks } = require('../services/achievement/streakService');
         
         const streaks = await getUserActiveStreaks(userId);
@@ -2302,15 +2334,24 @@ const initializeSocket = (io) => {
  */
 const updateUserOnlineStatus = async (userId, online) => {
   try {
+    const now = new Date();
+    
+    // Only update last_active timestamp if user is going online or was previously online
+    const updateData = online 
+      ? { is_online: true, last_active: now } 
+      : { is_online: false, last_active: now };
+    
+    info(`Updating user ${userId} status: ${online ? 'ONLINE' : 'OFFLINE'}`);
+    
     await supabase
       .from('users')
-      .update({
-        is_online: online,
-        last_active: new Date()
-      })
+      .update(updateData)
       .eq('id', userId);
-  } catch (error) {
-    console.error('Error updating online status:', error);
+      
+    return true;
+  } catch (err) {
+    error(`Failed to update online status for user ${userId}: ${err.message}`);
+    return false;
   }
 };
 

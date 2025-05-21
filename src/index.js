@@ -28,6 +28,11 @@ const { startHealthMonitoring } = require('./services/healthMonitor');
 // Import and run database migrations
 const { runMigrations } = require('./database/runMigrations');
 
+// Import scheduled notifications
+const { initializeScheduledNotifications } = require('./services/notification/scheduledNotifications');
+const { initializeStreakNotifications } = require('./services/notification/streakNotifications');
+const { initializeWheelNotifications } = require('./services/notification/wheelNotifications');
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const interestRoutes = require('./routes/interestRoutes');
@@ -46,6 +51,13 @@ const reportRoutes = require('./routes/reportRoutes');
 const adminReportRoutes = require('./routes/adminReportRoutes');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const achievementRoutes = require('./routes/achievementRoutes');
+const verificationRoutes = require('./routes/verificationRoutes');
+const adminVerificationRoutes = require('./routes/adminVerificationRoutes');
+const streakRoutes = require('./routes/streakRoutes');
+const wheelRoutes = require('./routes/wheelRoutes');
+const gameRoutes = require('./routes/gameRoutes');
 
 // Initialize Express app
 const app = express();
@@ -78,6 +90,15 @@ app.set('io', io);
 
 // Initialize socket manager
 initializeSocket(io);
+
+// Initialize scheduled notifications
+initializeScheduledNotifications();
+
+// Initialize streak notifications
+initializeStreakNotifications();
+
+// Initialize wheel notifications
+initializeWheelNotifications();
 
 // Apply global middleware
 app.use(cors());
@@ -144,6 +165,13 @@ app.use('/api/admin/reports', adminReportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/achievements', achievementRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/admin/verification', adminVerificationRoutes);
+app.use('/api/streaks', streakRoutes);
+app.use('/api/wheel', wheelRoutes);
+app.use('/api/games', gameRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

@@ -1,145 +1,281 @@
+## Circle App - Advanced Feature Details
 
-## REST API Endpoints for Circle
+### 1. AI-Powered Features
 
-### Message Endpoints (`/api/messages`)
-1. **Send Message** - `POST /api/messages`
-   - Sends a new message to another user
-   - Requires authentication
+**1.1 AI Matchmaking**
+Leverage user behavior, profile data, chat tone, and interaction patterns to recommend better matches. Integrate ML models with Supabase triggers or Node.js services.
 
-2. **Get Conversation** - `GET /api/messages/conversation/:userId`
-   - Retrieves messages between current user and specified user
-   - Requires authentication
+**1.2 AI Chat Copilot**
+Suggest message replies or icebreakers based on ongoing conversation. Uses GPT-style models to assist users in engaging naturally.
 
-3. **Get All Conversations** - `GET /api/messages/conversations`
-   - Retrieves all conversations for the current user
-   - Requires authentication
+**1.3 Auto-Generated Profiles**
+When a new user signs up, generate a catchy bio and profile using inputs like interests, mood, or photos. Prompt users to edit or approve.
 
-4. **Get Media Upload URL** - `POST /api/messages/media-upload-url`
-   - Gets a pre-signed URL for uploading message media
-   - Requires authentication
+**1.4 AI Mood Detection**
+Detect emotional tone from profile photos or recent chats using emotion AI APIs. Reflect mood in UI (e.g., calm, excited, lonely).
 
-5. **Delete Conversation** - `DELETE /api/messages/conversation/:userId`
-   - Deletes entire conversation with specified user
-   - Requires authentication
+---
 
-### User Message Endpoints (`/api/user-messages`)
-1. **Delete Own Message** - `DELETE /api/user-messages/:messageId`
-   - Allows a user to delete their own message
-   - Requires authentication
+### 2. Gamification & Engagement
 
-### Admin Message Endpoints (`/api/admin/messages`)
-1. **Get Reported Messages** - `GET /api/admin/messages/reports/:reportId/messages`
-   - Retrieves reported messages for a specific report
-   - Requires admin authentication
+**2.1 Daily Match Wheel**
+Let users spin a wheel daily to get match suggestions or mini rewards (e.g., Super Like, profile boost).
 
-2. **Delete Message (Admin)** - `DELETE /api/admin/messages/:messageId`
-   - Allows admin to delete any message
-   - Requires admin authentication
+**2.2 Achievements & Badges**
+Give users badges for milestones: first match, 100 messages, daily streaks, etc. Display them on profiles.
 
-3. **Delete Conversation (Admin)** - Related to admin functions for deleting conversations
-   - Requires admin authentication
+**2.3 Streak System**
+Reward users for chatting consistently with matches (e.g., 3-day chat streak = bonus emoji reactions).
 
-## Socket Events
+**2.4 Mini-Games in Chat**
+Add icebreaker games like emoji guessing, truth/dare cards, or trivia quizzes that can be played inside the chat.
 
-### Client-to-Server Events (Emitted by Client)
+---
 
-1. **`message:send`**
-   - Sends a real-time message to another user
-   - Payload: `{ receiverId, content, mediaUrl? }`
-   - Can include optional callback for delivery confirmation
+### 3. Live & Event Features
 
-2. **`message:markAllRead`**
-   - Marks all messages from a specific user as read
-   - Payload: `{ senderId }`
+**3.1 Live Audio Rooms**
+Let users join themed audio discussions (e.g., music talk, dating advice) like Clubhouse or Twitter Spaces.
 
-3. **`message:edit`**
-   - Edits an existing message
-   - Payload: `{ messageId, content }`
+**3.2 Speed Matching Events**
+Host live speed dating events. Users are matched randomly for 1-2 minutes in video/audio/text and can then decide to connect or skip.
 
-4. **`message:delete`**
-   - Deletes a message
-   - Payload: `{ messageId, forEveryone }`
-   - `forEveryone`: boolean, true to delete for all users
+**3.3 Watch Party Mode**
+Users match and watch YouTube or Netflix together in sync, with live reactions/chat.
 
-5. **`message:react`**
-   - Adds a reaction to a message
-   - Payload: `{ messageId, reaction }`
+---
 
-6. **`match:message`**
-   - Sends a message in a match room
-   - Payload: `{ matchId, message }`
+### 4. Personalization
 
-7. **`match:editMessage`**
-   - Edits a message in a match room
-   - Payload: `{ matchId, messageId, content }`
+**4.1 Custom App Themes**
+Let users customize UI colors or themes (e.g., dark, pastel, neon). Save preferences in Supabase.
 
-8. **`match:deleteMessage`**
-   - Deletes a message in a match room
-   - Payload: `{ matchId, messageId }`
+**4.2 Sound/Vibe Profiles**
+Let users choose audio themes for app interactions: calm, energetic, romantic. Add subtle sound effects during navigation.
 
-9. **`match:reactToMessage`**
-   - Adds a reaction to a message in a match room
-   - Payload: `{ matchId, messageId, reaction }`
+**4.3 Animated Vibe Intro**
+Users can create a quick animated intro showing their "vibe" (fun, nerdy, chill). It plays when someone views their profile.
 
-10. **`match:replyToMessage`**
-    - Replies to a message in a match room
-    - Payload: `{ matchId, replyToMessageId, replyToContent, message }`
+---
 
-### Server-to-Client Events (Received by Client)
+### 5. Growth & Community
 
-1. **`message:received`**
-   - Notifies when a new message is received
-   - Payload: message object with details
+**5.1 Referral Leaderboard**
+Track and rank users based on successful invites. Offer rewards or badges.
 
-2. **`message:delivered`**
-   - Confirms message delivery
-   - Payload: `{ messageId, deliveredAt }`
+**5.2 Verified Profiles**
+Add a badge for verified users. Verification via email, selfie photo, or linked social accounts (Instagram/Twitter).
 
-3. **`message:edited`**
-   - Notifies when a message has been edited
-   - Payload: `{ messageId, conversationId, content, updatedAt }`
+**5.3 Community Clubs**
+Allow users to join interest-based clubs (e.g., gaming, anime, photography) with feeds, events, and match filters inside clubs.
 
-4. **`message:editConfirmed`**
-   - Confirms message edit
-   - Payload: `{ messageId, conversationId, content, updatedAt }`
+---
 
-5. **`message:deleted`**
-   - Notifies when a message has been deleted
-   - Payload: `{ messageId, conversationId, deletedBy, deletedForEveryone }`
+### 6. Backend & Admin Enhancements
 
-6. **`message:deleteConfirmed`**
-   - Confirms message deletion
-   - Payload: `{ messageId, conversationId, deletedForEveryone }`
+**6.1 Modular Plugin System**
+Structure the backend so features like stories, feed, live events can be toggled on/off per deployment. Use modular services in Node.js.
 
-7. **`match:message`**
-   - Receives message in a match room
-   - Payload: message object with details
+**6.2 User Activity Logging**
+Track metrics like time spent, chats initiated, matches accepted. Store logs in Supabase or stream to BigQuery for analytics.
 
-8. **`match:messageSent`**
-   - Confirms match message was sent
-   - Payload: `{ messageId, matchId, message, timestamp, deliveryStatus, recipientCount }`
+**6.3 Admin Dashboard**
+Create a secure admin panel using React or Supabase Studio to manage users, flag content, and see usage stats.
 
-9. **`match:messageEdited`**
-   - Notifies when a match message has been edited
-   - Payload: `{ messageId, senderId, senderName, content, editedAt }`
+**6.4 Smart Notification Engine**
+Trigger messages like "You haven’t talked to X in 2 days" or "Your match streak is almost over" using scheduled Supabase Edge functions or cron jobs.
 
-10. **`match:messageEditConfirmed`**
-    - Confirms match message edit
-    - Payload: `{ messageId, matchId, content, editedAt }`
+---
 
-11. **`match:messageDeleted`**
-    - Notifies when a match message has been deleted
-    - Payload: `{ messageId, deletedBy, deletedAt }`
+### 7. Additional Crazy and Unique Features
 
-12. **`match:messageDeleteConfirmed`**
-    - Confirms match message deletion
-    - Payload: `{ messageId, matchId, deletedAt }`
+**7.1 AI-Powered Profile Review**
+Automatically rate or suggest improvements to user profiles using AI.
 
-13. **`match:messageReaction`**
-    - Notifies when someone reacts to a match message
-    - Payload: `{ messageId, userId, reaction, timestamp }`
+**7.2 Dynamic Avatars**
+Generate cartoon avatars or stickers from profile pictures.
 
-14. **`match:reactionConfirmed`**
-    - Confirms match message reaction
-    - Payload: `{ messageId, matchId, reaction, timestamp }`
+**7.3 Emoji Reactions with Animations**
+React to messages or profiles with animated emoji bursts.
 
+**7.4 Voice Bio**
+Users can record a short voice introduction in addition to text bio.
+
+**7.5 Time Capsule Messages**
+Users can send messages to be unlocked by a match after a certain time (e.g., 7 days of chatting).
+
+**7.6 Icebreaker Cards Deck**
+Users can draw virtual cards with fun questions to kickstart conversations.
+
+**7.7 Spotify Integration**
+Share currently playing track in profile or chats.
+
+**7.8 Instagram Highlight Import**
+Pull selected Instagram highlights into profile gallery.
+
+**7.9 Real-time Vibe Matching**
+Match users based on current mood/music/activity.
+
+**7.10 In-app Event Calendar**
+Display upcoming social or community events for users to join.
+
+---
+
+### 8. Core Backend Features
+
+**8.1 Authentication & User Management**
+
+* User registration with validation
+* User login with JWT token generation
+* Profile management (update, view)
+* Admin authentication and management
+* Password hashing and security
+* Token-based authentication middleware
+
+**8.2 Real-time Messaging System**
+
+* Socket.IO-based real-time communication
+* Private messaging between users
+* Message delivery status tracking
+* Read receipts
+* Message sequencing and ordering
+* Connection stability monitoring
+* Automatic message recovery
+* Typing indicators
+* Media message support
+* Message reactions
+
+**8.3 Matchmaking System**
+
+* AI-powered matching algorithm
+* Interest-based matching
+* Preference-based matching (Dating/Friendship)
+* Real-time match notifications
+* Match acceptance/rejection handling
+* Match timeout management
+* Match pool management
+* Automatic match cleanup
+
+**8.4 Profile Management**
+
+* Profile picture upload and management
+* User interests management
+* Location-based features
+* Bio and personal information
+* Preference settings
+* Profile visibility controls
+
+**8.5 User Search & Discovery**
+
+* User search functionality
+* Profile viewing
+* Interest-based discovery
+* Location-based discovery
+
+**8.6 Connection Management**
+
+* Real-time connection status
+* Automatic reconnection handling
+* Connection health monitoring
+* Heartbeat mechanism
+* Connection stability metrics
+* Rate limiting per IP
+
+**8.7 Admin Features**
+
+* User management
+* Content moderation
+* System settings management
+* Analytics and reporting
+* Matchmaking statistics
+* Server health monitoring
+* User ban/suspend functionality
+
+**8.8 Media Handling**
+
+* Profile picture upload
+* Message media upload
+* AWS S3 integration
+* Media URL generation
+* Media file management
+
+**8.9 Security Features**
+
+* JWT authentication
+* Password hashing
+* Rate limiting
+* Input validation
+* Error handling
+* Admin access control
+
+**8.10 Database Integration**
+
+* Supabase integration
+* Real-time database updates
+* Data persistence
+* Message history
+* User data management
+
+**8.11 Error Handling & Logging**
+
+* Comprehensive error handling
+* Logging system
+* Error reporting
+* Debug information
+
+**8.12 API Endpoints**
+
+* RESTful API design
+* WebSocket endpoints
+* Admin API endpoints
+* Health check endpoints
+* Analytics endpoints
+
+**8.13 System Monitoring**
+
+* Health monitoring
+* Performance tracking
+* Connection monitoring
+* Error tracking
+* Usage statistics
+
+**8.14 Matchmaking Features**
+
+* Real-time matchmaking
+* Match acceptance flow
+* Match timeout handling
+* Match pool management
+* Match cleanup
+
+**8.15 User Experience Features**
+
+* Typing indicators
+* Online/offline status
+* Message delivery status
+* Read receipts
+* Connection status updates
+
+**8.16 Data Validation**
+
+* Input validation
+* Schema validation
+* Data sanitization
+* Type checking
+
+**8.17 Performance Optimizations**
+
+* Connection pooling
+* Rate limiting
+* Caching
+* Batch processing
+* Optimized queries
+
+**8.18 Scalability Features**
+
+* Load balancing support
+* Connection management
+* Resource optimization
+* Batch processing
+* Queue management
+
+Would you like a visual roadmap, timeline, or implementation plan for these features?

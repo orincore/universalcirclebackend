@@ -28,6 +28,14 @@ const POOL_CLEANUP_INTERVAL = 30000; // Clean the pool every 30 seconds
 let matchmakingIntervalId = null;
 let poolCleanupIntervalId = null;
 
+// Import AI services
+const {
+  generateMessageSuggestions,
+  generateProfileBio,
+  generateIcebreakers,
+  detectConversationMood
+} = require('../services/ai/aiCopilotService');
+
 /**
  * Clean up the matchmaking pool by removing disconnected users
  */
@@ -676,36 +684,36 @@ const initializeSocket = (io) => {
               created_at: new Date(),
               updated_at: new Date(),
               sequence: currentSequence // Store sequence for ordering
-            })
-            .select()
-            .single();
-          
+          })
+          .select()
+          .single();
+        
           // Clear the timeout since we got a response
           clearTimeout(dbTimeout);
           
           // Remove from pending messages
           socket.pendingMessages.delete(tempMessageId);
           
-          if (error) {
-            console.error('Error creating message:', error);
+        if (error) {
+          console.error('Error creating message:', error);
             const dbError = { message: 'Failed to send message', details: error.message };
             socket.emit('error', dbError);
             if (typeof callback === 'function') callback({ success: false, error: dbError });
-            return;
-          }
-          
-          // Add sender info to the message object
-          message.sender = {
-            id: socket.user.id,
+          return;
+        }
+        
+        // Add sender info to the message object
+        message.sender = {
+          id: socket.user.id,
             username: socket.user.username,
-            firstName: socket.user.first_name,
-            lastName: socket.user.last_name,
-            profilePictureUrl: socket.user.profile_picture_url
-          };
-          
+          firstName: socket.user.first_name,
+          lastName: socket.user.last_name,
+          profilePictureUrl: socket.user.profile_picture_url
+        };
+        
           // Forward the message to the recipient if they are online
-          const receiverSocketId = connectedUsers.get(receiverId);
-          if (receiverSocketId) {
+        const receiverSocketId = connectedUsers.get(receiverId);
+        if (receiverSocketId) {
             const receiverSocket = io.sockets.sockets.get(receiverSocketId);
             if (receiverSocket) {
               // Add to receiver's active conversations
@@ -760,6 +768,40 @@ const initializeSocket = (io) => {
             socket.connectionStability.messagesSinceReconnect++;
             socket.connectionStability.connectionHealth = Math.min(100, 
               socket.connectionStability.connectionHealth + 5);
+          }
+          
+          // Process conversation streak
+          try {
+            const { processConversationStreak } = require('../services/achievement/streakService');
+            const { checkMessageAchievements } = require('../services/achievement/achievementService');
+            
+            // Track streak for this conversation
+            const streakInfo = await processConversationStreak(senderId, receiverId);
+            if (streakInfo) {
+              // Add streak info to message delivery data for both users
+              if (receiverSocketId) {
+                const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+                if (receiverSocket) {
+                  receiverSocket.emit('conversation:streak', {
+                    conversationId: streakInfo.conversation_id,
+                    streakDays: streakInfo.streak_days,
+                    expiresAt: streakInfo.expires_at
+                  });
+                }
+              }
+              
+              socket.emit('conversation:streak', {
+                conversationId: streakInfo.conversation_id,
+                streakDays: streakInfo.streak_days,
+                expiresAt: streakInfo.expires_at
+              });
+            }
+            
+            // Check for message achievements
+            await checkMessageAchievements(senderId);
+          } catch (achievementError) {
+            console.error('Error processing achievements:', achievementError);
+            // Non-blocking, don't fail the message send operation
           }
         } catch (dbError) {
           // Clear the timeout
@@ -1586,11 +1628,11 @@ const initializeSocket = (io) => {
               // Store last typing time to prevent flooding
               const now = Date.now();
               if (!socket.lastTypingEmit || now - socket.lastTypingEmit > 1000) {
-                io.to(receiverSocketId).emit('typing:start', {
-                  userId,
+            io.to(receiverSocketId).emit('typing:start', {
+              userId,
                   username: socket.user.username,
-                  timestamp: new Date().toISOString()
-                });
+              timestamp: new Date().toISOString()
+            });
                 socket.lastTypingEmit = now;
               }
               
@@ -1621,12 +1663,12 @@ const initializeSocket = (io) => {
           // Store last typing time to prevent flooding
           const now = Date.now();
           if (!socket.lastMatchTypingEmit || now - socket.lastMatchTypingEmit > 1000) {
-            socket.to(matchId).emit('match:typing', {
-              userId,
-              username: socket.user.username,
-              isTyping: true,
-              timestamp: new Date().toISOString()
-            });
+          socket.to(matchId).emit('match:typing', {
+            userId,
+            username: socket.user.username,
+            isTyping: true,
+            timestamp: new Date().toISOString()
+          });
             socket.lastMatchTypingEmit = now;
           }
           
@@ -1936,7 +1978,7 @@ const initializeSocket = (io) => {
           );
           
           if (!isUserStillConnected) {
-            // Update user's online status in database
+      // Update user's online status in database
             await updateUserOnlineStatus(socket.user.id, false);
             
             // Notify other users of offline status
@@ -1965,7 +2007,292 @@ const initializeSocket = (io) => {
         console.error('Error handling disconnect:', error);
       }
     });
+
+    // After the connection handler initialization, add these event handlers
+
+    // Handle notification events
+    socket.on('notification:read', async (data) => {
+      try {
+        const { notificationId } = data;
+        const userId = socket.user.id;
+        
+        if (!notificationId) {
+          socket.emit('error', {
+            source: 'notification:read',
+            message: 'Notification ID is required'
+          });
+          return;
+        }
+        
+        const { markNotificationRead } = require('../services/notification/notificationService');
+        const success = await markNotificationRead(notificationId, userId);
+        
+        if (!success) {
+          socket.emit('error', {
+            source: 'notification:read',
+            message: 'Notification not found or could not be updated'
+          });
+          return;
+        }
+        
+        socket.emit('notification:readConfirmed', {
+          notificationId
+        });
+      } catch (err) {
+        console.error('Error marking notification as read:', err);
+        socket.emit('error', {
+          source: 'notification:read',
+          message: 'Server error while updating notification'
+        });
+      }
+    });
+
+    socket.on('notification:readAll', async () => {
+      try {
+        const userId = socket.user.id;
+        
+        const { error: updateError } = await supabase
+          .from('notifications')
+          .update({ 
+            is_read: true,
+            read_at: new Date()
+          })
+          .eq('user_id', userId)
+          .eq('is_read', false);
+        
+        if (updateError) {
+          console.error('Error marking all notifications as read:', updateError);
+          socket.emit('error', {
+            source: 'notification:readAll',
+            message: 'Server error while updating notifications'
+          });
+          return;
+        }
+        
+        socket.emit('notification:allRead', {
+          success: true
+        });
+      } catch (err) {
+        console.error('Error marking all notifications as read:', err);
+        socket.emit('error', {
+          source: 'notification:readAll',
+          message: 'Server error while updating notifications'
+        });
+      }
+    });
+
+    socket.on('notification:getAll', async (data = {}) => {
+      try {
+        const userId = socket.user.id;
+        const limit = parseInt(data.limit) || 20;
+        const offset = parseInt(data.offset) || 0;
+        const unreadOnly = data.unreadOnly === true;
+        
+        const { getUserNotifications } = require('../services/notification/notificationService');
+        const notifications = await getUserNotifications(userId, {
+          limit, 
+          offset,
+          unreadOnly
+        });
+        
+        socket.emit('notification:list', {
+          notifications,
+          pagination: {
+            limit,
+            offset,
+            hasMore: notifications.length === limit
+          }
+        });
+      } catch (err) {
+        console.error('Error fetching notifications:', err);
+        socket.emit('error', {
+          source: 'notification:getAll',
+          message: 'Server error while fetching notifications'
+        });
+      }
+    });
+
+    socket.on('notification:getCount', async () => {
+      try {
+        const userId = socket.user.id;
+        
+        const { count, error: countError } = await supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('is_read', false);
+        
+        if (countError) {
+          console.error('Error counting unread notifications:', countError);
+          socket.emit('error', {
+            source: 'notification:getCount',
+            message: 'Server error while counting notifications'
+          });
+          return;
+        }
+        
+        socket.emit('notification:count', { count });
+      } catch (err) {
+        console.error('Error counting notifications:', err);
+        socket.emit('error', {
+          source: 'notification:getCount',
+          message: 'Server error while counting notifications'
+        });
+      }
+    });
+
+    // Add this to the socket.on connection handler section
+
+    // Provide achievement data
+    socket.on('achievement:get', async () => {
+      try {
+        const userId = socket.user.id;
+        const { getUserAchievements, getUserPoints } = require('../services/achievement/achievementService');
+        
+        const achievements = await getUserAchievements(userId);
+        const points = await getUserPoints(userId);
+        
+        socket.emit('achievement:data', {
+          achievements,
+          points
+        });
+      } catch (err) {
+        console.error('Error fetching achievements:', err);
+        socket.emit('error', {
+          source: 'achievement:get',
+          message: 'Error fetching achievement data'
+        });
+      }
+    });
+
+    // Get user's active streaks
+    socket.on('streak:getAll', async () => {
+      try {
+        const userId = socket.user.id;
+        const { getUserActiveStreaks } = require('../services/achievement/streakService');
+        
+        const streaks = await getUserActiveStreaks(userId);
+        
+        socket.emit('streak:data', {
+          streaks
+        });
+      } catch (err) {
+        console.error('Error fetching streaks:', err);
+        socket.emit('error', {
+          source: 'streak:getAll',
+          message: 'Error fetching streak data'
+        });
+      }
+    });
+
+    // In the connection handler, after all existing socket event handlers, add these new AI-powered event handlers
+
+    // Add these AI feature handlers at the end of the connection handler
+    
+    // AI message suggestions handler
+    socket.on('ai:messageSuggestions', async ({ conversationId }, callback) => {
+      try {
+        logger.info('Generating AI message suggestions', { userId: socket.user.id, conversationId });
+        
+        if (!conversationId) {
+          return callback({
+            success: false,
+            error: { message: 'Conversation ID is required' }
+          });
+        }
+        
+        const suggestions = await generateMessageSuggestions(conversationId);
+        
+        callback({
+          success: true,
+          suggestions
+        });
+      } catch (error) {
+        logger.error('Error generating message suggestions', { error, userId: socket.user.id, conversationId });
+        callback({
+          success: false,
+          error: { message: 'Failed to generate message suggestions' }
+        });
+      }
+    });
+    
+    // AI feature: Generate profile bio
+    socket.on('ai:generateBio', async (data, callback) => {
+      try {
+        logger.info('Generating AI profile bio', { userId: socket.user.id });
+        
+        const bio = await generateProfileBio(socket.user.id);
+        
+        callback({
+          success: true,
+          bio
+        });
+      } catch (error) {
+        logger.error('Error generating profile bio', { error, userId: socket.user.id });
+        callback({
+          success: false,
+          error: { message: 'Failed to generate profile bio' }
+        });
+      }
+    });
+    
+    // AI feature: Generate icebreakers
+    socket.on('ai:generateIcebreakers', async ({ matchId }, callback) => {
+      try {
+        logger.info('Generating AI icebreakers', { userId: socket.user.id, matchId });
+        
+        if (!matchId) {
+          return callback({
+            success: false,
+            error: { message: 'Match ID is required' }
+          });
+        }
+        
+        const icebreakers = await generateIcebreakers(matchId);
+        
+        callback({
+          success: true,
+          icebreakers
+        });
+      } catch (error) {
+        logger.error('Error generating icebreakers', { error, userId: socket.user.id, matchId });
+        callback({
+          success: false,
+          error: { message: 'Failed to generate icebreakers' }
+        });
+      }
+    });
+    
+    // AI feature: Detect conversation mood
+    socket.on('ai:detectMood', async ({ conversationId }, callback) => {
+      try {
+        logger.info('Detecting conversation mood', { userId: socket.user.id, conversationId });
+        
+        if (!conversationId) {
+          return callback({
+            success: false,
+            error: { message: 'Conversation ID is required' }
+          });
+        }
+        
+        const { mood, confidence } = await detectConversationMood(conversationId);
+        
+        callback({
+          success: true,
+          mood,
+          confidence
+        });
+      } catch (error) {
+        logger.error('Error detecting conversation mood', { error, userId: socket.user.id, conversationId });
+        callback({
+          success: false,
+          error: { message: 'Failed to detect conversation mood' }
+        });
+      }
+    });
   });
+
+  return io;
 };
 
 /**
@@ -2380,7 +2707,7 @@ const findMatchForUser = (socket) => {
         });
       }
     }
-
+    
     // Sort by score (highest first)
     potentialMatches.sort((a, b) => b.score - a.score);
     

@@ -2,6 +2,8 @@ const supabase = require('../config/database');
 const { messageCreateSchema, messageMediaSchema } = require('../models/message');
 const { generateUploadUrl } = require('../utils/awsS3');
 const { notifyConversationDeleted } = require('../socket/socketManager');
+const streakService = require('../services/streakService');
+const logger = require('../utils/logger');
 
 /**
  * Send a message to another user
@@ -58,6 +60,31 @@ const sendMessage = async (req, res) => {
         success: false,
         message: 'Failed to send message'
       });
+    }
+
+    // Update conversation streak
+    try {
+      const conversationId = message.conversation_id || `conv_${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`;
+      const streakResult = await streakService.updateConversationStreak(
+        conversationId,
+        senderId,
+        receiverId,
+        message.created_at
+      );
+      
+      // Include streak info in response
+      message.streak = {
+        currentStreak: streakResult.currentStreak,
+        isNewStreak: streakResult.isNewStreak,
+        isNewDay: streakResult.isNewDay
+      };
+      
+      if (streakResult.isNewStreak) {
+        logger.info(`Streak updated for conversation ${conversationId}: ${streakResult.currentStreak} days`);
+      }
+    } catch (streakError) {
+      logger.error(`Error updating streak: ${streakError.message}`);
+      // Don't fail the whole request if streak update fails
     }
 
     return res.status(201).json({

@@ -30,7 +30,7 @@ app.post("/github-webhook", (req, res) => {
 
   console.log("✅ GitHub push event received");
 
-  exec("cd ~/universalcirclebackend && git pull origin main && pm2 restart all", (err, stdout, stderr) => {
+  exec("cd ~/universalcirclebackend && git pull origin main && npm install && pm2 restart all", (err, stdout, stderr) => {
     if (err) {
       console.error("❌ Deployment failed:", stderr);
       return res.status(500).send("Deployment failed");

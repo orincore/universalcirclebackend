@@ -1,0 +1,16 @@
+{
+  "name": "mini-games-test-scripts",
+  "version": "1.0.0",
+  "description": "Test scripts for Mini-Games API",
+  "main": "test_games_api.js",
+  "scripts": {
+    "test": "node test_games_api.js",
+    "test:all-games": "node test_all_game_types.js",
+    "monitor": "node monitor_game_messages.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "socket.io-client": "^4.7.2"
+  }
+} 

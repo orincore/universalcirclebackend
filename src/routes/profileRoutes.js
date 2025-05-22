@@ -31,9 +31,9 @@ router.delete('/voice-bio', authenticate, deleteVoiceBio);
 router.get('/voice-bio/:userId', getVoiceBio);
 
 // Get pre-signed URL for profile picture upload
-router.get('/profile-picture-upload-url', getProfilePictureUploadUrl);
+router.get('/profile-picture-upload-url', authenticate, getProfilePictureUploadUrl);
 
 // Update profile picture after upload
-router.put('/profile-picture', updateProfilePicture);
+router.put('/profile-picture', authenticate, updateProfilePicture);
 
 module.exports = router; 

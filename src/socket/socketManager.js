@@ -204,7 +204,7 @@ const clearMatchmakingTimeouts = (userId) => {
  * @param {object} io - Socket.IO server instance
  */
 const initializeSocket = (io) => {
-  // Store reference to io instance
+  // Store io instance for global access
   ioInstance = io;
   
   // Configure Socket.IO for better performance and reliability with optimal settings
@@ -3054,7 +3054,12 @@ module.exports = {
   initializeSocket,
   notifyMessageDeletion,
   notifyBulkMessageDeletion,
-  notifyConversationDeleted
+  notifyConversationDeleted,
+  connectedUsers,
+  activeMatches,
+  ioInstance,
+  createMatchInDatabase,
+  updateUserOnlineStatus
 };
 
 /**

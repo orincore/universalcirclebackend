@@ -1,0 +1,20 @@
+{"timestamp":"2025-05-22T13:06:33.656Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-22T13:06:35.115Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-22T13:06:35.115Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-22T13:06:35.115Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-22T13:06:35.204Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-22T13:06:35.208Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-22T13:06:35.213Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-22T13:06:35.214Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-22T13:06:35.242Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-22T13:06:35.257Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-22T13:06:35.268Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-22T13:06:35.269Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-22T13:06:35.269Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-22T13:06:35.395Z","level":"error","message":"(node:29294) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-22T13:06:35.440Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-22T13:06:36.083Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-22T13:06:36.085Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-22T13:06:36.085Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-22T13:06:36.085Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-22T13:06:37.225Z","level":"info","message":"Health check recorded successfully","cpuUsage":77,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":4.16964125},"databaseStatus":"healthy"}

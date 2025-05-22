@@ -480,7 +480,7 @@ const respondToMatch = async (req, res) => {
     console.log(`User ${userId} responded to match ${matchId}: ${accepted ? 'accepted' : 'declined'}`);
     
     // First check activeMatches from Socket.IO (for new matches)
-    const { activeMatches, createMatchInDatabase } = require('../socket/socketManager');
+    const { activeMatches, connectedUsers, createMatchInDatabase, ioInstance } = require('../socket/socketManager');
     
     if (activeMatches && activeMatches.has(matchId)) {
       const matchData = activeMatches.get(matchId);
@@ -507,11 +507,33 @@ const respondToMatch = async (req, res) => {
         if (bothAccepted) {
           console.log(`Match ${matchId} accepted by both users`);
           
-          // Create the match in the database
-          await createMatchInDatabase(matchId, matchData.users[0], matchData.users[1]);
-          
-          // Clean up
-          activeMatches.delete(matchId);
+          try {
+            // Create the match in the database
+            await createMatchInDatabase(matchId, matchData.users[0], matchData.users[1]);
+            
+            // Notify both users about match acceptance via socket
+            matchData.users.forEach(uid => {
+              const socketId = connectedUsers.get(uid);
+              if (socketId && ioInstance) {
+                ioInstance.to(socketId).emit('match:accepted', {
+                  matchId,
+                  status: 'matched',
+                  otherUserId: uid === matchData.users[0] ? matchData.users[1] : matchData.users[0],
+                  timestamp: new Date().toISOString()
+                });
+              }
+            });
+            
+            // Only delete match from active matches after database creation and notifications
+            activeMatches.delete(matchId);
+          } catch (dbError) {
+            console.error(`Error creating match in database: ${dbError}`);
+            // Don't delete from activeMatches if there was an error
+            return res.status(500).json({
+              success: false,
+              message: 'Error creating match in database'
+            });
+          }
           
           return res.status(200).json({
             success: true,
@@ -523,6 +545,15 @@ const respondToMatch = async (req, res) => {
             }
           });
         } else {
+          // Notify the other user that this user accepted
+          const otherUserSocketId = connectedUsers.get(otherUserId);
+          if (otherUserSocketId && ioInstance) {
+            ioInstance.to(otherUserSocketId).emit('match:userAccepted', {
+              matchId,
+              userId
+            });
+          }
+          
           return res.status(200).json({
             success: true,
             message: 'Match acceptance recorded, waiting for other user',
@@ -534,7 +565,16 @@ const respondToMatch = async (req, res) => {
           });
         }
       } else {
-        // User rejected
+        // User rejected - notify the other user
+        const otherUserSocketId = connectedUsers.get(otherUserId);
+        if (otherUserSocketId && ioInstance) {
+          ioInstance.to(otherUserSocketId).emit('match:rejected', {
+            matchId,
+            rejectedBy: userId
+          });
+        }
+        
+        // Now safe to remove from active matches
         activeMatches.delete(matchId);
         
         return res.status(200).json({

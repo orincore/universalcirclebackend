@@ -2224,7 +2224,7 @@ const initializeSocket = (io) => {
     // AI message suggestions handler
     socket.on('ai:messageSuggestions', async ({ conversationId }, callback) => {
       try {
-        logger.info('Generating AI message suggestions', { userId: socket.user.id, conversationId });
+        info('Generating AI message suggestions', { userId: socket.user.id, conversationId });
         
         if (!conversationId) {
           return callback({
@@ -2240,7 +2240,7 @@ const initializeSocket = (io) => {
           suggestions
         });
       } catch (error) {
-        logger.error('Error generating message suggestions', { error, userId: socket.user.id, conversationId });
+        console.error('Error generating message suggestions', { error, userId: socket.user.id, conversationId });
         callback({
           success: false,
           error: { message: 'Failed to generate message suggestions' }
@@ -2251,7 +2251,7 @@ const initializeSocket = (io) => {
     // AI feature: Generate profile bio
     socket.on('ai:generateBio', async (data, callback) => {
       try {
-        logger.info('Generating AI profile bio', { userId: socket.user.id });
+        info('Generating AI profile bio', { userId: socket.user.id });
         
         const bio = await generateProfileBio(socket.user.id);
         
@@ -2259,8 +2259,8 @@ const initializeSocket = (io) => {
           success: true,
           bio
         });
-      } catch (error) {
-        logger.error('Error generating profile bio', { error, userId: socket.user.id });
+      } catch (err) {
+        console.error('Error generating profile bio', { error: err, userId: socket.user.id });
         callback({
           success: false,
           error: { message: 'Failed to generate profile bio' }
@@ -2271,7 +2271,7 @@ const initializeSocket = (io) => {
     // AI feature: Generate icebreakers
     socket.on('ai:generateIcebreakers', async ({ matchId }, callback) => {
       try {
-        logger.info('Generating AI icebreakers', { userId: socket.user.id, matchId });
+        info('Generating AI icebreakers', { userId: socket.user.id, matchId });
         
         if (!matchId) {
           return callback({
@@ -2286,8 +2286,8 @@ const initializeSocket = (io) => {
           success: true,
           icebreakers
         });
-      } catch (error) {
-        logger.error('Error generating icebreakers', { error, userId: socket.user.id, matchId });
+      } catch (err) {
+        console.error('Error generating icebreakers', { error: err, userId: socket.user.id, matchId });
         callback({
           success: false,
           error: { message: 'Failed to generate icebreakers' }
@@ -2298,7 +2298,7 @@ const initializeSocket = (io) => {
     // AI feature: Detect conversation mood
     socket.on('ai:detectMood', async ({ conversationId }, callback) => {
       try {
-        logger.info('Detecting conversation mood', { userId: socket.user.id, conversationId });
+        info('Detecting conversation mood', { userId: socket.user.id, conversationId });
         
         if (!conversationId) {
           return callback({
@@ -2314,8 +2314,8 @@ const initializeSocket = (io) => {
           mood,
           confidence
         });
-      } catch (error) {
-        logger.error('Error detecting conversation mood', { error, userId: socket.user.id, conversationId });
+      } catch (err) {
+        console.error('Error detecting conversation mood', { error: err, userId: socket.user.id, conversationId });
         callback({
           success: false,
           error: { message: 'Failed to detect conversation mood' }

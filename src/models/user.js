@@ -22,7 +22,12 @@ const interestValidator = (value, helpers) => {
 const userRegistrationSchema = Joi.object({
   firstName: Joi.string().min(2).max(50).required(),
   lastName: Joi.string().min(2).max(50).required(),
-  gender: Joi.string().valid('male', 'female', 'other').required(),
+  gender: Joi.string().valid(
+    'male', 'female', 'transgender', 'trans', 'non-binary', 
+    'nonbinary', 'genderqueer', 'genderfluid', 'agender', 
+    'bigender', 'two-spirit', 'third-gender', 'queer', 
+    'questioning', 'intersex', 'other'
+  ).required(),
   dateOfBirth: Joi.date().iso().required(),
   email: Joi.string().email().required(),
   phoneNumber: Joi.string().pattern(/^\+?[0-9]{10,15}$/).required(),
@@ -51,6 +56,12 @@ const userLoginSchema = Joi.object({
 const profileUpdateSchema = Joi.object({
   firstName: Joi.string().min(2).max(50),
   lastName: Joi.string().min(2).max(50),
+  gender: Joi.string().valid(
+    'male', 'female', 'transgender', 'trans', 'non-binary', 
+    'nonbinary', 'genderqueer', 'genderfluid', 'agender', 
+    'bigender', 'two-spirit', 'third-gender', 'queer', 
+    'questioning', 'intersex', 'other'
+  ),
   preference: Joi.string().valid('Dating', 'Friendship'),
   interests: Joi.array().custom(interestValidator, 'interests validation'),
   location: Joi.object({

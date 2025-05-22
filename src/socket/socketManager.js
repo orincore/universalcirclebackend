@@ -2716,6 +2716,60 @@ const findMatchForUser = (socket) => {
       // Skip users with no interests
       if (otherUserInterests.length === 0) continue;
       
+      // Apply gender matching rules
+      const userGender = socket.user.gender?.toLowerCase() || 'unknown';
+      const otherUserGender = otherUser.user?.gender?.toLowerCase() || 'unknown';
+      
+      // Define LGBTQ+ gender categories
+      const lgbtqGenderCategories = [
+        'transgender', 'trans', 'non-binary', 'nonbinary', 'genderqueer', 
+        'genderfluid', 'agender', 'bigender', 'two-spirit', 'third-gender',
+        'queer', 'questioning', 'intersex', 'other'
+      ];
+      
+      const isUserLgbtq = lgbtqGenderCategories.includes(userGender);
+      const isOtherUserLgbtq = lgbtqGenderCategories.includes(otherUserGender);
+      
+      if (userGender === 'unknown' || otherUserGender === 'unknown') {
+        console.log(`Skipping user ${otherUserId} due to missing gender information`);
+        continue;
+      }
+      
+      // For Dating preference: 
+      // 1. Match male with female (heterosexual)
+      // 2. Match LGBTQ+ users with other LGBTQ+ users
+      if (userPreference === 'Dating') {
+        // For heterosexual matching (male-female only)
+        if ((userGender === 'male' || userGender === 'female') && 
+            (otherUserGender === 'male' || otherUserGender === 'female')) {
+          const isHeterosexualMatch = 
+            (userGender === 'male' && otherUserGender === 'female') || 
+            (userGender === 'female' && otherUserGender === 'male');
+          
+          if (!isHeterosexualMatch) {
+            console.log(`Skipping user ${otherUserId} for heterosexual dating - gender mismatch: User is ${userGender}, Other user is ${otherUserGender}`);
+            continue;
+          }
+        }
+        // For LGBTQ+ community matching - they can match with each other
+        else if (isUserLgbtq && isOtherUserLgbtq) {
+          console.log(`Found potential LGBTQ+ dating match between users ${userId} (${userGender}) and ${otherUserId} (${otherUserGender})`);
+          // Allow the match to continue
+        }
+        // Skip cross-matching between heterosexual and LGBTQ+ users for dating
+        else {
+          console.log(`Skipping cross-category match for dating: User is ${userGender}, Other user is ${otherUserGender}`);
+          continue;
+        }
+      }
+      
+      // For Friendship preference: allow LGBTQ+ users to match with any gender
+      if (userPreference === 'Friendship') {
+        // No gender restrictions for friendship - anyone can match with anyone
+        console.log(`Found potential friendship match between users ${userId} (${userGender}) and ${otherUserId} (${otherUserGender})`);
+        // Allow the match to continue
+      }
+      
       // Find shared interests (case-insensitive comparison)
       const sharedInterests = [];
       for (const interest of userInterests) {

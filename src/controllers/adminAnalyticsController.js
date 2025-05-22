@@ -815,18 +815,45 @@ const processMonthlyGrowth = (userData) => {
 };
 
 const processGenderDistribution = (userData) => {
+  // Initialize with main categories
   const genders = {
     male: 0,
     female: 0,
-    nonbinary: 0,
+    transgender: 0,
+    'non-binary': 0,
+    genderqueer: 0,
+    genderfluid: 0,
+    agender: 0,
     other: 0
   };
   
+  // Map similar terms to standardized categories
+  const genderMap = {
+    trans: 'transgender',
+    nonbinary: 'non-binary',
+    'two-spirit': 'other',
+    'third-gender': 'other',
+    queer: 'other',
+    questioning: 'other',
+    intersex: 'other',
+    bigender: 'other'
+  };
+  
   userData.forEach(user => {
+    if (!user.gender) return;
+    
     const gender = user.gender.toLowerCase();
+    
+    // Check if it's one of our main categories
     if (genders.hasOwnProperty(gender)) {
       genders[gender]++;
-    } else {
+    } 
+    // Check if it maps to one of our standardized categories
+    else if (genderMap.hasOwnProperty(gender)) {
+      genders[genderMap[gender]]++;
+    } 
+    // Otherwise put in other
+    else {
       genders.other++;
     }
   });

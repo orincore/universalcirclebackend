@@ -169,7 +169,9 @@ Education: ${userData.education}
 Occupation: ${userData.occupation}
 Looking for: ${userData.looking_for}
 
-Based on this information, write a friendly, engaging, and authentic profile bio of about 2-3 sentences that highlights their personality and interests. The bio should be written in first person ("I") and should sound natural, not overly formal or robotic. Make it warm, approachable, and uniquely tailored to them.
+Based on this information, write a friendly, engaging, and authentic profile bio that highlights their personality and interests. The bio should be written in first person ("I") and should sound natural, not overly formal or robotic. Make it warm, approachable, and uniquely tailored to them.
+
+IMPORTANT: The bio MUST be 150 words maximum - ideally between 50-100 words for optimal readability. Keep it concise but impactful.
 
 Return only the bio text with no additional explanation or formatting.`;
 
@@ -184,7 +186,11 @@ Return only the bio text with no additional explanation or formatting.`;
       return getFallbackProfileBio();
     }
     
-    return bio;
+    // Enforce word limit (150 words max)
+    const words = bio.split(/\s+/);
+    const truncatedBio = words.length > 150 ? words.slice(0, 150).join(' ') + '...' : bio;
+    
+    return truncatedBio;
   } catch (error) {
     logger.error('Error generating profile bio', { userId, error });
     return getFallbackProfileBio();

@@ -2592,6 +2592,18 @@ const notifyMatchFound = (user1, user2, sharedInterests) => {
 
 // Function to create match data in format expected by Flutter client
 const createMatchData = (otherUser, sharedInterests, matchId, preference) => {
+  // Calculate age from date_of_birth if available
+  let age = null;
+  if (otherUser.date_of_birth) {
+    const birthDate = new Date(otherUser.date_of_birth);
+    const today = new Date();
+    age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+  }
+  
   // Sanitize user data to include only necessary fields
   const sanitizedUser = {
     id: otherUser.id,
@@ -2599,7 +2611,11 @@ const createMatchData = (otherUser, sharedInterests, matchId, preference) => {
     name: otherUser.name || otherUser.first_name || otherUser.username || 'User',
     profilePicture: otherUser.profilePicture || otherUser.profile_picture_url || null,
     bio: otherUser.bio || null,
-    interests: otherUser.interests || []
+    interests: otherUser.interests || [],
+    // Add new fields for gender, age, and location
+    gender: otherUser.gender || null,
+    age: age,
+    location: otherUser.location || null
   };
   
   // Format in a way that Match.fromJson in Flutter can parse

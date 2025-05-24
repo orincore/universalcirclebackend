@@ -36,6 +36,12 @@ const {
   detectConversationMood
 } = require('../services/ai/aiCopilotService');
 
+// Import AI bot profile service
+const { generateBotProfile, generateBotResponse } = require('../services/ai/botProfileService');
+
+// Track bot matches and their data
+const botMatches = new Map();
+
 /**
  * Clean up the matchmaking pool by removing disconnected users
  */
@@ -892,6 +898,11 @@ const initializeSocket = (io) => {
           deliveryStatus: wasDelivered ? 'delivered' : 'sent',
           recipientCount: Math.max(0, roomSize - 1) // Number of recipients
         });
+        
+        // Check if this is a bot match and handle bot response
+        if (botMatches.has(matchId)) {
+          handleBotResponse(matchId, message, socket);
+        }
         
         // Provide callback response if client is listening for it
         if (typeof callback === 'function') {
@@ -2633,7 +2644,7 @@ const createMatchData = (otherUser, sharedInterests, matchId, preference) => {
  * Find a match for a user
  * @param {object} socket - User socket
  */
-const findMatchForUser = (socket) => {
+const findMatchForUser = async (socket) => {
   try {
     const userId = socket.user.id;
     
@@ -2957,23 +2968,164 @@ const findMatchForUser = (socket) => {
       userTimeouts.set(userId, timeoutId);
       userTimeouts.set(bestMatch.userId, timeoutId);
     } else {
-      console.log(`No suitable matches found for user ${userId}`);
-      socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
+      console.log(`No suitable real user matches found for user ${userId}. Creating AI bot match.`);
       
-      // Reset processing flag but keep in matchmaking pool
-      userPoolData.isBeingProcessed = false;
-      matchmakingPool.set(userId, userPoolData);
+      // Generate a bot profile with matching gender and preference
+      const userGender = socket.user.gender?.toLowerCase() || 'male';
+      const userPreference = socket.user.preference || 'Friendship';
       
-      // Set a timeout to try again after delay
-      const timeoutId = setTimeout(() => {
-        if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
-          console.log(`Retrying match for user ${userId}`);
-          socket.emit('match:waiting', { message: 'Searching for a match...' });
-          findMatchForUser(socket);
+      // Select appropriate gender for the bot based on user's gender and preference
+      let botGender;
+      if (userPreference === 'Dating') {
+        // For dating, select appropriate gender based on user's gender
+        if (['male', 'female'].includes(userGender)) {
+          // For heterosexual matching
+          botGender = userGender === 'male' ? 'female' : 'male';
+        } else {
+          // For LGBTQ+ matching (generate a bot with same gender category)
+          botGender = userGender;
         }
-      }, 10000); // Try again in 10 seconds
+      } else {
+        // For friendship, can be any gender but respect LGBTQ+ specific matching
+        const lgbtqGenderCategories = [
+          'transgender', 'trans', 'non-binary', 'nonbinary', 'genderqueer', 
+          'genderfluid', 'agender', 'bigender', 'two-spirit', 'third-gender',
+          'queer', 'questioning', 'intersex', 'other'
+        ];
+        
+        const isUserLgbtq = lgbtqGenderCategories.includes(userGender);
+        
+        if (isUserLgbtq) {
+          // LGBTQ+ users for friendship get matched with LGBTQ+ bots
+          botGender = lgbtqGenderCategories[Math.floor(Math.random() * lgbtqGenderCategories.length)];
+        } else {
+          // Non-LGBTQ+ users can get any gender for friendship
+          const genders = ['male', 'female'];
+          botGender = genders[Math.floor(Math.random() * genders.length)];
+        }
+      }
       
-      userTimeouts.set(userId, timeoutId);
+      try {
+        // Generate a bot profile matching user's preferences
+        const botProfile = await generateBotProfile(
+          botGender, 
+          userPreference, 
+          socket.user.interests || []
+        );
+        
+        // Generate a matchId and create the match
+        const matchId = uuidv4();
+        
+        // Store bot match data for response handling
+        botMatches.set(matchId, {
+          matchId,
+          userId: socket.user.id,
+          botProfile,
+          preference: userPreference,
+          messages: [],
+          createdAt: new Date()
+        });
+        
+        // Format bot as a user to fit into the existing flow
+        const botAsUser = {
+          id: botProfile.id,
+          username: botProfile.username,
+          first_name: botProfile.firstName,
+          last_name: botProfile.lastName,
+          gender: botProfile.gender,
+          bio: botProfile.bio,
+          date_of_birth: botProfile.date_of_birth,
+          profile_picture_url: botProfile.profile_picture_url,
+          interests: botProfile.interests,
+          preference: userPreference
+        };
+        
+        // Create shared interests based on user's interests and bot's interests
+        const sharedInterests = socket.user.interests 
+          ? socket.user.interests.filter(interest => botProfile.interests.includes(interest))
+          : [];
+        
+        // Ensure at least one shared interest
+        if (sharedInterests.length === 0 && botProfile.interests.length > 0) {
+          sharedInterests.push(botProfile.interests[0]);
+        }
+        
+        // Add to active matches
+        activeMatches.set(matchId, {
+          users: [userId, botProfile.id],
+          acceptances: {
+            [userId]: false,
+            [botProfile.id]: true // Bot automatically accepts
+          },
+          sharedInterests,
+          preference: userPreference,
+          createdAt: new Date(),
+          isBot: true
+        });
+        
+        // Remove user from matchmaking pool
+        matchmakingPool.delete(userId);
+        
+        // Reset processing flag
+        userPoolData.isBeingProcessed = false;
+        
+        // Notify user of the match
+        const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
+        socket.emit('match:found', { match: userMatchData });
+        
+        console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
+        
+        // Clear user timeout
+        clearMatchmakingTimeouts(userId);
+        
+        // Set timeout for match acceptance (even though bot auto-accepts)
+        const timeoutId = setTimeout(() => {
+          // Check if match still exists and hasn't been accepted by the user
+          if (activeMatches.has(matchId)) {
+            const matchData = activeMatches.get(matchId);
+            const userAccepted = matchData.acceptances[userId];
+            
+            if (!userAccepted) {
+              console.log(`Bot match ${matchId} timed out due to no user response`);
+              
+              // Notify user
+              const socketId = connectedUsers.get(userId);
+              if (socketId) {
+                ioInstance.to(socketId).emit('match:timeout', {
+                  matchId,
+                  message: 'Match timed out due to no response'
+                });
+              }
+              
+              // Clean up
+              activeMatches.delete(matchId);
+              botMatches.delete(matchId);
+            }
+          }
+        }, MATCH_ACCEPTANCE_TIMEOUT);
+        
+        userTimeouts.set(userId, timeoutId);
+      } catch (error) {
+        console.error('Error creating bot match:', error);
+        
+        // Fallback to standard behavior
+        socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
+        
+        // Reset processing flag but keep in matchmaking pool
+        userPoolData.isBeingProcessed = false;
+        matchmakingPool.set(userId, userPoolData);
+        
+        // Set a timeout to try again after delay
+        const timeoutId = setTimeout(() => {
+          if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
+            console.log(`Retrying match for user ${userId}`);
+            socket.emit('match:waiting', { message: 'Searching for a match...' });
+            findMatchForUser(socket);
+          }
+        }, 10000); // Try again in 10 seconds
+        
+        userTimeouts.set(userId, timeoutId);
+      }
     }
   } catch (error) {
     console.error('Error finding match:', error);
@@ -3184,3 +3336,72 @@ module.exports = {
  *    });
  *    ```
  */ 
+
+/**
+ * Handle bot responses to user messages
+ * @param {string} matchId - Match ID
+ * @param {string} userMessage - Message from user
+ * @param {object} socket - User's socket
+ */
+const handleBotResponse = async (matchId, userMessage, socket) => {
+  try {
+    // Get bot match data
+    const botMatch = botMatches.get(matchId);
+    if (!botMatch) {
+      console.error(`Bot match ${matchId} not found`);
+      return;
+    }
+    
+    // Add user message to match history
+    botMatch.messages.push({
+      senderId: socket.user.id,
+      message: userMessage,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Add a slight delay to make the response seem more natural
+    const responseDelay = 1000 + Math.random() * 3000; // 1-4 seconds
+    
+    setTimeout(async () => {
+      try {
+        // Generate bot response
+        const botResponse = await generateBotResponse(
+          userMessage,
+          botMatch.botProfile,
+          botMatch.preference
+        );
+        
+        // Generate a message ID for the bot's response
+        const botMessageId = uuidv4();
+        const timestamp = new Date().toISOString();
+        
+        // Prepare the message object
+        const messageObject = {
+          id: botMessageId,
+          senderId: botMatch.botProfile.id,
+          senderName: botMatch.botProfile.username || `${botMatch.botProfile.firstName}`,
+          message: botResponse,
+          timestamp
+        };
+        
+        // Add bot message to match history
+        botMatch.messages.push({
+          senderId: botMatch.botProfile.id,
+          message: botResponse,
+          timestamp
+        });
+        
+        // Get user socket ID
+        const userSocketId = connectedUsers.get(botMatch.userId);
+        if (userSocketId) {
+          // Send bot message to user
+          ioInstance.to(userSocketId).emit('match:message', messageObject);
+        }
+      } catch (error) {
+        console.error('Error generating bot response:', error);
+      }
+    }, responseDelay);
+  } catch (error) {
+    console.error('Error handling bot response:', error);
+  }
+};

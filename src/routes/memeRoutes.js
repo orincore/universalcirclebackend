@@ -3,6 +3,7 @@ const axios = require('axios');
 const router = express.Router();
 const apiKeyAuth = require('../middlewares/apiKeyAuth');
 const logger = require('../utils/logger');
+const { trackApiKeyUsage } = require('../services/apiKeyService');
 
 // Configure axios defaults for Reddit API with improved User-Agent
 const axiosInstance = axios.create({
@@ -270,8 +271,35 @@ async function fetchSubredditPosts(subreddit) {
   }
 }
 
-// All other routes require API key authentication
+// Custom middleware to track API key usage
+const trackUsage = async (req, res, next) => {
+  // Store the original json method
+  const originalJson = res.json;
+  
+  // Override the json method
+  res.json = function(data) {
+    // Track API key usage before sending response
+    try {
+      if (req.apiKey) {
+        // Track usage asynchronously without waiting
+        trackApiKeyUsage(req.apiKey).catch(err => {
+          logger.error('Error tracking API key usage in middleware:', err);
+        });
+      }
+    } catch (error) {
+      logger.error('Error in trackUsage middleware:', error);
+    }
+    
+    // Call the original json method
+    return originalJson.call(this, data);
+  };
+  
+  next();
+};
+
+// All routes require API key authentication and usage tracking
 router.use(apiKeyAuth);
+router.use(trackUsage);
 
 // Get memes from a specific subreddit
 router.get('/:subreddit', async (req, res) => {

@@ -682,21 +682,28 @@ const generateTravelExperiences = () => {
 };
 
 /**
- * Create a bot record in the users table
- * @param {Object} botProfile - Bot profile data
- * @returns {Promise<Object>} Created bot user data from database
+ * Create a bot user record in the database
+ * @param {object} botProfile - Bot profile data
+ * @returns {Promise<object>} Created user record
  */
 const createBotUserRecord = async (botProfile) => {
   try {
-    // First check if the bot already exists in the database
+    if (!botProfile || !botProfile.id) {
+      throw new Error('Invalid bot profile provided - missing ID');
+    }
+    
+    console.log(`[BOT DEBUG] Creating bot user record for ${botProfile.id}`);
+    
+    // Check if user already exists to avoid duplicates
     const { data: existingUser, error: checkError } = await supabase
       .from('users')
-      .select('id')
+      .select('*')
       .eq('id', botProfile.id)
       .single();
     
-    if (checkError && checkError.code !== 'PGRST116') {
-      error(`Error checking for existing bot user: ${checkError.message}`);
+    if (checkError && !checkError.message.includes('No rows found')) {
+      // This is a real error, not just "no rows found"
+      error(`Error checking for existing bot: ${checkError.message}`);
     }
     
     if (existingUser) {
@@ -719,10 +726,10 @@ const createBotUserRecord = async (botProfile) => {
       profile_picture_url: botProfile.profile_picture_url,
       is_online: true,
       last_active: new Date().toISOString(),
-      created_at: botProfile.joinDate,
+      created_at: botProfile.joinDate || new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      preference: 'Friendship', // Default preference
-      location: botProfile.location
+      preference: botProfile.preference || 'Friendship', // Default preference
+      location: botProfile.location || 'Mumbai'
     };
     
     // Try to add is_bot field if it exists in the schema
@@ -745,6 +752,8 @@ const createBotUserRecord = async (botProfile) => {
       info(`is_bot field check failed: ${schemaCheckError.message}`);
     }
     
+    console.log(`[BOT DEBUG] Inserting bot user record with fields: ${Object.keys(userRecord).join(', ')}`);
+    
     // Insert the bot as a user in the database
     const { data, error: insertError } = await supabase
       .from('users')
@@ -754,13 +763,27 @@ const createBotUserRecord = async (botProfile) => {
     
     if (insertError) {
       error(`Failed to create bot user record: ${insertError.message}`);
+      
+      // Check if the error is due to missing required fields
+      if (insertError.message.includes('violates not-null constraint')) {
+        const missingField = insertError.message.match(/column "([^"]+)"/);
+        if (missingField && missingField[1]) {
+          error(`Missing required field: ${missingField[1]}`);
+        }
+      }
+      
       throw new Error(`Failed to create bot user record: ${insertError.message}`);
     }
     
-    info(`Successfully created bot user ${botProfile.id} in database`);
+    if (!data) {
+      throw new Error('No data returned from bot user creation');
+    }
+    
+    console.log(`[BOT DEBUG] Successfully created bot user ${botProfile.id} (${data.username}) in database`);
     return data;
   } catch (err) {
     error(`Error creating bot user record: ${err.message}`);
+    console.error(err.stack);
     throw err;
   }
 };
@@ -774,6 +797,8 @@ const createBotUserRecord = async (botProfile) => {
  */
 const generateBotProfile = async (gender = 'male', preference = 'Friendship', userInterests = []) => {
   try {
+    console.log(`[BOT DEBUG] Generating bot profile with gender ${gender}, preference ${preference}`);
+    
     // Normalize gender to lowercase
     const normalizedGender = gender.toLowerCase();
     
@@ -800,6 +825,9 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
     // Create unique ID for the bot - use standard UUID without prefix
     const botId = uuidv4();
     
+    // Create a username - ensure it's unique by adding the UUID fragment
+    const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}${botId.substring(0, 6)}`;
+    
     // Use AI to generate bio if available
     let bio = '';
     try {
@@ -814,10 +842,12 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       const result = await model.generateContent(prompt);
       const response = await result.response;
       bio = response.text().trim();
+      console.log(`[BOT DEBUG] Generated AI bio for bot ${botId}: ${bio.substring(0, 50)}...`);
     } catch (aiError) {
-      error('Error generating AI bio:', aiError);
+      error(`Error generating AI bio: ${aiError.message}`);
       // Fallback bio
       bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
+      console.log(`[BOT DEBUG] Using fallback bio for bot ${botId}: ${bio}`);
     }
     
     // Create profile picture URL using randomuser.me API
@@ -827,10 +857,9 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
         ? `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 99)}.jpg`
         : `https://randomuser.me/api/portraits/lego/${Math.floor(Math.random() * 8)}.jpg`;
     
-    // Create a username
-    const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}`;
+    const joinDate = getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5); // Joined 5-95 days ago
     
-    // Create the bot profile
+    // Create the bot profile with all required fields
     const botProfile = {
       id: botId,
       firstName,
@@ -846,8 +875,11 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       profile_picture_url: profilePictureUrl,
       isBot: true, // Flag to identify this as a bot
       lastActive: new Date().toISOString(), // Current time
-      joinDate: getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5) // Joined 5-95 days ago
+      joinDate,
+      preference // Include the preference in the bot profile
     };
+    
+    console.log(`[BOT DEBUG] Generated bot profile for ${botId} (${username})`);
     
     // CRITICAL: Create user record in database FIRST and await its completion
     // This ensures the bot exists in the database before any references to it
@@ -861,12 +893,15 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       info(`Successfully created bot user record for ${botId}`);
     } catch (dbError) {
       error(`Error creating bot user record: ${dbError.message}`);
-      throw new Error(`Failed to create bot in database: ${dbError.message}`);
+      // Try once more with the fallback method
+      console.log(`[BOT DEBUG] Attempting fallback bot creation for ${botId}`);
+      return generateFallbackBotProfile(gender, preference, userInterests);
     }
     
     return botProfile;
   } catch (err) {
     error(`Error generating bot profile: ${err.message}`);
+    console.error(err.stack);
     // In case of any error, use the fallback but ensure it's created in DB
     return generateFallbackBotProfile(gender, preference, userInterests);
   }
@@ -965,16 +1000,26 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
  */
 const verifyBotExists = async (botId) => {
   try {
-    if (!botId) return false;
+    if (!botId) {
+      error('verifyBotExists called with null or undefined botId');
+      return false;
+    }
+    
+    console.log(`[BOT DEBUG] Verifying bot ${botId} exists in database`);
     
     // Check if bot exists in users table
-    const { data, error } = await supabase
+    const { data, error: queryError } = await supabase
       .from('users')
-      .select('id')
+      .select('id, username')
       .eq('id', botId)
       .single();
       
+    if (queryError) {
+      error(`Database error checking bot ${botId}: ${queryError.message}`);
+    }
+      
     if (data) {
+      console.log(`[BOT DEBUG] Bot ${botId} (${data.username}) verified in database`);
       return true; // Bot exists
     }
     
@@ -983,6 +1028,7 @@ const verifyBotExists = async (botId) => {
     return false;
   } catch (err) {
     error(`Error verifying bot existence: ${err.message}`);
+    console.error(err.stack);
     return false;
   }
 };

@@ -536,6 +536,192 @@ const initializeSocket = (io) => {
       }
     });
     
+    // Add this handler inside the connection handler after the match:message handler
+    socket.on('match:accept', async (data, callback) => {
+      try {
+        const { matchId } = data;
+        const userId = socket.user.id;
+        
+        console.log(`[MATCH DEBUG] User ${userId} accepting match ${matchId}`);
+        
+        if (!matchId) {
+          const error = { message: 'Match ID is required' };
+          socket.emit('error', { source: 'match:accept', ...error });
+          if (typeof callback === 'function') callback({ success: false, error });
+          return;
+        }
+        
+        // Check if match exists
+        if (!activeMatches.has(matchId)) {
+          console.error(`[MATCH DEBUG] Match ${matchId} not found in activeMatches`);
+          const error = { message: 'Match not found' };
+          socket.emit('error', { source: 'match:accept', ...error });
+          if (typeof callback === 'function') callback({ success: false, error });
+          return;
+        }
+        
+        const matchData = activeMatches.get(matchId);
+        
+        // Check if user is part of the match
+        if (!matchData.users.includes(userId)) {
+          console.error(`[MATCH DEBUG] User ${userId} is not part of match ${matchId}`);
+          const error = { message: 'You are not part of this match' };
+          socket.emit('error', { source: 'match:accept', ...error });
+          if (typeof callback === 'function') callback({ success: false, error });
+          return;
+        }
+        
+        // Update acceptance status
+        matchData.acceptances[userId] = true;
+        activeMatches.set(matchId, matchData);
+        
+        console.log(`[MATCH DEBUG] Updated acceptance status for user ${userId} in match ${matchId}`);
+        
+        // Check if this is a bot match
+        const isBot = botMatches.has(matchId);
+        
+        // Check if both users have accepted
+        const allAccepted = Object.values(matchData.acceptances).every(status => status === true);
+        
+        if (allAccepted) {
+          console.log(`[MATCH DEBUG] All participants accepted match ${matchId}`);
+          
+          // Update match status in database
+          try {
+            const updateResult = await supabase
+              .from('matches')
+              .update({
+                status: 'accepted',
+                accepted_at: new Date().toISOString()
+              })
+              .eq('id', matchId);
+              
+            if (updateResult.error) {
+              console.error(`[MATCH DEBUG] Error updating match status: ${updateResult.error.message}`);
+            } else {
+              console.log(`[MATCH DEBUG] Updated match status in database`);
+            }
+          } catch (dbError) {
+            console.error(`[MATCH DEBUG] Database error updating match: ${dbError.message}`);
+            // Continue despite error - we'll handle match in memory
+          }
+          
+          // Auto-join the match room
+          socket.join(matchId);
+          console.log(`[MATCH DEBUG] User ${userId} joined match room ${matchId}`);
+          
+          // Notify all participants that the match is fully accepted
+          matchData.users.forEach(participantId => {
+            const participantSocketId = connectedUsers.get(participantId);
+            if (participantSocketId) {
+              ioInstance.to(participantSocketId).emit('match:accepted', {
+                matchId,
+                accepted: true,
+                acceptedBy: matchData.users
+              });
+            }
+          });
+          
+          // For bot matches, send an initial greeting message after a short delay
+          if (isBot) {
+            console.log(`[MATCH DEBUG] Preparing bot greeting for match ${matchId}`);
+            const botMatch = botMatches.get(matchId);
+            
+            // Delay to make it seem more natural
+            setTimeout(async () => {
+              try {
+                const botProfile = botMatch.botProfile;
+                const botMessageId = uuidv4();
+                const timestamp = new Date().toISOString();
+                
+                // Create a simple greeting message
+                const greetingOptions = [
+                  `Hi there! I'm ${botProfile.firstName}. Nice to match with you!`,
+                  `Hey! I'm excited to chat with you. I'm ${botProfile.firstName} by the way.`,
+                  `Hello! Thanks for accepting the match. I'm ${botProfile.firstName} and I enjoy ${botProfile.interests[0]}.`,
+                  `Hi! I'm ${botProfile.firstName}. I see we both like ${matchData.sharedInterests[0] || 'interesting things'}. What else are you into?`
+                ];
+                
+                const greeting = greetingOptions[Math.floor(Math.random() * greetingOptions.length)];
+                
+                const messageObject = {
+                  id: botMessageId,
+                  senderId: botProfile.id,
+                  senderName: botProfile.username || botProfile.firstName,
+                  message: greeting,
+                  timestamp
+                };
+                
+                // Save greeting to database
+                try {
+                  const { error: dbError } = await supabase
+                    .from('messages')
+                    .insert({
+                      id: botMessageId,
+                      sender_id: botProfile.id,
+                      receiver_id: userId,
+                      content: greeting,
+                      is_read: false,
+                      created_at: timestamp,
+                      updated_at: timestamp
+                    });
+                    
+                  if (dbError) {
+                    console.error(`[MATCH DEBUG] Error saving bot greeting: ${dbError.message}`);
+                  }
+                } catch (dbError) {
+                  console.error(`[MATCH DEBUG] Database error saving greeting: ${dbError.message}`);
+                }
+                
+                // Send the greeting to the user
+                socket.emit('match:message', messageObject);
+                console.log(`[MATCH DEBUG] Sent bot greeting to user ${userId}`);
+                
+                // Add message to match history
+                if (!matchMessageHistory.has(matchId)) {
+                  matchMessageHistory.set(matchId, []);
+                }
+                
+                const history = matchMessageHistory.get(matchId);
+                history.push({ role: 'assistant', content: greeting });
+                
+              } catch (greetingError) {
+                console.error(`[MATCH DEBUG] Error sending bot greeting: ${greetingError.message}`);
+              }
+            }, 2000 + Math.random() * 2000); // 2-4 second delay
+          }
+        } else {
+          // Not all accepted yet, just acknowledge this user's acceptance
+          socket.emit('match:acceptConfirmed', {
+            matchId,
+            accepted: true,
+            message: 'Your acceptance has been recorded'
+          });
+          
+          if (typeof callback === 'function') {
+            callback({
+              success: true,
+              matchId,
+              accepted: true
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`[MATCH DEBUG] Error handling match acceptance: ${error.message}`);
+        socket.emit('error', {
+          source: 'match:accept',
+          message: 'Failed to process match acceptance'
+        });
+        
+        if (typeof callback === 'function') {
+          callback({
+            success: false,
+            error: { message: error.message }
+          });
+        }
+      }
+    });
+    
     // Add other socket handlers here
     
   });
@@ -1234,7 +1420,7 @@ const findMatchForUser = async (socket) => {
       }
       
       try {
-        info(`Generating bot profile with gender ${botGender} for user ${userId}`);
+        console.log(`[MATCH DEBUG] Generating bot profile with gender ${botGender} for user ${userId} with preference ${userPreference}`);
         
         // Generate a bot profile matching user's preferences
         const botProfile = await generateBotProfile(
@@ -1247,19 +1433,21 @@ const findMatchForUser = async (socket) => {
           throw new Error('Failed to generate valid bot profile');
         }
         
-        info(`Successfully generated bot profile with ID ${botProfile.id}`);
+        console.log(`[MATCH DEBUG] Successfully generated bot profile with ID ${botProfile.id} (${botProfile.username})`);
         
         // Verify bot exists in the database before proceeding
         const botExists = await verifyBotExists(botProfile.id);
         
         if (!botExists) {
+          console.error(`[MATCH DEBUG] Bot ${botProfile.id} does not exist in database after creation`);
           throw new Error(`Bot ${botProfile.id} does not exist in database after creation`);
         }
         
-        info(`Verified bot ${botProfile.id} exists in database`);
+        console.log(`[MATCH DEBUG] Verified bot ${botProfile.id} exists in database`);
         
         // Generate a matchId and create the match
         const matchId = uuidv4();
+        console.log(`[MATCH DEBUG] Generated match ID ${matchId} for bot match`);
         
         // Store bot match data for response handling
         botMatches.set(matchId, {
@@ -1297,6 +1485,7 @@ const findMatchForUser = async (socket) => {
         
         // Add to active matches
         activeMatches.set(matchId, {
+          id: matchId,
           users: [userId, botProfile.id],
           acceptances: {
             [userId]: false,
@@ -1317,16 +1506,56 @@ const findMatchForUser = async (socket) => {
         // Create match in database
         try {
           // Create match record in database
-          info(`Creating match record in database between user ${userId} and bot ${botProfile.id}`);
+          console.log(`[MATCH DEBUG] Creating match record in database between user ${userId} and bot ${botProfile.id}`);
           const result = await createMatchInDatabase(matchId, userId, botProfile.id);
           
           if (!result || !result.success) {
+            console.error(`[MATCH DEBUG] Failed to create match in database: ${result?.error?.message || 'Unknown error'}`);
             throw new Error(result?.error?.message || 'Failed to create match in database');
           }
           
-          info(`Successfully created match record in database with ID ${matchId}`);
+          console.log(`[MATCH DEBUG] Successfully created match record in database with ID ${matchId}`);
+          
+          // Notify user of the match
+          const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
+          socket.emit('match:found', { match: userMatchData });
+          
+          console.log(`[MATCH DEBUG] Notified user ${userId} about match with bot ${botProfile.id}`);
+          
+          // Clear user timeout
+          clearMatchmakingTimeouts(userId);
+          
+          // Set timeout for match acceptance (even though bot auto-accepts)
+          const timeoutId = setTimeout(() => {
+            // Check if match still exists and hasn't been accepted by the user
+            if (activeMatches.has(matchId)) {
+              const matchData = activeMatches.get(matchId);
+              const userAccepted = matchData.acceptances[userId];
+              
+              if (!userAccepted) {
+                console.log(`[MATCH DEBUG] Bot match ${matchId} timed out due to no user response`);
+                
+                // Notify user
+                const socketId = connectedUsers.get(userId);
+                if (socketId) {
+                  ioInstance.to(socketId).emit('match:timeout', {
+                    matchId,
+                    message: 'Match timed out due to no response'
+                  });
+                }
+                
+                // Clean up
+                activeMatches.delete(matchId);
+                botMatches.delete(matchId);
+              }
+            }
+          }, MATCH_ACCEPTANCE_TIMEOUT);
+          
+          userTimeouts.set(userId, timeoutId);
+          
         } catch (dbError) {
-          error(`Error creating bot match in database: ${dbError.message}`);
+          console.error(`[MATCH DEBUG] Error creating bot match in database: ${dbError.message}`);
+          
           // If we can't create the match, abort and try again with a real user
           activeMatches.delete(matchId);
           botMatches.delete(matchId);
@@ -1342,63 +1571,27 @@ const findMatchForUser = async (socket) => {
           
           return;
         }
-        
-        // Notify user of the match
-        const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
-        socket.emit('match:found', { match: userMatchData });
-        
-        console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
-        
-        // Clear user timeout
-        clearMatchmakingTimeouts(userId);
-        
-        // Set timeout for match acceptance (even though bot auto-accepts)
-        const timeoutId = setTimeout(() => {
-          // Check if match still exists and hasn't been accepted by the user
-          if (activeMatches.has(matchId)) {
-            const matchData = activeMatches.get(matchId);
-            const userAccepted = matchData.acceptances[userId];
-            
-            if (!userAccepted) {
-              console.log(`Bot match ${matchId} timed out due to no user response`);
-              
-              // Notify user
-              const socketId = connectedUsers.get(userId);
-              if (socketId) {
-                ioInstance.to(socketId).emit('match:timeout', {
-                  matchId,
-                  message: 'Match timed out due to no response'
-                });
-              }
-              
-              // Clean up
-              activeMatches.delete(matchId);
-              botMatches.delete(matchId);
-            }
-          }
-        }, MATCH_ACCEPTANCE_TIMEOUT);
-        
-        userTimeouts.set(userId, timeoutId);
       } catch (error) {
-        console.error('Error creating bot match:', error);
+        console.error(`[MATCH DEBUG] Error creating bot match: ${error.message}`);
+        console.error(error.stack);
         
         // Fallback to standard behavior
-      socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
-      
-      // Reset processing flag but keep in matchmaking pool
-      userPoolData.isBeingProcessed = false;
-      matchmakingPool.set(userId, userPoolData);
-      
-      // Set a timeout to try again after delay
-      const timeoutId = setTimeout(() => {
-        if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
-          console.log(`Retrying match for user ${userId}`);
-          socket.emit('match:waiting', { message: 'Searching for a match...' });
-          findMatchForUser(socket);
-        }
-      }, 10000); // Try again in 10 seconds
-      
-      userTimeouts.set(userId, timeoutId);
+        socket.emit('match:notFound', { message: 'No suitable matches found at this time. Please try again later.' });
+        
+        // Reset processing flag but keep in matchmaking pool
+        userPoolData.isBeingProcessed = false;
+        matchmakingPool.set(userId, userPoolData);
+        
+        // Set a timeout to try again after delay
+        const timeoutId = setTimeout(() => {
+          if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
+            console.log(`[MATCH DEBUG] Retrying match for user ${userId}`);
+            socket.emit('match:waiting', { message: 'Searching for a match...' });
+            findMatchForUser(socket);
+          }
+        }, 10000); // Try again in 10 seconds
+        
+        userTimeouts.set(userId, timeoutId);
       }
     }
   } catch (error) {

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middlewares/auth');
-const { isAdmin } = require('../middlewares/admin');
 const {
   generateApiKey,
   getApiKeyStats,
@@ -9,6 +8,52 @@ const {
 } = require('../services/apiKeyService');
 const supabase = require('../config/database');
 const logger = require('../utils/logger');
+
+// Admin middleware to check if the authenticated user is an admin
+const isAdmin = async (req, res, next) => {
+  try {
+    // User is already set by the authenticate middleware
+    const userId = req.user.id || req.user.userId; // Support both formats
+    
+    // Check if user has admin role directly from the JWT token
+    if (req.user.role === 'admin') {
+      return next();
+    }
+    
+    // If role not in token, verify from database
+    const { data, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
+      
+    if (error || !data) {
+      logger.warn(`User ${userId} not found during admin check`);
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized - User not found'
+      });
+    }
+    
+    // Check if user is an admin
+    if (data.role !== 'admin') {
+      logger.warn(`Non-admin user ${userId} attempted to access admin route`);
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden - Admin access required'
+      });
+    }
+    
+    // User is an admin, proceed
+    next();
+  } catch (error) {
+    logger.error('Error in admin authorization:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error during admin authorization'
+    });
+  }
+};
 
 // All routes require authentication and admin privileges
 router.use(authenticate);

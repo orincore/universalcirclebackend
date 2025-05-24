@@ -974,7 +974,7 @@ const initializeSocket = (io) => {
         }
       } catch (error) {
         error(`Error handling match message: ${error.message}`);
-        socket.emit('error', { 
+        socket.emit('error', {
           source: 'match:message',
           message: 'Failed to process message' 
         });
@@ -2174,10 +2174,10 @@ const initializeSocket = (io) => {
         socket.emit('error', {
           source: 'notification:readAll',
           message: 'Server error while updating notifications'
+            });
+          }
         });
-      }
-    });
-
+        
     socket.on('notification:getAll', async (data = {}) => {
       try {
         const userId = socket.user.id;
@@ -2221,7 +2221,7 @@ const initializeSocket = (io) => {
         
         if (countError) {
           console.error('Error counting unread notifications:', countError);
-          socket.emit('error', {
+        socket.emit('error', {
             source: 'notification:getCount',
             message: 'Server error while counting notifications'
           });
@@ -2255,7 +2255,7 @@ const initializeSocket = (io) => {
         });
       } catch (err) {
         console.error('Error fetching achievements:', err);
-        socket.emit('error', {
+          socket.emit('error', {
           source: 'achievement:get',
           message: 'Error fetching achievement data'
         });
@@ -2275,7 +2275,7 @@ const initializeSocket = (io) => {
         });
       } catch (err) {
         console.error('Error fetching streaks:', err);
-        socket.emit('error', {
+          socket.emit('error', {
           source: 'streak:getAll',
           message: 'Error fetching streak data'
         });
@@ -2387,7 +2387,7 @@ const initializeSocket = (io) => {
         });
       }
     });
-
+    
     // Inside initializeSocket function, add these socket handlers
     // Note: These will be added to the existing socket handlers
 
@@ -2405,7 +2405,7 @@ const initializeSocket = (io) => {
         
         // Validate that user has interests
         if (!userInterests || userInterests.length === 0) {
-          socket.emit('error', { 
+          socket.emit('error', {
             source: 'matchmaking', 
             message: 'You need to add interests to your profile before matchmaking' 
           });
@@ -2422,10 +2422,10 @@ const initializeSocket = (io) => {
         }
         
         // Add user to matchmaking pool
-        matchmakingPool.set(userId, {
-          userId,
-          socketId: socket.id,
-          user: socket.user,
+              matchmakingPool.set(userId, {
+                userId,
+                socketId: socket.id,
+                user: socket.user,
           interests: userInterests,
           joinedAt: new Date(),
           isBeingProcessed: false
@@ -2448,7 +2448,7 @@ const initializeSocket = (io) => {
         }, 2000);
       } catch (err) {
         error(`Error in matchmaking:join handler: ${err.message}`);
-        socket.emit('error', { 
+        socket.emit('error', {
           source: 'matchmaking', 
           message: 'Server error joining matchmaking' 
         });
@@ -2462,16 +2462,16 @@ const initializeSocket = (io) => {
           return;
         }
         
-        const userId = socket.user.id;
-        
-        // Remove user from matchmaking pool
+      const userId = socket.user.id;
+      
+      // Remove user from matchmaking pool
         if (matchmakingPool.has(userId)) {
-          matchmakingPool.delete(userId);
+      matchmakingPool.delete(userId);
           info(`User ${userId} left matchmaking`);
-          
+      
           // Clear any timeouts
-          clearMatchmakingTimeouts(userId);
-          
+      clearMatchmakingTimeouts(userId);
+      
           // Confirm to user
           socket.emit('matchmaking:status', { 
             status: 'left', 
@@ -2545,7 +2545,7 @@ const initializeSocket = (io) => {
         findMatchForUser(socket, forceBotMatch);
       } catch (err) {
         error(`Error in find:match handler: ${err.message}`);
-        socket.emit('error', { 
+        socket.emit('error', {
           source: 'matchmaking', 
           message: 'Server error finding a match' 
         });
@@ -2589,7 +2589,7 @@ const initializeSocket = (io) => {
         socket.emit('match:messageAck', { matchId, status: 'delivered' });
       } catch (err) {
         error(`Error in match:messageBot handler: ${err.message}`);
-        socket.emit('error', { 
+        socket.emit('error', {
           source: 'chat', 
           message: 'Server error sending message to bot' 
         });
@@ -3190,9 +3190,9 @@ const findMatchForUser = async (socket, forceBotMatch = false) => {
           
           // Notify all users in the match
           for (const userId of matchData.users) {
-            const socketId = connectedUsers.get(userId);
-            if (socketId) {
-              ioInstance.to(socketId).emit('match:timeout', {
+              const socketId = connectedUsers.get(userId);
+              if (socketId) {
+                ioInstance.to(socketId).emit('match:timeout', {
                 matchId,
                 message: 'Match timed out due to missing acceptances'
               });
@@ -3781,4 +3781,4 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
       console.error('Failed to notify user of error:', notifyError);
     }
   }
-};
+}; 

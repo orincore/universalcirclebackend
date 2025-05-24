@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key Management - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .key-container {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+        .key-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 200px;
+            text-align: center;
+        }
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-card.active { border-left: 4px solid #28a745; }
+        .stat-card.revoked { border-left: 4px solid #dc3545; }
+        .stat-card.total { border-left: 4px solid #007bff; }
+        .table-responsive {
+            margin-top: 20px;
+        }
+        .api-key-preview {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>API Key Management</h1>
+        
+        <ul class="nav nav-tabs mb-4" id="apiKeyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="generate-tab" data-bs-toggle="tab" data-bs-target="#generate" type="button" role="tab" aria-controls="generate" aria-selected="false">Generate Key</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage" type="button" role="tab" aria-controls="manage" aria-selected="false">Manage Keys</button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="apiKeyTabsContent">
+            <!-- Overview Tab -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+                <h3>API Key Usage Overview</h3>
+                
+                <div class="key-stats" id="key-stats">
+                    <div class="loader" id="stats-loader"></div>
+                </div>
+                
+                <h4>Top Used API Keys</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>User</th>
+                                <th>Name</th>
+                                <th>Usage Count</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-keys-table">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Generate Key Tab -->
+            <div class="tab-pane fade" id="generate" role="tabpanel" aria-labelledby="generate-tab">
+                <h3>Generate New API Key</h3>
+                
+                <form id="generate-key-form">
+                    <div class="mb-3">
+                        <label for="user-id" class="form-label">User ID</label>
+                        <input type="text" class="form-control" id="user-id" placeholder="Enter User ID" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="key-name" class="form-label">Key Name</label>
+                        <input type="text" class="form-control" id="key-name" placeholder="Enter a name for this API key" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="rate-limit" class="form-label">Rate Limit (requests per day)</label>
+                        <input type="number" class="form-control" id="rate-limit" placeholder="Default: 100" value="100">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Generate API Key</button>
+                </form>
+                
+                <div id="key-result" class="mt-4" style="display: none;">
+                    <h4>Generated API Key</h4>
+                    <div class="alert alert-warning">
+                        <strong>Important:</strong> This key will only be shown once. Please copy it now and store it securely.
+                    </div>
+                    <div class="key-container" id="generated-key"></div>
+                    
+                    <button class="btn btn-sm btn-outline-secondary mt-2" id="copy-key">
+                        <i class="bi bi-clipboard"></i> Copy Key
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Manage Keys Tab -->
+            <div class="tab-pane fade" id="manage" role="tabpanel" aria-labelledby="manage-tab">
+                <h3>Manage API Keys</h3>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="search-user" placeholder="Filter by User ID">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="filter-status">
+                            <option value="">All Statuses</option>
+                            <option value="active">Active</option>
+                            <option value="revoked">Revoked</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-secondary w-100" id="apply-filters">Apply Filters</button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-primary w-100" id="refresh-keys">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>User</th>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th>Usage Count</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keys-table">
+                            <tr>
+                                <td colspan="8" class="text-center">
+                                    <div class="loader" id="keys-loader"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <nav aria-label="API keys pagination" class="mt-3">
+                    <ul class="pagination justify-content-center" id="pagination">
+                        <!-- Will be populated by JavaScript -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Key Details Modal -->
+    <div class="modal fade" id="keyDetailsModal" tabindex="-1" aria-labelledby="keyDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="keyDetailsModalLabel">API Key Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="key-details-body">
+                    <div class="loader"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="revoke-key-btn" data-key="">Revoke Key</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // API Base URL
+        const API_BASE_URL = '/api/admin/keys';
+        
+        // Get authentication token from localStorage or wherever it's stored
+        function getAuthToken() {
+            return localStorage.getItem('adminToken');
+        }
+        
+        // API request helper
+        async function apiRequest(endpoint, method = 'GET', body = null) {
+            const token = getAuthToken();
+            if (!token) {
+                alert('You are not authenticated. Please log in.');
+                window.location.href = '/admin/login.html';
+                return;
+            }
+            
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            };
+            
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'API request failed');
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('API Request Error:', error);
+                throw error;
+            }
+        }
+        
+        // Format date helper
+        function formatDate(dateString) {
+            if (!dateString) return 'Never';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+        
+        // Load API key statistics
+        async function loadKeyStats() {
+            try {
+                const statsElem = document.getElementById('key-stats');
+                const loader = document.getElementById('stats-loader');
+                const topKeysTable = document.getElementById('top-keys-table');
+                
+                const data = await apiRequest('/stats/summary');
+                
+                loader.style.display = 'none';
+                
+                // Update stats cards
+                statsElem.innerHTML = `
+                    <div class="stat-card total">
+                        <div class="title">Total Keys</div>
+                        <div class="number">${data.data.total_keys}</div>
+                    </div>
+                    <div class="stat-card active">
+                        <div class="title">Active Keys</div>
+                        <div class="number">${data.data.active_keys}</div>
+                    </div>
+                    <div class="stat-card revoked">
+                        <div class="title">Revoked Keys</div>
+                        <div class="number">${data.data.revoked_keys}</div>
+                    </div>
+                `;
+                
+                // Update top used keys table
+                topKeysTable.innerHTML = '';
+                
+                if (data.data.top_used_keys.length === 0) {
+                    topKeysTable.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center">No API keys found</td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                data.data.top_used_keys.forEach(key => {
+                    topKeysTable.innerHTML += `
+                        <tr>
+                            <td><span class="api-key-preview">${key.key_preview}</span></td>
+                            <td>${key.user ? `${key.user.username} (${key.user.first_name} ${key.user.last_name})` : 'Unknown'}</td>
+                            <td>${key.name}</td>
+                            <td>${key.usage_count}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary view-key-btn" data-key="${key.key_preview}">View</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                // Add event listeners to view buttons
+                document.querySelectorAll('.view-key-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const keyPreview = this.getAttribute('data-key');
+                        showKeyDetails(keyPreview);
+                    });
+                });
+            } catch (error) {
+                document.getElementById('stats-loader').style.display = 'none';
+                document.getElementById('key-stats').innerHTML = `
+                    <div class="alert alert-danger w-100">Error loading API key statistics: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // Load API keys list
+        async function loadKeys(page = 1, filters = {}) {
+            try {
+                const keysTable = document.getElementById('keys-table');
+                const keysLoader = document.getElementById('keys-loader');
+                const paginationElem = document.getElementById('pagination');
+                
+                const limit = 10;
+                const offset = (page - 1) * limit;
+                
+                let endpoint = `?limit=${limit}&offset=${offset}`;
+                
+                if (filters.user_id) {
+                    endpoint += `&user_id=${filters.user_id}`;
+                }
+                
+                if (filters.status) {
+                    endpoint += `&status=${filters.status}`;
+                }
+                
+                const data = await apiRequest(endpoint);
+                
+                // Update table
+                keysTable.innerHTML = '';
+                
+                if (data.data.length === 0) {
+                    keysTable.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center">No API keys found</td>
+                        </tr>
+                    `;
+                    paginationElem.innerHTML = '';
+                    return;
+                }
+                
+                data.data.forEach(key => {
+                    keysTable.innerHTML += `
+                        <tr>
+                            <td><span class="api-key-preview">${key.key_preview}</span></td>
+                            <td>${key.user ? `${key.user.username} (${key.user.first_name} ${key.user.last_name})` : 'Unknown'}</td>
+                            <td>${key.name}</td>
+                            <td>${formatDate(key.created_at)}</td>
+                            <td>${formatDate(key.last_used)}</td>
+                            <td>${key.usage_count}</td>
+                            <td>
+                                <span class="badge ${key.status === 'active' ? 'bg-success' : 'bg-danger'}">${key.status}</span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary view-key-btn" data-key="${key.key_preview}">View</button>
+                                ${key.status === 'active' ? `<button class="btn btn-sm btn-outline-danger revoke-btn" data-key="${key.key_preview}">Revoke</button>` : ''}
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                // Set up pagination
+                const totalPages = Math.ceil(data.pagination.total / limit);
+                paginationElem.innerHTML = '';
+                
+                if (totalPages > 1) {
+                    paginationElem.innerHTML += `
+                        <li class="page-item ${page === 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="#" data-page="${page - 1}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    `;
+                    
+                    for (let i = 1; i <= totalPages; i++) {
+                        paginationElem.innerHTML += `
+                            <li class="page-item ${i === page ? 'active' : ''}">
+                                <a class="page-link" href="#" data-page="${i}">${i}</a>
+                            </li>
+                        `;
+                    }
+                    
+                    paginationElem.innerHTML += `
+                        <li class="page-item ${page === totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="#" data-page="${page + 1}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    `;
+                    
+                    // Add pagination event listeners
+                    document.querySelectorAll('.page-link').forEach(link => {
+                        link.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const newPage = parseInt(this.getAttribute('data-page'));
+                            loadKeys(newPage, filters);
+                        });
+                    });
+                }
+                
+                // Add event listeners to view and revoke buttons
+                document.querySelectorAll('.view-key-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const keyPreview = this.getAttribute('data-key');
+                        showKeyDetails(keyPreview);
+                    });
+                });
+                
+                document.querySelectorAll('.revoke-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const keyPreview = this.getAttribute('data-key');
+                        if (confirm(`Are you sure you want to revoke this API key: ${keyPreview}?`)) {
+                            revokeKey(keyPreview);
+                        }
+                    });
+                });
+            } catch (error) {
+                keysTable.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            <div class="alert alert-danger">Error loading API keys: ${error.message}</div>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('pagination').innerHTML = '';
+            }
+        }
+        
+        // Show API key details
+        async function showKeyDetails(keyPreview) {
+            const modal = new bootstrap.Modal(document.getElementById('keyDetailsModal'));
+            const modalBody = document.getElementById('key-details-body');
+            const revokeBtn = document.getElementById('revoke-key-btn');
+            
+            modalBody.innerHTML = '<div class="loader"></div>';
+            revokeBtn.setAttribute('data-key', keyPreview);
+            
+            modal.show();
+            
+            try {
+                const data = await apiRequest(`/${keyPreview}`);
+                const key = data.data;
+                
+                modalBody.innerHTML = `
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">API Key:</div>
+                        <div class="col-md-8"><span class="api-key-preview">${key.key_preview}</span></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Name:</div>
+                        <div class="col-md-8">${key.name}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">User:</div>
+                        <div class="col-md-8">${key.user ? `${key.user.username} (${key.user.first_name} ${key.user.last_name})` : 'Unknown'}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Email:</div>
+                        <div class="col-md-8">${key.user ? key.user.email : 'Unknown'}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Status:</div>
+                        <div class="col-md-8">
+                            <span class="badge ${key.status === 'active' ? 'bg-success' : 'bg-danger'}">${key.status}</span>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Created:</div>
+                        <div class="col-md-8">${formatDate(key.created_at)}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Last Used:</div>
+                        <div class="col-md-8">${formatDate(key.last_used)}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Usage Count:</div>
+                        <div class="col-md-8">${key.usage_count}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Rate Limit:</div>
+                        <div class="col-md-8">${key.rate_limit} requests per day</div>
+                    </div>
+                `;
+                
+                // Hide revoke button if already revoked
+                if (key.status !== 'active') {
+                    revokeBtn.style.display = 'none';
+                } else {
+                    revokeBtn.style.display = 'block';
+                }
+            } catch (error) {
+                modalBody.innerHTML = `<div class="alert alert-danger">Error loading API key details: ${error.message}</div>`;
+                revokeBtn.style.display = 'none';
+            }
+        }
+        
+        // Generate new API key
+        async function generateKey(userId, name, rateLimit) {
+            try {
+                const keyResult = document.getElementById('key-result');
+                const generatedKeyElem = document.getElementById('generated-key');
+                
+                const data = await apiRequest('', 'POST', {
+                    user_id: userId,
+                    name: name,
+                    rate_limit: rateLimit
+                });
+                
+                generatedKeyElem.textContent = data.data.apiKey;
+                keyResult.style.display = 'block';
+                
+                // Auto-scroll to result
+                keyResult.scrollIntoView({ behavior: 'smooth' });
+                
+                // Refresh the overview stats
+                loadKeyStats();
+                
+                return data;
+            } catch (error) {
+                alert(`Error generating API key: ${error.message}`);
+                throw error;
+            }
+        }
+        
+        // Revoke API key
+        async function revokeKey(keyPreview) {
+            try {
+                await apiRequest(`/${keyPreview}`, 'DELETE');
+                
+                alert('API key revoked successfully');
+                
+                // Refresh data
+                loadKeyStats();
+                loadKeys();
+                
+                // Close modal if open
+                const modal = bootstrap.Modal.getInstance(document.getElementById('keyDetailsModal'));
+                if (modal) {
+                    modal.hide();
+                }
+            } catch (error) {
+                alert(`Error revoking API key: ${error.message}`);
+            }
+        }
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load initial data
+            loadKeyStats();
+            loadKeys();
+            
+            // Set up event listeners
+            
+            // Generate key form
+            document.getElementById('generate-key-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const userId = document.getElementById('user-id').value;
+                const keyName = document.getElementById('key-name').value;
+                const rateLimit = parseInt(document.getElementById('rate-limit').value) || 100;
+                
+                generateKey(userId, keyName, rateLimit);
+            });
+            
+            // Copy key button
+            document.getElementById('copy-key').addEventListener('click', function() {
+                const keyText = document.getElementById('generated-key').textContent;
+                navigator.clipboard.writeText(keyText)
+                    .then(() => {
+                        this.textContent = 'Copied!';
+                        setTimeout(() => {
+                            this.textContent = 'Copy Key';
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Could not copy text: ', err);
+                        alert('Failed to copy API key. Please select and copy it manually.');
+                    });
+            });
+            
+            // Filter buttons
+            document.getElementById('apply-filters').addEventListener('click', function() {
+                const userId = document.getElementById('search-user').value;
+                const status = document.getElementById('filter-status').value;
+                
+                loadKeys(1, {
+                    user_id: userId,
+                    status: status
+                });
+            });
+            
+            // Refresh button
+            document.getElementById('refresh-keys').addEventListener('click', function() {
+                loadKeys();
+            });
+            
+            // Revoke key button in modal
+            document.getElementById('revoke-key-btn').addEventListener('click', function() {
+                const keyPreview = this.getAttribute('data-key');
+                if (confirm(`Are you sure you want to revoke this API key: ${keyPreview}?`)) {
+                    revokeKey(keyPreview);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

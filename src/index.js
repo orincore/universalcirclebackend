@@ -59,6 +59,8 @@ const streakRoutes = require('./routes/streakRoutes');
 const wheelRoutes = require('./routes/wheelRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const memeRoutes = require('./routes/memeRoutes');
+const apiKeyRoutes = require('./routes/apiKeyRoutes');
+const adminApiKeyRoutes = require('./routes/adminApiKeyRoutes');
 
 // Initialize Express app
 const app = express();
@@ -163,17 +165,19 @@ app.use('/api/admin/auth', authLimiter, adminAuthRoutes);
 app.use('/api/admin/messages', adminMessageRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api/admin/reports', adminReportRoutes);
+app.use('/api/admin/verification', adminVerificationRoutes);
+app.use('/api/admin/keys', adminApiKeyRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/verification', verificationRoutes);
-app.use('/api/admin/verification', adminVerificationRoutes);
 app.use('/api/streaks', streakRoutes);
 app.use('/api/wheel', wheelRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/memes', memeRoutes);
+app.use('/api/keys', apiKeyRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

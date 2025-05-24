@@ -264,7 +264,7 @@ router.get('/:key', async (req, res) => {
       });
     }
     
-    // Sanitize the API key for security
+    // Include the full API key along with other details
     const sanitizedKey = {
       id: data.id,
       user: data.users,
@@ -275,7 +275,8 @@ router.get('/:key', async (req, res) => {
       status: data.status,
       rate_limit: data.rate_limit,
       permissions: data.permissions,
-      key_preview: `${data.key.substring(0, 8)}...${data.key.substring(data.key.length - 4)}`
+      key_preview: `${data.key.substring(0, 8)}...${data.key.substring(data.key.length - 4)}`,
+      key: data.key // Include the full API key
     };
     
     return res.json({

@@ -712,8 +712,8 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
     // Generate date of birth based on age using our utility function
     const dob = getDateOfBirthFromAge(age);
     
-    // Create unique ID for the bot
-    const botId = `bot_${uuidv4()}`;
+    // Create unique ID for the bot - use standard UUID without prefix
+    const botId = uuidv4();
     
     // Use AI to generate bio if available
     let bio = '';
@@ -747,7 +747,7 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
     
     // Create the bot profile with only fields that real users would have
     return {
-      id: botId,
+      id: botId, // Standard UUID without prefix
       firstName,
       lastName,
       username,
@@ -801,8 +801,8 @@ const generateFallbackBotProfile = (gender = 'male', preference = 'Friendship', 
   // Generate date of birth based on age
   const dob = getDateOfBirthFromAge(age);
   
-  // Create unique ID for the bot
-  const botId = `bot_${uuidv4()}`;
+  // Create unique ID for the bot - use standard UUID without prefix
+  const botId = uuidv4();
   
   // Simple fallback bio
   const bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
@@ -819,7 +819,7 @@ const generateFallbackBotProfile = (gender = 'male', preference = 'Friendship', 
   
   // Create the bot profile with only fields that real users would have
   return {
-    id: botId,
+    id: botId, // Standard UUID without prefix
     firstName,
     lastName,
     username,
@@ -846,6 +846,9 @@ const generateFallbackBotProfile = (gender = 'male', preference = 'Friendship', 
  */
 const generateBotResponse = async (userMessage, botProfile, preference = 'Friendship') => {
   try {
+    // Detect the language of the user message (simplified approach)
+    const isEnglishMessage = /^[A-Za-z\s\d.,!?'"\-():;]+$/.test(userMessage);
+    
     const prompt = `
       You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${botProfile.location}, India.
       You work as a ${botProfile.occupation} and have ${botProfile.education}.
@@ -854,11 +857,14 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
       
       You are chatting with someone on a ${preference.toLowerCase()} app. You are having a conversation in a ${preference.toLowerCase()} context, not a romantic one.
       
+      IMPORTANT: Respond in the SAME LANGUAGE that the person is using to talk to you. If they write in Hindi, respond in Hindi. If they write in Tamil, respond in Tamil. Match their language.
+      
       Respond naturally and conversationally to this message from them: "${userMessage}"
       
       Keep your response short (1-3 sentences), friendly, and authentic.
-      Don't use emojis or hashtags. Be conversational and natural.
+      Don't use emojis or hashtags. Be conversational and very natural like a real human.
       Don't mention that you are an AI.
+      Don't explain your behavior - just respond naturally.
     `;
     
     const result = await model.generateContent(prompt);
@@ -867,8 +873,22 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
   } catch (error) {
     console.error('Error generating bot response:', error);
     
-    // Fallback responses
-    const fallbackResponses = [
+    // Fallback responses in appropriate language based on simple detection
+    // Check if message is likely non-English
+    const isNonEnglish = /[^\x00-\x7F]/.test(userMessage);
+    
+    // Hindi fallback responses
+    const hindiFallbackResponses = [
+      "नमस्ते! आपसे बात करके अच्छा लगा। और बताइए अपने बारे में?",
+      "बहुत दिलचस्प! मुझे भी ऐसी चीज़ें पसंद हैं।",
+      "आप क्या करना पसंद करते हैं? मुझे ${botProfile.interests[0]} बहुत पसंद है।",
+      "वाह, यह तो बहुत अच्छा है! और सुनाइए?",
+      "मैं ${botProfile.location} में रहता/रहती हूँ। आप कहाँ से हैं?",
+      "ये बात मुझे पसंद आई! थोड़ा और बताइए?"
+    ];
+    
+    // English fallback responses
+    const englishFallbackResponses = [
       `That's interesting! Tell me more about yourself.`,
       `I enjoy ${botProfile.interests[0]} too! What else do you like to do?`,
       `I've been working as a ${botProfile.occupation} for a while now. What about you?`,
@@ -881,7 +901,10 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
       `That sounds like fun! I should try that sometime.`
     ];
     
-    return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+    // Choose appropriate language fallbacks
+    const fallbackResponses = isNonEnglish ? hindiFallbackResponses : englishFallbackResponses;
+    
+    return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)].replace(/\${botProfile\.interests\[0\]}/g, botProfile.interests[0] || "reading").replace(/\${botProfile\.interests\[1\]}/g, botProfile.interests[1] || "traveling").replace(/\${botProfile\.location}/g, botProfile.location || "Mumbai").replace(/\${botProfile\.occupation}/g, botProfile.occupation || "professional");
   }
 };
 

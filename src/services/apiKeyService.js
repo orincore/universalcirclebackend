@@ -138,22 +138,43 @@ async function trackApiKeyUsage(apiKey) {
       return;
     }
 
-    // Update the last used timestamp and increment usage count
-    const { error } = await supabase
+    // First, get the current usage count
+    const { data: keyData, error: fetchError } = await supabase
+      .from('api_keys')
+      .select('usage_count')
+      .eq('key', apiKey)
+      .single();
+
+    if (fetchError) {
+      logger.error('Error fetching current API key usage count:', {
+        error: fetchError.message,
+        code: fetchError.code,
+        apiKey: apiKey ? `${apiKey.substring(0, 8)}...` : 'undefined'
+      });
+      return;
+    }
+
+    // Now update with the incremented count
+    const currentCount = keyData?.usage_count || 0;
+    const newCount = currentCount + 1;
+
+    const { error: updateError } = await supabase
       .from('api_keys')
       .update({
         last_used: new Date(),
-        usage_count: supabase.raw('usage_count + 1')
+        usage_count: newCount
       })
       .eq('key', apiKey);
       
-    if (error) {
+    if (updateError) {
       logger.error('Error tracking API key usage:', {
-        error: error.message,
-        code: error.code,
-        hint: error.hint || 'No hint provided',
-        details: error.details || 'No details provided'
+        error: updateError.message,
+        code: updateError.code,
+        hint: updateError.hint || 'No hint provided',
+        details: updateError.details || 'No details provided'
       });
+    } else {
+      logger.debug(`Successfully updated API key usage. New count: ${newCount}`);
     }
   } catch (error) {
     // Provide more detailed error logging

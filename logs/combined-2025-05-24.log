@@ -1209,3 +1209,29 @@
 {"timestamp":"2025-05-24T18:08:15.685Z","level":"info","message":"Added 10 memes from IndianDankMemes, total: 10/10"}
 {"timestamp":"2025-05-24T18:08:15.686Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
 {"timestamp":"2025-05-24T18:08:16.017Z","level":"error","message":"supabase.raw is not a function","stack":"TypeError: supabase.raw is not a function\n    at trackApiKeyUsage (/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/services/apiKeyService.js:146:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)","apiKey":"093ebc34...","environment":"development"}
+{"timestamp":"2025-05-24T18:11:08.283Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-24T18:11:08.284Z","level":"info","message":"Successfully initialized Gemini AI model"}
+{"timestamp":"2025-05-24T18:11:09.046Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-24T18:11:09.046Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-24T18:11:09.046Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-24T18:11:09.080Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-24T18:11:09.082Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-24T18:11:09.083Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-24T18:11:09.083Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-24T18:11:09.089Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-24T18:11:09.089Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-24T18:11:09.092Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-24T18:11:09.092Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-24T18:11:09.092Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-24T18:11:09.120Z","level":"error","message":"(node:29568) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-24T18:11:09.125Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-24T18:11:09.634Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-24T18:11:09.634Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T18:11:09.634Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T18:11:09.634Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-24T18:11:10.724Z","level":"info","message":"Health check recorded successfully","cpuUsage":27,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.585315292},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-24T18:11:23.450Z","level":"debug","message":"Successfully updated API key usage. New count: 1"}
+{"timestamp":"2025-05-24T18:11:23.451Z","level":"info","message":"Fetching memes from subreddit: IndianDankMemes"}
+{"timestamp":"2025-05-24T18:11:24.976Z","level":"info","message":"Added 10 memes from IndianDankMemes, total: 10/10"}
+{"timestamp":"2025-05-24T18:11:24.976Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T18:11:25.111Z","level":"debug","message":"Successfully updated API key usage. New count: 2"}

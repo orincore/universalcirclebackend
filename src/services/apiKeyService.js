@@ -109,6 +109,35 @@ async function validateApiKey(apiKey) {
  */
 async function trackApiKeyUsage(apiKey) {
   try {
+    // Skip tracking for development API keys to avoid unnecessary database calls
+    if (process.env.NODE_ENV !== 'production') {
+      const devApiKey = process.env.DEV_API_KEY || 'dev-api-key-universalcircle-123456';
+      if (apiKey === devApiKey) {
+        logger.debug('Skipping usage tracking for development API key');
+        return;
+      }
+    }
+
+    // Special handling for fallback API keys or testing scenarios
+    if (!apiKey || apiKey === 'test-key' || apiKey.includes('fallback')) {
+      logger.debug('Skipping usage tracking for special key type');
+      return;
+    }
+
+    // Check if we can connect to the database before attempting update
+    try {
+      // A lightweight query to check database connection
+      const { error: pingError } = await supabase.from('api_keys').select('count', { count: 'exact', head: true });
+      
+      if (pingError) {
+        logger.warn(`Database connection check failed, skipping API key tracking: ${pingError.message}`);
+        return;
+      }
+    } catch (pingError) {
+      logger.warn(`Could not connect to database, skipping API key tracking: ${pingError.message}`);
+      return;
+    }
+
     // Update the last used timestamp and increment usage count
     const { error } = await supabase
       .from('api_keys')
@@ -119,10 +148,23 @@ async function trackApiKeyUsage(apiKey) {
       .eq('key', apiKey);
       
     if (error) {
-      logger.error('Error tracking API key usage:', error);
+      logger.error('Error tracking API key usage:', {
+        error: error.message,
+        code: error.code,
+        hint: error.hint || 'No hint provided',
+        details: error.details || 'No details provided'
+      });
     }
   } catch (error) {
-    logger.error('Error in trackApiKeyUsage:', error);
+    // Provide more detailed error logging
+    logger.error('Error in trackApiKeyUsage:', {
+      message: error.message,
+      stack: error.stack,
+      apiKey: apiKey ? `${apiKey.substring(0, 8)}...` : 'undefined',
+      environment: process.env.NODE_ENV || 'unknown'
+    });
+    
+    // Don't throw the error, just log it to prevent API disruption
   }
 }
 

@@ -849,7 +849,7 @@ const initializeSocket = (io) => {
     });
     
     // Handle messages in match rooms
-    socket.on('match:message', (data, callback) => {
+    socket.on('match:message', async (data, callback) => {
       try {
         const { matchId, message } = data;
         const userId = socket.user.id;
@@ -886,7 +886,45 @@ const initializeSocket = (io) => {
         const roomSize = room ? room.size : 1; // Count includes the sender
         const wasDelivered = roomSize > 1; // Delivered if more than just the sender
         
-        // Add to in-memory store or database here if needed for persistence
+        // Save message to database
+        try {
+          // Get match data to determine the recipient
+          let recipientId;
+          
+          // Check if this is a bot match
+          if (botMatches.has(matchId)) {
+            const botMatch = botMatches.get(matchId);
+            recipientId = botMatch.botProfile.id;
+          } else if (activeMatches.has(matchId)) {
+            // Regular user match
+            const matchData = activeMatches.get(matchId);
+            recipientId = matchData.users.find(id => id !== userId);
+          } else {
+            throw new Error(`Match ${matchId} not found in activeMatches or botMatches`);
+          }
+          
+          // Insert message into database
+          const { data: savedMessage, error: dbError } = await supabase
+            .from('messages')
+            .insert({
+              id: messageId,
+              sender_id: userId,
+              receiver_id: recipientId,
+              content: message,
+              is_read: false,
+              created_at: timestamp,
+              updated_at: timestamp
+            });
+          
+          if (dbError) {
+            throw new Error(`Database error: ${dbError.message}`);
+          }
+          
+          info(`Saved message from ${userId} to ${recipientId} in database`);
+        } catch (dbError) {
+          error(`Error saving message to database: ${dbError.message}`);
+          // Don't fail the operation, continue sending the message
+        }
         
         // Emit the message to the match room
         socket.to(matchId).emit('match:message', messageObject);
@@ -903,28 +941,13 @@ const initializeSocket = (io) => {
         if (botMatches.has(matchId)) {
           handleBotResponse(matchId, message, socket);
         }
-        
-        // Provide callback response if client is listening for it
-        if (typeof callback === 'function') {
-          callback({
-            success: true,
-            messageId,
-            deliveryStatus: wasDelivered ? 'delivered' : 'sent',
-            recipientCount: Math.max(0, roomSize - 1)
-          });
-        }
       } catch (error) {
-        console.error('Error sending match message:', error);
-        const errorData = { 
+        error(`Error handling match message: ${error.message}`);
+        socket.emit('error', { 
           source: 'match:message',
-          message: 'Failed to send message', 
-          details: error.message 
-        };
-        socket.emit('error', errorData);
-        
-        if (typeof callback === 'function') {
-          callback({ success: false, error: errorData });
-        }
+          message: 'Failed to process message' 
+        });
+        if (typeof callback === 'function') callback({ success: false, error: { message: error.message } });
       }
     });
 
@@ -3069,6 +3092,15 @@ const findMatchForUser = async (socket) => {
         // Reset processing flag
         userPoolData.isBeingProcessed = false;
         
+        // Create match in database
+        try {
+          // Create match record in database
+          await createMatchInDatabase(matchId, userId, botProfile.id);
+        } catch (dbError) {
+          error(`Error creating bot match in database: ${dbError.message}`);
+          // Continue despite database error - treat as non-critical
+        }
+        
         // Notify user of the match
         const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
         socket.emit('match:found', { match: userMatchData });
@@ -3364,11 +3396,12 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     
     setTimeout(async () => {
       try {
-        // Generate bot response
+        // Generate bot response - pass userId to enable database storage
         const botResponse = await generateBotResponse(
           userMessage,
           botMatch.botProfile,
-          botMatch.preference
+          botMatch.preference,
+          socket.user.id // Pass user ID for database storage
         );
         
         // Generate a message ID for the bot's response

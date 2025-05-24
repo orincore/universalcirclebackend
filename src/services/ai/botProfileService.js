@@ -17,6 +17,7 @@ const indianMaleFirstNames = [
   'Rohan', 'Siddharth', 'Yash', 'Sai', 'Pranav', 'Virat'
 ];
 
+//List of common Indian female first names
 const indianFemaleFirstNames = [
   'Saanvi', 'Aanya', 'Aadhya', 'Aaradhya', 'Ananya', 'Pari', 'Anika', 'Navya', 
   'Angel', 'Diya', 'Myra', 'Sara', 'Iraa', 'Ahana', 'Anvi', 'Prisha', 'Riya', 

@@ -58,6 +58,7 @@ const adminVerificationRoutes = require('./routes/adminVerificationRoutes');
 const streakRoutes = require('./routes/streakRoutes');
 const wheelRoutes = require('./routes/wheelRoutes');
 const gameRoutes = require('./routes/gameRoutes');
+const memeRoutes = require('./routes/memeRoutes');
 
 // Initialize Express app
 const app = express();
@@ -172,6 +173,7 @@ app.use('/api/admin/verification', adminVerificationRoutes);
 app.use('/api/streaks', streakRoutes);
 app.use('/api/wheel', wheelRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/memes', memeRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

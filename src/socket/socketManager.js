@@ -767,27 +767,37 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
   try {
     console.log(`Creating match record in database: ${matchId} between ${user1Id} and ${user2Id}`);
     
-    // Verify both users exist in the database
-    const { data: user1, error: user1Error } = await supabase
+    // First verify that both users exist in the database
+    const { data: user1Exists, error: user1Error } = await supabase
       .from('users')
       .select('id')
       .eq('id', user1Id)
       .single();
       
-    if (user1Error || !user1) {
-      error(`User1 ${user1Id} does not exist in database: ${user1Error?.message || 'Not found'}`);
-      return { success: false, error: { message: `User ${user1Id} not found in database` } };
+    if (user1Error && user1Error.code !== 'PGRST116') {
+      console.error(`Error checking if user1 (${user1Id}) exists:`, user1Error);
+      return { success: false, error: user1Error };
     }
     
-    const { data: user2, error: user2Error } = await supabase
+    if (!user1Exists) {
+      console.error(`User1 (${user1Id}) does not exist in the database`);
+      return { success: false, error: { message: `User ${user1Id} does not exist in the database` } };
+    }
+    
+    const { data: user2Exists, error: user2Error } = await supabase
       .from('users')
       .select('id')
       .eq('id', user2Id)
       .single();
       
-    if (user2Error || !user2) {
-      error(`User2 ${user2Id} does not exist in database: ${user2Error?.message || 'Not found'}`);
-      return { success: false, error: { message: `User ${user2Id} not found in database` } };
+    if (user2Error && user2Error.code !== 'PGRST116') {
+      console.error(`Error checking if user2 (${user2Id}) exists:`, user2Error);
+      return { success: false, error: user2Error };
+    }
+    
+    if (!user2Exists) {
+      console.error(`User2 (${user2Id}) does not exist in the database`);
+      return { success: false, error: { message: `User ${user2Id} does not exist in the database` } };
     }
     
     // First, check if a match already exists between these users
@@ -1497,82 +1507,27 @@ const findMatchForUser = async (socket) => {
           isBot: true
         });
         
+        // Create the match in the database
+        const matchResult = await createMatchInDatabase(matchId, userId, botProfile.id);
+        if (!matchResult.success) {
+          console.error('Failed to create bot match in database:', matchResult.error);
+        } else {
+          console.log(`Successfully created bot match in database: ${matchId}`);
+        }
+        
         // Remove user from matchmaking pool
         matchmakingPool.delete(userId);
         
         // Reset processing flag
         userPoolData.isBeingProcessed = false;
         
-        // Create match in database
-        try {
-          // Create match record in database
-          console.log(`[MATCH DEBUG] Creating match record in database between user ${userId} and bot ${botProfile.id}`);
-          const result = await createMatchInDatabase(matchId, userId, botProfile.id);
-          
-          if (!result || !result.success) {
-            console.error(`[MATCH DEBUG] Failed to create match in database: ${result?.error?.message || 'Unknown error'}`);
-            throw new Error(result?.error?.message || 'Failed to create match in database');
-          }
-          
-          console.log(`[MATCH DEBUG] Successfully created match record in database with ID ${matchId}`);
-          
-          // Notify user of the match
-          const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
-          socket.emit('match:found', { match: userMatchData });
-          
-          console.log(`[MATCH DEBUG] Notified user ${userId} about match with bot ${botProfile.id}`);
-          
-          // Clear user timeout
-          clearMatchmakingTimeouts(userId);
-          
-          // Set timeout for match acceptance (even though bot auto-accepts)
-          const timeoutId = setTimeout(() => {
-            // Check if match still exists and hasn't been accepted by the user
-            if (activeMatches.has(matchId)) {
-              const matchData = activeMatches.get(matchId);
-              const userAccepted = matchData.acceptances[userId];
-              
-              if (!userAccepted) {
-                console.log(`[MATCH DEBUG] Bot match ${matchId} timed out due to no user response`);
-                
-                // Notify user
-                const socketId = connectedUsers.get(userId);
-                if (socketId) {
-                  ioInstance.to(socketId).emit('match:timeout', {
-                    matchId,
-                    message: 'Match timed out due to no response'
-                  });
-                }
-                
-                // Clean up
-                activeMatches.delete(matchId);
-                botMatches.delete(matchId);
-              }
-            }
-          }, MATCH_ACCEPTANCE_TIMEOUT);
-          
-          userTimeouts.set(userId, timeoutId);
-          
-        } catch (dbError) {
-          console.error(`[MATCH DEBUG] Error creating bot match in database: ${dbError.message}`);
-          
-          // If we can't create the match, abort and try again with a real user
-          activeMatches.delete(matchId);
-          botMatches.delete(matchId);
-          
-          // Put user back in pool
-          userPoolData.isBeingProcessed = false;
-          matchmakingPool.set(userId, userPoolData);
-          
-          // Notify user
-          socket.emit('match:notFound', { 
-            message: 'We encountered an issue creating your match. Please try again.' 
-          });
-          
-          return;
-        }
+        // Notify user of the match
+        const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
+        socket.emit('match:found', { match: userMatchData });
+        
+        console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
       } catch (error) {
-        console.error(`[MATCH DEBUG] Error creating bot match: ${error.message}`);
+        console.error('Error creating bot match:', error);
         console.error(error.stack);
         
         // Fallback to standard behavior
@@ -1808,169 +1763,94 @@ module.exports = {
  * Handle bot responses to user messages
  * @param {string} matchId - Match ID
  * @param {string} userMessage - Message from user
- * @param {object} userSocket - User's socket
+ * @param {object} socket - User's socket
  */
-const handleBotResponse = async (matchId, userMessage, userSocket) => {
+const handleBotResponse = async (matchId, userMessage, socket) => {
   try {
-    console.log(`[BOT DEBUG] Starting bot response handler for match ${matchId}`);
-    
-    // Get the bot match data
+    // Get bot match data
     const botMatch = botMatches.get(matchId);
     if (!botMatch) {
-      console.error(`[BOT DEBUG] No bot match found for matchId: ${matchId}`);
+      console.error(`Bot match ${matchId} not found`);
       return;
     }
     
-    const { botProfile, userId } = botMatch;
-    console.log(`[BOT DEBUG] Bot match found. Bot: ${botProfile.id}, User: ${userId}`);
-    
-    // Add user message to match history for context
-    if (!matchMessageHistory.has(matchId)) {
-      matchMessageHistory.set(matchId, []);
-    }
-    
-    const history = matchMessageHistory.get(matchId);
-    history.push({ role: 'user', content: userMessage });
-    
-    // Keep only the last 10 messages for context
-    if (history.length > 10) {
-      history.splice(0, history.length - 10);
-    }
-    
-    // Get user socket if it wasn't provided
-    let socket = userSocket;
-    if (!socket) {
-      const userSocketId = connectedUsers.get(userId);
-      if (!userSocketId) {
-        console.error(`[BOT DEBUG] No socket found for user ${userId}`);
-        return;
-      }
-      socket = ioInstance.sockets.sockets.get(userSocketId);
-      if (!socket) {
-        console.error(`[BOT DEBUG] Could not get socket for user ${userId} with socketId ${userSocketId}`);
-        return;
-      }
-    }
-    
-    // Check if socket is valid and has emit function
-    if (!socket || typeof socket.emit !== 'function') {
-      console.error(`[BOT DEBUG] Invalid socket object for user ${userId}. Socket exists: ${!!socket}`);
+    // Verify the bot exists in the database
+    const botExists = await verifyBotExists(botMatch.botProfile.id);
+    if (!botExists) {
+      console.error(`Bot ${botMatch.botProfile.id} does not exist in the database. Cannot process message.`);
       return;
-    } else {
-      console.log(`[BOT DEBUG] Valid socket found for user ${userId}`);
     }
     
-    // Send an immediate simple response to ensure user gets something
-    const immediateResponse = {
-      id: uuidv4(),
-      senderId: botProfile.id,
-      senderName: botProfile.username || botProfile.first_name,
-      message: "I'm thinking...",
-      timestamp: new Date().toISOString(),
-      isTyping: true
-    };
+    // Add user message to match history
+    botMatch.messages.push({
+      senderId: socket.user.id,
+      message: userMessage,
+      timestamp: new Date().toISOString()
+    });
     
-    console.log(`[BOT DEBUG] Sending immediate response to user ${userId}`);
-    socket.emit('match:message', immediateResponse);
+    // Add a slight delay to make the response seem more natural
+    const responseDelay = 1000 + Math.random() * 3000; // 1-4 seconds
     
-    // Wait a short time to simulate typing
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Prepare a fallback response in case AI generation fails
-    const fallbackResponses = [
-      "That's interesting! Tell me more about it.",
-      "I understand. What else is on your mind?",
-      "I'd love to hear more about that.",
-      "Interesting perspective! I appreciate you sharing that with me.",
-      "Thanks for sharing that with me. How has your day been going?",
-      "I see what you mean. What else would you like to talk about?"
-    ];
-    
-    let botMessage = "";
-    
-    try {
-      // Prepare prompt for AI
-      const prompt = `You are ${botProfile.first_name}, a ${botProfile.age}-year-old ${botProfile.gender} from ${botProfile.city || 'the area'}. 
-      Your interests include ${botProfile.interests.join(', ')}. 
-      Your education background is ${botProfile.education || 'not specified'} and your occupation is ${botProfile.occupation || 'not specified'}.
-      
-      You are having a chat conversation with a user. Respond naturally as if you were a real person using casual, friendly language.
-      Keep your response fairly brief (1-3 sentences) and conversational. Do not use hashtags or emojis.
-      
-      Respond to this message from the user: "${userMessage}"`;
-      
-      // Try to generate AI response
-      if (typeof model !== 'undefined') {
-        console.log(`[BOT DEBUG] Generating AI response using model`);
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        botMessage = response.text().trim();
-        console.log(`[BOT DEBUG] Generated AI response: "${botMessage.substring(0, 30)}..."`);
-      } else {
-        console.error(`[BOT DEBUG] AI model not available, using fallback`);
-        throw new Error('AI model not available');
-      }
-    } catch (aiError) {
-      console.error(`[BOT DEBUG] Error generating AI content: ${aiError.message}`);
-      // Use fallback response if AI generation fails
-      botMessage = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-      console.log(`[BOT DEBUG] Using fallback response: "${botMessage}"`);
-    }
-    
-    // Ensure we have a message to send
-    if (!botMessage || botMessage.trim() === '') {
-      botMessage = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-      console.log(`[BOT DEBUG] Empty response from AI, using fallback: "${botMessage}"`);
-    }
-    
-    // Prepare bot response
-    const messageId = uuidv4();
-    const timestamp = new Date().toISOString();
-    
-    const botResponseObject = {
-      id: messageId,
-      senderId: botProfile.id,
-      senderName: botProfile.username || botProfile.first_name,
-      message: botMessage,
-      timestamp,
-      isBot: true
-    };
-    
-    // Save bot message to history
-    history.push({ role: 'assistant', content: botMessage });
-    
-    // Send bot response to user
-    console.log(`[BOT DEBUG] Sending bot response to user ${userId}`);
-    socket.emit('match:message', botResponseObject);
-    
-    // Save message to database (fire and forget)
-    try {
-      console.log(`[BOT DEBUG] Saving bot message to database`);
-      const { error: dbError } = await supabase
-        .from('messages')
-        .insert({
-          id: messageId,
-          sender_id: botProfile.id,
-          receiver_id: userId,
-          content: botMessage,
-          is_read: false,
-          created_at: timestamp,
-          updated_at: timestamp
+    setTimeout(async () => {
+      try {
+        // Generate bot response
+        const botResponse = await generateBotResponse(
+          userMessage,
+          botMatch.botProfile,
+          botMatch.preference
+        );
+        
+        // Generate a message ID for the bot's response
+        const botMessageId = uuidv4();
+        const timestamp = new Date().toISOString();
+        
+        // Prepare the message object
+        const messageObject = {
+          id: botMessageId,
+          senderId: botMatch.botProfile.id,
+          senderName: botMatch.botProfile.username || `${botMatch.botProfile.firstName}`,
+          message: botResponse,
+          timestamp
+        };
+        
+        // Add bot message to match history
+        botMatch.messages.push({
+          senderId: botMatch.botProfile.id,
+          message: botResponse,
+          timestamp
         });
-      
-      if (dbError) {
-        console.error(`[BOT DEBUG] Database error saving bot message: ${dbError.message}`);
-      } else {
-        console.log(`[BOT DEBUG] Bot message saved to database`);
+        
+        // Get user socket ID
+        const userSocketId = connectedUsers.get(botMatch.userId);
+        if (userSocketId) {
+          // Send bot message to user
+          ioInstance.to(userSocketId).emit('match:message', messageObject);
+        }
+        
+        // Save message to database
+        try {
+          const { error: messageError } = await supabase
+            .from('messages')
+            .insert({
+              id: botMessageId,
+              match_id: matchId,
+              sender_id: botMatch.botProfile.id,
+              receiver_id: botMatch.userId,
+              content: botResponse,
+              created_at: timestamp
+            });
+            
+          if (messageError) {
+            console.error('Error saving bot message to database:', messageError);
+          }
+        } catch (dbError) {
+          console.error('Database error saving bot message:', dbError);
+        }
+      } catch (error) {
+        console.error('Error generating bot response:', error);
       }
-    } catch (dbError) {
-      console.error(`[BOT DEBUG] Error saving bot message to database: ${dbError.message}`);
-      // Don't block the flow if database save fails
-    }
-    
-    console.log(`[BOT DEBUG] Bot response completed for match ${matchId}`);
+    }, responseDelay);
   } catch (error) {
-    console.error(`[BOT DEBUG] Critical error in handleBotResponse: ${error.message}`);
-    console.error(error.stack);
+    console.error('Error handling bot response:', error);
   }
-}
+};

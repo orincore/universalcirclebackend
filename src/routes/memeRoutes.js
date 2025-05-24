@@ -5,14 +5,30 @@ const apiKeyAuth = require('../middlewares/apiKeyAuth');
 const logger = require('../utils/logger');
 const { trackApiKeyUsage } = require('../services/apiKeyService');
 
+// Add more variety to User-Agent to avoid Reddit blocking
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (iPad; CPU OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (compatible; UniversalCircleApp/1.0; +https://universalcircle.in)'
+];
+
+// Get a random User-Agent
+function getRandomUserAgent() {
+  const randomIndex = Math.floor(Math.random() * USER_AGENTS.length);
+  return USER_AGENTS[randomIndex];
+}
+
 // Configure axios defaults for Reddit API with improved User-Agent
 const axiosInstance = axios.create({
   headers: {
     // More detailed User-Agent to avoid Reddit API blocking
-    'User-Agent': 'Mozilla/5.0 (compatible; UniversalCircleApp/1.0; +https://universalcircle.in)'
+    'User-Agent': getRandomUserAgent()
   },
   // Add timeout to avoid hanging requests
-  timeout: 10000
+  timeout: 15000 // Extended timeout for slower connections
 });
 
 // Fallback memes for when Reddit API fails completely
@@ -49,23 +65,72 @@ const FALLBACK_MEMES = [
     created_utc: Math.floor(Date.now() / 1000),
     nsfw: false,
     post_hint: "image"
+  },
+  {
+    title: "The face you make when someone says 'just one more quick change'",
+    image_url: "https://i.imgur.com/K9qRmwd.jpg",
+    author: "UniversalCircle",
+    subreddit: "fallback",
+    upvotes: 666,
+    permalink: "https://universalcircle.in",
+    created_utc: Math.floor(Date.now() / 1000),
+    nsfw: false,
+    post_hint: "image"
+  },
+  {
+    title: "Trying to explain my code to non-developers",
+    image_url: "https://i.imgur.com/kxG3b3H.jpg",
+    author: "UniversalCircle",
+    subreddit: "fallback",
+    upvotes: 555,
+    permalink: "https://universalcircle.in",
+    created_utc: Math.floor(Date.now() / 1000),
+    nsfw: false,
+    post_hint: "image"
+  },
+  {
+    title: "When the client asks for a small change that breaks everything",
+    image_url: "https://i.imgur.com/9mHzW0k.jpg",
+    author: "UniversalCircle",
+    subreddit: "fallback",
+    upvotes: 444,
+    permalink: "https://universalcircle.in",
+    created_utc: Math.floor(Date.now() / 1000),
+    nsfw: false,
+    post_hint: "image"
+  },
+  {
+    title: "That feeling when your code works on the first try",
+    image_url: "https://i.imgur.com/vYGLKIQ.jpg",
+    author: "UniversalCircle",
+    subreddit: "fallback",
+    upvotes: 333,
+    permalink: "https://universalcircle.in",
+    created_utc: Math.floor(Date.now() / 1000),
+    nsfw: false,
+    post_hint: "image"
   }
 ];
 
-// List of Indian meme subreddits with fallbacks
+// List of Indian meme subreddits with fallbacks - prioritized by reliability
 const INDIAN_MEME_SUBREDDITS = [
-  "IndianDankMemes", 
-  "IndianMeyMeys", 
-  "memes", 
-  "dankindianmemes", 
-  "PoliticalIndianMemes",
+  "IndianDankMemes",  // Most reliable based on logs
+  "memes",            // General memes as fallback
+  "IndianMeyMeys",
   "indiameme",
-  "desimemes",
   "SaimanSays",
-  "Indiangirlsontinder",
+  "dankindianmemes",
+  "india",
+  "delhi",
+  "mumbai",
+  "bangalore",
+  "bollywood",
+  "cricket",
+  "desimemes",
   "indianpeoplefacebook",
+  "PoliticalIndianMemes",
   "BollyBlindsNGossip",
-  "india"
+  "Indiangirlsontinder"
 ];
 
 // Default number of memes to return
@@ -74,14 +139,15 @@ const DEFAULT_MEME_COUNT = 10;
 // Track problematic subreddits to avoid them in future requests during this server session
 const problematicSubreddits = new Set();
 
-// Reset problematic subreddits every hour to give them another chance
+// Reset problematic subreddits every 30 minutes to give them another chance
+// This is reduced from 1 hour to improve recovery speed
 setInterval(() => {
   const count = problematicSubreddits.size;
   if (count > 0) {
     logger.info(`Resetting ${count} problematic subreddits to give them another chance`);
     problematicSubreddits.clear();
   }
-}, 60 * 60 * 1000); // 1 hour
+}, 30 * 60 * 1000); // 30 minutes
 
 // Public endpoint to get API status (no API key required)
 router.get('/status', (req, res) => {
@@ -112,7 +178,8 @@ router.get('/status', (req, res) => {
       }
     ],
     supported_subreddits: availableSubreddits,
-    problematic_count: problematicSubreddits.size
+    problematic_count: problematicSubreddits.size,
+    fallback_count: FALLBACK_MEMES.length
   });
 });
 
@@ -137,6 +204,75 @@ function getRandomItems(array, count) {
   return shuffled.slice(0, count);
 }
 
+// Third-level fallback method using a different Reddit URL structure
+async function fetchSubredditPostsLastResort(subreddit) {
+  try {
+    // If this subreddit has been problematic, skip it
+    if (problematicSubreddits.has(subreddit)) {
+      logger.warn(`Skipping previously problematic subreddit: ${subreddit}`);
+      return { success: false, message: 'Subreddit previously failed' };
+    }
+    
+    logger.info(`Fetching memes from subreddit: ${subreddit} (last resort method)`);
+    
+    // Try using Reddit's old interface which might have different rate limiting
+    const response = await axios.get(
+      `https://old.reddit.com/r/${subreddit}/top.json?sort=top&t=week&limit=50`,
+      { 
+        timeout: 15000,
+        headers: {
+          'User-Agent': getRandomUserAgent()
+        },
+        validateStatus: status => status < 500
+      }
+    );
+    
+    // Handle different status codes
+    if (response.status !== 200) {
+      if (response.status === 403 || response.status === 404) {
+        logger.warn(`Subreddit ${subreddit} is restricted or not found in last resort attempt. Adding to problematic list.`);
+        problematicSubreddits.add(subreddit);
+      } else {
+        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit} in last resort attempt`);
+      }
+      return { success: false, status: response.status, message: `Reddit API returned status ${response.status}` };
+    }
+    
+    if (!response.data?.data?.children?.length) {
+      logger.warn(`No posts found in subreddit: ${subreddit} (last resort method)`);
+      return { success: false, message: 'No posts found' };
+    }
+    
+    // Filter for image posts with more flexible criteria
+    const posts = response.data.data.children.filter(post => 
+      !post.data.stickied && 
+      (post.data.url.endsWith('.jpg') || 
+       post.data.url.endsWith('.png') || 
+       post.data.url.endsWith('.gif') || 
+       post.data.url.endsWith('.jpeg') ||
+       post.data.url.includes('i.redd.it') ||
+       post.data.url.includes('imgur.com') ||
+       (post.data.post_hint && post.data.post_hint.includes('image')))
+    );
+    
+    if (posts.length === 0) {
+      logger.warn(`No valid image posts found in subreddit: ${subreddit} (last resort method)`);
+      return { success: false, message: 'No valid image posts found' };
+    }
+    
+    return { success: true, posts };
+  } catch (error) {
+    logger.error(`Error fetching from subreddit ${subreddit} (last resort): ${error.message}`);
+    
+    // If the request was blocked or failed, mark this subreddit as problematic
+    if (error.response?.status === 403 || error.response?.status === 404) {
+      problematicSubreddits.add(subreddit);
+    }
+    
+    return { success: false, message: error.message };
+  }
+}
+
 // Alternative method to fetch Reddit content using .json approach
 async function fetchSubredditPostsAlternative(subreddit) {
   try {
@@ -152,9 +288,9 @@ async function fetchSubredditPostsAlternative(subreddit) {
     const response = await axios.get(
       `https://www.reddit.com/r/${subreddit}.json?limit=100`,
       { 
-        timeout: 8000,
+        timeout: 15000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; UniversalCircleApp/1.0; +https://universalcircle.in)'
+          'User-Agent': getRandomUserAgent()
         },
         validateStatus: status => status < 500
       }
@@ -163,17 +299,17 @@ async function fetchSubredditPostsAlternative(subreddit) {
     // Handle different status codes
     if (response.status !== 200) {
       if (response.status === 403 || response.status === 404) {
-        logger.warn(`Subreddit ${subreddit} is restricted or not found. Adding to problematic list.`);
-        problematicSubreddits.add(subreddit);
+        logger.warn(`Subreddit ${subreddit} is restricted or not found. Trying last resort method before giving up.`);
+        return await fetchSubredditPostsLastResort(subreddit);
       } else {
-        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit}`);
+        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit}. Trying last resort method.`);
+        return await fetchSubredditPostsLastResort(subreddit);
       }
-      return { success: false, status: response.status, message: `Reddit API returned status ${response.status}` };
     }
     
     if (!response.data?.data?.children?.length) {
-      logger.warn(`No posts found in subreddit: ${subreddit}`);
-      return { success: false, message: 'No posts found' };
+      logger.warn(`No posts found in subreddit: ${subreddit}. Trying last resort method.`);
+      return await fetchSubredditPostsLastResort(subreddit);
     }
     
     // Filter for image posts
@@ -188,20 +324,17 @@ async function fetchSubredditPostsAlternative(subreddit) {
     );
     
     if (posts.length === 0) {
-      logger.warn(`No valid image posts found in subreddit: ${subreddit}`);
-      return { success: false, message: 'No valid image posts found' };
+      logger.warn(`No valid image posts found in subreddit: ${subreddit}. Trying last resort method.`);
+      return await fetchSubredditPostsLastResort(subreddit);
     }
     
     return { success: true, posts };
   } catch (error) {
     logger.error(`Error fetching from subreddit ${subreddit} (alternative): ${error.message}`);
     
-    // If the request was blocked or failed, mark this subreddit as problematic
-    if (error.response?.status === 403 || error.response?.status === 404) {
-      problematicSubreddits.add(subreddit);
-    }
-    
-    return { success: false, message: error.message };
+    // Try the last resort method before giving up
+    logger.warn(`Alternative method failed for ${subreddit}, trying last resort method...`);
+    return await fetchSubredditPostsLastResort(subreddit);
   }
 }
 
@@ -217,8 +350,16 @@ async function fetchSubredditPosts(subreddit) {
     logger.info(`Fetching memes from subreddit: ${subreddit}`);
     
     try {
+      // Use a new axios instance with a fresh random User-Agent for each request
+      const tempAxios = axios.create({
+        headers: {
+          'User-Agent': getRandomUserAgent()
+        },
+        timeout: 15000
+      });
+      
       // First try the standard approach
-      const response = await axiosInstance.get(
+      const response = await tempAxios.get(
         `https://www.reddit.com/r/${subreddit}/hot.json?limit=100`,
         { validateStatus: status => status < 500 }
       );
@@ -232,7 +373,7 @@ async function fetchSubredditPosts(subreddit) {
       
       if (!response.data?.data?.children?.length) {
         logger.warn(`No posts found in subreddit: ${subreddit}`);
-        return { success: false, message: 'No posts found' };
+        return await fetchSubredditPostsAlternative(subreddit);
       }
       
       // Filter for image posts
@@ -248,7 +389,7 @@ async function fetchSubredditPosts(subreddit) {
       
       if (posts.length === 0) {
         logger.warn(`No valid image posts found in subreddit: ${subreddit}`);
-        return { success: false, message: 'No valid image posts found' };
+        return await fetchSubredditPostsAlternative(subreddit);
       }
       
       return { success: true, posts };
@@ -310,18 +451,35 @@ router.get('/:subreddit', async (req, res) => {
     
     // If this is a known problematic subreddit
     if (problematicSubreddits.has(subreddit)) {
-      return res.status(403).json({
-        success: false,
-        message: `Subreddit r/${subreddit} is restricted, private, or cannot be accessed by the API`
+      // Instead of error, use fallback memes
+      logger.warn(`Requested problematic subreddit ${subreddit}, using fallback memes`);
+      
+      const fallbackCount = Math.min(count, FALLBACK_MEMES.length);
+      const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
+      
+      return res.json({
+        count: fallbackMemes.length,
+        source: "fallback_problematic_subreddit",
+        requested_subreddit: subreddit,
+        memes: fallbackMemes
       });
     }
     
     const result = await fetchSubredditPosts(subreddit);
     
     if (!result.success) {
-      return res.status(result.status || 404).json({
-        success: false,
-        message: result.message || `Failed to fetch memes from subreddit: ${subreddit}`
+      // Use fallback memes instead of returning error
+      logger.warn(`Failed to fetch from ${subreddit}, using fallback memes`);
+      
+      const fallbackCount = Math.min(count, FALLBACK_MEMES.length);
+      const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
+      
+      return res.json({
+        count: fallbackMemes.length,
+        source: "fallback_fetch_failed",
+        requested_subreddit: subreddit,
+        error_details: result.message,
+        memes: fallbackMemes
       });
     }
     
@@ -342,10 +500,16 @@ router.get('/:subreddit', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching memes:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching memes from Reddit',
-      error: error.message
+    
+    // Even for unexpected errors, use fallback memes
+    const fallbackCount = Math.min(DEFAULT_MEME_COUNT, FALLBACK_MEMES.length);
+    const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
+    
+    return res.json({
+      count: fallbackMemes.length,
+      source: "fallback_error",
+      memes: fallbackMemes,
+      error_details: error.message
     });
   }
 });
@@ -375,7 +539,7 @@ router.get('/', async (req, res) => {
       
       return res.json({
         count: fallbackMemes.length,
-        source: "fallback",
+        source: "fallback_all_problematic",
         memes: fallbackMemes
       });
     }
@@ -420,8 +584,29 @@ router.get('/', async (req, res) => {
       
       return res.json({
         count: fallbackMemes.length,
-        source: "fallback",
+        source: "fallback_fetch_failed",
         memes: fallbackMemes
+      });
+    }
+    
+    // If we got some memes but not enough, fill the rest with fallbacks
+    if (allMemes.length < memesNeeded && FALLBACK_MEMES.length > 0) {
+      logger.info(`Only got ${allMemes.length}/${memesNeeded} memes, adding fallbacks to complete the request`);
+      
+      const needFallbacks = memesNeeded - allMemes.length;
+      const fallbackCount = Math.min(needFallbacks, FALLBACK_MEMES.length);
+      const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
+      
+      // Add fallbacks to the collection
+      allMemes.push(...fallbackMemes);
+      
+      logger.info(`Successfully fetched ${allMemes.length} memes (${fallbackCount} from fallbacks)`);
+      
+      return res.json({
+        count: allMemes.length,
+        source: "mixed",
+        fallback_count: fallbackCount,
+        memes: allMemes
       });
     }
     

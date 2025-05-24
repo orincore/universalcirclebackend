@@ -7,7 +7,19 @@ const supabase = require('../../config/database');
 // Initialize Google Generative AI client
 const API_KEY = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+// Create model with fallback to ensure we don't crash
+let model;
+try {
+  if (!API_KEY) {
+    console.error('GEMINI_API_KEY is not set in environment variables');
+  } else {
+    model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    console.log('Successfully initialized Gemini AI model');
+  }
+} catch (err) {
+  console.error('Failed to initialize Gemini AI model:', err);
+}
 
 // Lists of common Indian first names
 const indianMaleFirstNames = [
@@ -779,6 +791,10 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
     // Use AI to generate bio if available
     let bio = '';
     try {
+      if (!model) {
+        throw new Error('AI model not initialized or unavailable');
+      }
+
       const prompt = `
         Generate a ${preference.toLowerCase()} profile bio for a ${age}-year-old ${normalizedGender} from ${city}, India named ${firstName}. 
         Their interests include ${interests.join(', ')}.
@@ -790,10 +806,12 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       const result = await model.generateContent(prompt);
       const response = await result.response;
       bio = response.text().trim();
+      console.log(`Successfully generated AI bio for bot ${botId}`);
     } catch (aiError) {
       console.error('Error generating AI bio:', aiError);
-      // Fallback bio
+      // Fallback bio without using AI
       bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
+      console.log(`Using fallback bio for bot ${botId} due to AI error`);
     }
     
     // Create profile picture URL using randomuser.me API
@@ -957,33 +975,44 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
     // Detect the language of the user message (simplified approach)
     const isEnglishMessage = /^[A-Za-z\s\d.,!?'"\-():;]+$/.test(userMessage);
     
-    const prompt = `
-      You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${botProfile.location}, India.
-      You work as a ${botProfile.occupation} and have ${botProfile.education}.
-      Your interests include ${botProfile.interests.join(', ')}.
-      Your bio: "${botProfile.bio}"
-      
-      You are chatting with someone on a ${preference.toLowerCase()} app. You are having a conversation in a ${preference.toLowerCase()} context, not a romantic one.
-      
-      IMPORTANT: Respond in the SAME LANGUAGE that the person is using to talk to you. If they write in Hindi, respond in Hindi. If they write in Tamil, respond in Tamil. Match their language.
-      
-      Respond naturally and conversationally to this message from them: "${userMessage}"
-      
-      Keep your response short (1-3 sentences), friendly, and authentic.
-      Don't use emojis or hashtags. Be conversational and very natural like a real human.
-      Don't mention that you are an AI.
-      Don't explain your behavior - just respond naturally.
-    `;
-    
     let botResponse = '';
     
-    try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      botResponse = response.text().trim();
-    } catch (genError) {
-      error(`Error generating bot response content: ${genError.message}`);
-      // Fallback responses in appropriate language based on simple detection
+    // Check if AI model is available
+    if (model) {
+      try {
+        const prompt = `
+          You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${botProfile.location}, India.
+          You work as a ${botProfile.occupation} and have ${botProfile.education}.
+          Your interests include ${botProfile.interests.join(', ')}.
+          Your bio: "${botProfile.bio}"
+          
+          You are chatting with someone on a ${preference.toLowerCase()} app. You are having a conversation in a ${preference.toLowerCase()} context, not a romantic one.
+          
+          IMPORTANT: Respond in the SAME LANGUAGE that the person is using to talk to you. If they write in Hindi, respond in Hindi. If they write in Tamil, respond in Tamil. Match their language.
+          
+          Respond naturally and conversationally to this message from them: "${userMessage}"
+          
+          Keep your response short (1-3 sentences), friendly, and authentic.
+          Don't use emojis or hashtags. Be conversational and very natural like a real human.
+          Don't mention that you are an AI.
+          Don't explain your behavior - just respond naturally.
+        `;
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        botResponse = response.text().trim();
+        console.log(`Successfully generated AI response for bot ${botProfile.id}`);
+      } catch (genError) {
+        console.error(`Error generating bot response with AI: ${genError.message}`);
+        // Fall through to fallback responses
+        botResponse = ''; // Ensure empty so we use fallback
+      }
+    } else {
+      console.warn('AI model not available for bot response generation, using fallback');
+    }
+    
+    // If no response was generated (due to error or no model), use fallback
+    if (!botResponse) {
       // Check if message is likely non-English
       const isNonEnglish = /[^\x00-\x7F]/.test(userMessage);
       
@@ -1000,11 +1029,11 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
       // English fallback responses
       const englishFallbackResponses = [
         `That's interesting! Tell me more about yourself.`,
-        `I enjoy ${botProfile.interests[0]} too! What else do you like to do?`,
-        `I've been working as a ${botProfile.occupation} for a while now. What about you?`,
-        `I'm from ${botProfile.location}. Have you ever visited?`,
+        `I enjoy ${botProfile.interests[0] || 'reading'} too! What else do you like to do?`,
+        `I've been working as a ${botProfile.occupation || 'professional'} for a while now. What about you?`,
+        `I'm from ${botProfile.location || 'Mumbai'}. Have you ever visited?`,
         `That's cool! I'd love to hear more about your interests.`,
-        `I'm actually learning more about ${botProfile.interests[1]} these days. Any recommendations?`,
+        `I'm actually learning more about ${botProfile.interests[1] || 'traveling'} these days. Any recommendations?`,
         `Thanks for sharing that! I've had similar experiences.`,
         `That's a good point. I hadn't thought about it that way before.`,
         `I'm curious to know more about your perspective on that.`,
@@ -1019,6 +1048,8 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
         .replace(/\${botProfile\.interests\[1\]}/g, botProfile.interests[1] || "traveling")
         .replace(/\${botProfile\.location}/g, botProfile.location || "Mumbai")
         .replace(/\${botProfile\.occupation}/g, botProfile.occupation || "professional");
+      
+      console.log(`Using fallback response for bot ${botProfile.id}`);
     }
     
     // Store both messages in the database if userId is provided
@@ -1030,14 +1061,14 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
         // Store bot's response to user
         await storeBotMessage(botProfile.id, userId, botResponse);
       } catch (dbError) {
-        error(`Failed to store bot messages in database: ${dbError.message}`);
+        console.error(`Failed to store bot messages in database: ${dbError.message}`);
         // Continue even if message storage fails
       }
     }
     
     return botResponse;
   } catch (err) {
-    error(`Error in bot response generation: ${err.message}`);
+    console.error(`Error in bot response generation: ${err.message}`);
     return "I'm sorry, I couldn't process that message. Can you try again?";
   }
 };

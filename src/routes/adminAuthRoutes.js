@@ -29,7 +29,7 @@ router.post('/login', async (req, res) => {
       .from('users')
       .select('*')
       .eq('email', email)
-      .eq('role', 'admin')
+      .eq('is_admin', true)
       .single();
       
     if (error || !user) {
@@ -56,7 +56,7 @@ router.post('/login', async (req, res) => {
       { 
         id: user.id,
         email: user.email,
-        role: user.role,
+        is_admin: user.is_admin,
         firstName: user.first_name,
         lastName: user.last_name
       },
@@ -119,9 +119,9 @@ router.post('/verify', async (req, res) => {
     // Check if user still exists and is an admin
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, role, first_name, last_name')
+      .select('id, email, is_admin, first_name, last_name')
       .eq('id', decoded.id)
-      .eq('role', 'admin')
+      .eq('is_admin', true)
       .single();
       
     if (error || !user) {

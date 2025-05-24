@@ -23,18 +23,18 @@ const isAdmin = async (req, res, next) => {
     }
     
     // Log the token payload for debugging
-    logger.info(`Admin check for user ID: ${userId}, token role: ${req.user?.role}`);
+    logger.info(`Admin check for user ID: ${userId}, token is_admin: ${req.user?.is_admin}`);
     
-    // Check if user has admin role directly from the JWT token
-    if (req.user.role === 'admin') {
-      logger.info(`User ${userId} authorized as admin via JWT role claim`);
+    // Check if user is an admin directly from the JWT token
+    if (req.user.is_admin === true) {
+      logger.info(`User ${userId} authorized as admin via JWT is_admin claim`);
       return next();
     }
     
-    // If role not in token, verify from database
+    // If is_admin not in token, verify from database
     const { data, error } = await supabase
       .from('users')
-      .select('role')
+      .select('is_admin')
       .eq('id', userId)
       .single();
       
@@ -55,7 +55,7 @@ const isAdmin = async (req, res, next) => {
     }
     
     // Check if user is an admin
-    if (data.role !== 'admin') {
+    if (!data.is_admin) {
       logger.warn(`Non-admin user ${userId} attempted to access admin route`);
       return res.status(403).json({
         success: false,

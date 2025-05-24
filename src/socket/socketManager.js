@@ -37,7 +37,11 @@ const {
 } = require('../services/ai/aiCopilotService');
 
 // Import AI bot profile service
-const { generateBotProfile, generateBotResponse } = require('../services/ai/botProfileService');
+const { 
+  generateBotProfile, 
+  generateBotResponse,
+  verifyBotExists
+} = require('../services/ai/botProfileService');
 
 // Track bot matches and their data
 const botMatches = new Map();
@@ -2399,6 +2403,29 @@ const createMatchInDatabase = async (matchId, user1Id, user2Id) => {
   try {
     console.log(`Creating match record in database: ${matchId} between ${user1Id} and ${user2Id}`);
     
+    // Verify both users exist in the database
+    const { data: user1, error: user1Error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user1Id)
+      .single();
+      
+    if (user1Error || !user1) {
+      error(`User1 ${user1Id} does not exist in database: ${user1Error?.message || 'Not found'}`);
+      return { success: false, error: { message: `User ${user1Id} not found in database` } };
+    }
+    
+    const { data: user2, error: user2Error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user2Id)
+      .single();
+      
+    if (user2Error || !user2) {
+      error(`User2 ${user2Id} does not exist in database: ${user2Error?.message || 'Not found'}`);
+      return { success: false, error: { message: `User ${user2Id} not found in database` } };
+    }
+    
     // First, check if a match already exists between these users
     const { data: existingMatch, error: queryError } = await supabase
       .from('matches')
@@ -3029,12 +3056,29 @@ const findMatchForUser = async (socket) => {
       }
       
       try {
+        info(`Generating bot profile with gender ${botGender} for user ${userId}`);
+        
         // Generate a bot profile matching user's preferences
         const botProfile = await generateBotProfile(
           botGender, 
           userPreference, 
           socket.user.interests || []
         );
+        
+        if (!botProfile || !botProfile.id) {
+          throw new Error('Failed to generate valid bot profile');
+        }
+        
+        info(`Successfully generated bot profile with ID ${botProfile.id}`);
+        
+        // Verify bot exists in the database before proceeding
+        const botExists = await verifyBotExists(botProfile.id);
+        
+        if (!botExists) {
+          throw new Error(`Bot ${botProfile.id} does not exist in database after creation`);
+        }
+        
+        info(`Verified bot ${botProfile.id} exists in database`);
         
         // Generate a matchId and create the match
         const matchId = uuidv4();
@@ -3095,10 +3139,30 @@ const findMatchForUser = async (socket) => {
         // Create match in database
         try {
           // Create match record in database
-          await createMatchInDatabase(matchId, userId, botProfile.id);
+          info(`Creating match record in database between user ${userId} and bot ${botProfile.id}`);
+          const result = await createMatchInDatabase(matchId, userId, botProfile.id);
+          
+          if (!result || !result.success) {
+            throw new Error(result?.error?.message || 'Failed to create match in database');
+          }
+          
+          info(`Successfully created match record in database with ID ${matchId}`);
         } catch (dbError) {
           error(`Error creating bot match in database: ${dbError.message}`);
-          // Continue despite database error - treat as non-critical
+          // If we can't create the match, abort and try again with a real user
+          activeMatches.delete(matchId);
+          botMatches.delete(matchId);
+          
+          // Put user back in pool
+          userPoolData.isBeingProcessed = false;
+          matchmakingPool.set(userId, userPoolData);
+          
+          // Notify user
+          socket.emit('match:notFound', { 
+            message: 'We encountered an issue creating your match. Please try again.' 
+          });
+          
+          return;
         }
         
         // Notify user of the match
@@ -3381,6 +3445,13 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     const botMatch = botMatches.get(matchId);
     if (!botMatch) {
       console.error(`Bot match ${matchId} not found`);
+      return;
+    }
+    
+    // Verify bot exists in database before proceeding
+    const botExists = await verifyBotExists(botMatch.botProfile.id);
+    if (!botExists) {
+      error(`Bot ${botMatch.botProfile.id} not found in database. Cannot send messages.`);
       return;
     }
     

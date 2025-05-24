@@ -689,11 +689,15 @@ const generateTravelExperiences = () => {
 const createBotUserRecord = async (botProfile) => {
   try {
     // First check if the bot already exists in the database
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('id')
       .eq('id', botProfile.id)
       .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      error(`Error checking for existing bot user: ${checkError.message}`);
+    }
     
     if (existingUser) {
       info(`Bot user ${botProfile.id} already exists in database`);
@@ -718,7 +722,8 @@ const createBotUserRecord = async (botProfile) => {
       created_at: botProfile.joinDate,
       updated_at: new Date().toISOString(),
       preference: 'Friendship', // Default preference
-      is_bot: true // Mark as bot
+      is_bot: true, // Mark as bot
+      location: botProfile.location
     };
     
     // Insert the bot as a user in the database
@@ -729,6 +734,7 @@ const createBotUserRecord = async (botProfile) => {
       .single();
     
     if (insertError) {
+      error(`Failed to create bot user record: ${insertError.message}`);
       throw new Error(`Failed to create bot user record: ${insertError.message}`);
     }
     
@@ -790,7 +796,7 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       const response = await result.response;
       bio = response.text().trim();
     } catch (aiError) {
-      console.error('Error generating AI bio:', aiError);
+      error('Error generating AI bio:', aiError);
       // Fallback bio
       bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
     }
@@ -824,18 +830,25 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       joinDate: getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5) // Joined 5-95 days ago
     };
     
-    // Create user record in database
+    // CRITICAL: Create user record in database FIRST and await its completion
+    // This ensures the bot exists in the database before any references to it
+    let dbUser;
     try {
-      await createBotUserRecord(botProfile);
+      info(`Creating bot user record in database for ${botId}`);
+      dbUser = await createBotUserRecord(botProfile);
+      if (!dbUser) {
+        throw new Error('Failed to create bot user record in database');
+      }
+      info(`Successfully created bot user record for ${botId}`);
     } catch (dbError) {
-      error(`Warning: Failed to create bot user record: ${dbError.message}`);
-      // Continue with in-memory bot even if DB creation fails
+      error(`Error creating bot user record: ${dbError.message}`);
+      throw new Error(`Failed to create bot in database: ${dbError.message}`);
     }
     
     return botProfile;
   } catch (err) {
-    error('Error generating bot profile:', err);
-    // Return a fallback profile
+    error(`Error generating bot profile: ${err.message}`);
+    // In case of any error, use the fallback but ensure it's created in DB
     return generateFallbackBotProfile(gender, preference, userInterests);
   }
 };
@@ -848,72 +861,111 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
  * @returns {Promise<Object>} Bot profile
  */
 const generateFallbackBotProfile = async (gender = 'male', preference = 'Friendship', userInterests = []) => {
-  const normalizedGender = gender.toLowerCase();
-  
-  // Select appropriate first name based on gender
-  let firstName;
-  if (normalizedGender === 'male') {
-    firstName = indianMaleFirstNames[Math.floor(Math.random() * indianMaleFirstNames.length)];
-  } else if (normalizedGender === 'female') {
-    firstName = indianFemaleFirstNames[Math.floor(Math.random() * indianFemaleFirstNames.length)];
-  } else {
-    firstName = indianNonBinaryFirstNames[Math.floor(Math.random() * indianNonBinaryFirstNames.length)];
-  }
-  
-  const lastName = indianLastNames[Math.floor(Math.random() * indianLastNames.length)];
-  const age = generateRandomAge();
-  const city = indianCities[Math.floor(Math.random() * indianCities.length)];
-  const interests = generateRandomInterests(userInterests);
-  const education = generateRandomEducation();
-  const occupation = generateRandomOccupation();
-  
-  // Generate date of birth based on age
-  const dob = getDateOfBirthFromAge(age);
-  
-  // Create unique ID for the bot - use standard UUID without prefix
-  const botId = uuidv4();
-  
-  // Simple fallback bio
-  const bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
-  
-  // Create a username
-  const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}`;
-  
-  // Profile picture URL
-  const profilePictureUrl = normalizedGender === 'male' 
-    ? `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 99)}.jpg`
-    : normalizedGender === 'female'
-      ? `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 99)}.jpg`
-      : `https://randomuser.me/api/portraits/lego/${Math.floor(Math.random() * 8)}.jpg`;
-  
-  // Create the bot profile
-  const botProfile = {
-    id: botId,
-    firstName,
-    lastName,
-    username,
-    gender: normalizedGender,
-    bio,
-    interests,
-    education,
-    occupation,
-    location: city,
-    date_of_birth: dob,
-    profile_picture_url: profilePictureUrl,
-    isBot: true, // Flag to identify this as a bot
-    lastActive: new Date().toISOString(), // Current time
-    joinDate: getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5) // Joined 5-95 days ago
-  };
-  
-  // Create user record in database
   try {
-    await createBotUserRecord(botProfile);
-  } catch (dbError) {
-    error(`Warning: Failed to create bot user record: ${dbError.message}`);
-    // Continue with in-memory bot even if DB creation fails
+    const normalizedGender = gender.toLowerCase();
+    
+    // Select appropriate first name based on gender
+    let firstName;
+    if (normalizedGender === 'male') {
+      firstName = indianMaleFirstNames[Math.floor(Math.random() * indianMaleFirstNames.length)];
+    } else if (normalizedGender === 'female') {
+      firstName = indianFemaleFirstNames[Math.floor(Math.random() * indianFemaleFirstNames.length)];
+    } else {
+      firstName = indianNonBinaryFirstNames[Math.floor(Math.random() * indianNonBinaryFirstNames.length)];
+    }
+    
+    const lastName = indianLastNames[Math.floor(Math.random() * indianLastNames.length)];
+    const age = generateRandomAge();
+    const city = indianCities[Math.floor(Math.random() * indianCities.length)];
+    const interests = generateRandomInterests(userInterests);
+    const education = generateRandomEducation();
+    const occupation = generateRandomOccupation();
+    
+    // Generate date of birth based on age
+    const dob = getDateOfBirthFromAge(age);
+    
+    // Create unique ID for the bot - use standard UUID without prefix
+    const botId = uuidv4();
+    
+    // Simple fallback bio
+    const bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
+    
+    // Create a username
+    const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}`;
+    
+    // Profile picture URL
+    const profilePictureUrl = normalizedGender === 'male' 
+      ? `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 99)}.jpg`
+      : normalizedGender === 'female'
+        ? `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 99)}.jpg`
+        : `https://randomuser.me/api/portraits/lego/${Math.floor(Math.random() * 8)}.jpg`;
+    
+    // Create the bot profile
+    const botProfile = {
+      id: botId,
+      firstName,
+      lastName,
+      username,
+      gender: normalizedGender,
+      bio,
+      interests,
+      education,
+      occupation,
+      location: city,
+      date_of_birth: dob,
+      profile_picture_url: profilePictureUrl,
+      isBot: true, // Flag to identify this as a bot
+      lastActive: new Date().toISOString(), // Current time
+      joinDate: getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5) // Joined 5-95 days ago
+    };
+    
+    // CRITICAL: Create user record in database FIRST and await its completion
+    try {
+      info(`Creating fallback bot user record in database for ${botId}`);
+      const dbUser = await createBotUserRecord(botProfile);
+      if (!dbUser) {
+        throw new Error('Failed to create fallback bot user record in database');
+      }
+      info(`Successfully created fallback bot user record for ${botId}`);
+    } catch (dbError) {
+      error(`Critical error creating fallback bot user record: ${dbError.message}`);
+      throw new Error(`Failed to create fallback bot in database: ${dbError.message}`);
+    }
+    
+    return botProfile;
+  } catch (finalError) {
+    error(`Fatal error in fallback bot creation: ${finalError.message}`);
+    throw finalError; // Rethrow as this is our last resort
   }
-  
-  return botProfile;
+};
+
+/**
+ * Verify a bot exists in the database or create it
+ * @param {string} botId - The bot ID to verify
+ * @returns {Promise<boolean>} - True if bot exists or was created
+ */
+const verifyBotExists = async (botId) => {
+  try {
+    if (!botId) return false;
+    
+    // Check if bot exists in users table
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', botId)
+      .single();
+      
+    if (data) {
+      return true; // Bot exists
+    }
+    
+    // Bot doesn't exist, log error
+    error(`Bot ${botId} does not exist in database and no profile data available to create it`);
+    return false;
+  } catch (err) {
+    error(`Error verifying bot existence: ${err.message}`);
+    return false;
+  }
 };
 
 /**
@@ -925,6 +977,14 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
  */
 const storeBotMessage = async (senderId, receiverId, content) => {
   try {
+    // Verify both sender and receiver exist in the database
+    const senderExists = await verifyBotExists(senderId);
+    const receiverExists = await verifyBotExists(receiverId);
+    
+    if (!senderExists || !receiverExists) {
+      throw new Error(`Cannot store message: ${!senderExists ? 'Sender' : 'Receiver'} does not exist in database`);
+    }
+    
     // Create message in database
     const { data, error: msgError } = await supabase
       .from('messages')
@@ -953,6 +1013,9 @@ const storeBotMessage = async (senderId, receiverId, content) => {
 // Update generateBotResponse to store messages in the database
 const generateBotResponse = async (userMessage, botProfile, preference = 'Friendship', userId) => {
   try {
+    // First ensure bot exists in database
+    await verifyBotExists(botProfile.id);
+    
     // Detect the language of the user message (simplified approach)
     const isEnglishMessage = /^[A-Za-z\s\d.,!?'"\-():;]+$/.test(userMessage);
     
@@ -1045,5 +1108,6 @@ module.exports = {
   generateBotProfile,
   generateBotResponse,
   createBotUserRecord,
-  storeBotMessage
+  storeBotMessage,
+  verifyBotExists
 }; 

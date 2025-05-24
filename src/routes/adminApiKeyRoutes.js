@@ -12,9 +12,15 @@ const logger = require('../utils/logger');
 // Admin middleware to check if the authenticated user is an admin
 const isAdmin = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    // User is already set by the authenticate middleware
+    const userId = req.user.id || req.user.userId; // Support both formats
     
-    // Get user details from database
+    // Check if user has admin role directly from the JWT token
+    if (req.user.role === 'admin') {
+      return next();
+    }
+    
+    // If role not in token, verify from database
     const { data, error } = await supabase
       .from('users')
       .select('role')
@@ -22,6 +28,7 @@ const isAdmin = async (req, res, next) => {
       .single();
       
     if (error || !data) {
+      logger.warn(`User ${userId} not found during admin check`);
       return res.status(401).json({
         success: false,
         message: 'Unauthorized - User not found'

@@ -1009,3 +1009,49 @@
 {"timestamp":"2025-05-24T17:49:23.777Z","level":"info","message":"Fetching memes from Indian subreddit: IndianMeyMeys"}
 {"timestamp":"2025-05-24T17:49:25.501Z","level":"info","message":"Added 10 memes from IndianMeyMeys, total: 10/10"}
 {"timestamp":"2025-05-24T17:49:25.501Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:54:58.197Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-24T17:54:58.198Z","level":"info","message":"Successfully initialized Gemini AI model"}
+{"timestamp":"2025-05-24T17:54:58.520Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-24T17:54:58.520Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-24T17:54:58.520Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-24T17:54:58.551Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-24T17:54:58.552Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-24T17:54:58.554Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-24T17:54:58.554Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-24T17:54:58.558Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-24T17:54:58.559Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-24T17:54:58.561Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-24T17:54:58.561Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-24T17:54:58.561Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-24T17:54:58.586Z","level":"error","message":"(node:26735) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-24T17:54:58.591Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-24T17:54:59.114Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-24T17:54:59.114Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T17:54:59.114Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T17:54:59.114Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-24T17:55:00.227Z","level":"info","message":"Health check recorded successfully","cpuUsage":35,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.15481025},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-24T17:55:29.002Z","level":"error","message":"Error in trackApiKeyUsage:"}
+{"timestamp":"2025-05-24T17:55:29.003Z","level":"info","message":"Fetching memes from subreddit: memes"}
+{"timestamp":"2025-05-24T17:55:30.489Z","level":"info","message":"Added 10 memes from memes, total: 10/10"}
+{"timestamp":"2025-05-24T17:55:30.489Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:55:34.321Z","level":"error","message":"Error in trackApiKeyUsage:"}
+{"timestamp":"2025-05-24T17:55:34.322Z","level":"info","message":"Fetching memes from subreddit: IndianDankMemes"}
+{"timestamp":"2025-05-24T17:55:35.881Z","level":"info","message":"Added 10 memes from IndianDankMemes, total: 10/10"}
+{"timestamp":"2025-05-24T17:55:35.881Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:55:36.662Z","level":"error","message":"Error in trackApiKeyUsage:"}
+{"timestamp":"2025-05-24T17:55:36.663Z","level":"info","message":"Fetching memes from subreddit: memes"}
+{"timestamp":"2025-05-24T17:55:38.145Z","level":"info","message":"Added 10 memes from memes, total: 10/10"}
+{"timestamp":"2025-05-24T17:55:38.145Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:55:38.817Z","level":"error","message":"Error in trackApiKeyUsage:"}
+{"timestamp":"2025-05-24T17:55:38.817Z","level":"info","message":"Fetching memes from subreddit: IndianDankMemes"}
+{"timestamp":"2025-05-24T17:55:40.299Z","level":"info","message":"Added 10 memes from IndianDankMemes, total: 10/10"}
+{"timestamp":"2025-05-24T17:55:40.299Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:55:40.966Z","level":"error","message":"Error in trackApiKeyUsage:"}
+{"timestamp":"2025-05-24T17:55:40.966Z","level":"info","message":"Fetching memes from subreddit: IndianDankMemes"}
+{"timestamp":"2025-05-24T17:55:42.597Z","level":"info","message":"Added 10 memes from IndianDankMemes, total: 10/10"}
+{"timestamp":"2025-05-24T17:55:42.597Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:55:43.232Z","level":"error","message":"Error in trackApiKeyUsage:"}
+{"timestamp":"2025-05-24T17:55:43.232Z","level":"info","message":"Fetching memes from subreddit: PoliticalIndianMemes"}
+{"timestamp":"2025-05-24T17:55:45.645Z","level":"info","message":"Added 10 memes from PoliticalIndianMemes, total: 10/10"}
+{"timestamp":"2025-05-24T17:55:45.645Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T17:55:58.590Z","level":"info","message":"Running forced bot matches after one minute of matchmaking"}

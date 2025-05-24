@@ -115,7 +115,7 @@ router.get('/', async (req, res) => {
       });
     }
     
-    // Sanitize the API keys for security
+    // Include full API key along with preview
     const sanitizedKeys = data.map(key => ({
       id: key.id,
       user: key.users,
@@ -125,7 +125,8 @@ router.get('/', async (req, res) => {
       usage_count: key.usage_count,
       status: key.status,
       rate_limit: key.rate_limit,
-      key_preview: `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+      key_preview: `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`,
+      key: key.key // Include the full API key
     }));
     
     return res.json({
@@ -413,13 +414,14 @@ router.get('/stats/summary', async (req, res) => {
       });
     }
     
-    // Sanitize the top used keys
+    // Include full API key along with preview for each key
     const sanitizedTopUsed = topUsedKeys.map(key => ({
       id: key.id,
       user: key.users,
       name: key.name,
       usage_count: key.usage_count,
-      key_preview: `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+      key_preview: `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`,
+      key: key.key // Include the full API key
     }));
     
     return res.json({

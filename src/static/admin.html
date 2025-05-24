@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Universal Circle</title>
+    <script>
+        // Check if user is authenticated
+        const token = localStorage.getItem('jwtToken');
+        if (!token) {
+            // Redirect to login page
+            window.location.href = '/admin/login.html';
+        } else {
+            // Redirect to API keys management
+            window.location.href = '/admin/apiKeys.html';
+        }
+    </script>
+</head>
+<body>
+    <p>Redirecting to admin dashboard...</p>
+</body>
+</html> 

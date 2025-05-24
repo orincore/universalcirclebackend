@@ -2,6 +2,12 @@ const { verifyToken } = require('../utils/jwt');
 const supabase = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { info, error, warn } = require('../utils/logger');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Initialize Google Generative AI client
+const API_KEY = process.env.GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
 // Track connected users and their socket IDs
 const connectedUsers = new Map();
@@ -947,7 +953,7 @@ const initializeSocket = (io) => {
         }
       } catch (error) {
         error(`Error handling match message: ${error.message}`);
-        socket.emit('error', { 
+        socket.emit('error', {
           source: 'match:message',
           message: 'Failed to process message' 
         });
@@ -3205,22 +3211,22 @@ const findMatchForUser = async (socket) => {
         console.error('Error creating bot match:', error);
         
         // Fallback to standard behavior
-        socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
-        
-        // Reset processing flag but keep in matchmaking pool
-        userPoolData.isBeingProcessed = false;
-        matchmakingPool.set(userId, userPoolData);
-        
-        // Set a timeout to try again after delay
-        const timeoutId = setTimeout(() => {
-          if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
-            console.log(`Retrying match for user ${userId}`);
-            socket.emit('match:waiting', { message: 'Searching for a match...' });
-            findMatchForUser(socket);
-          }
-        }, 10000); // Try again in 10 seconds
-        
-        userTimeouts.set(userId, timeoutId);
+      socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
+      
+      // Reset processing flag but keep in matchmaking pool
+      userPoolData.isBeingProcessed = false;
+      matchmakingPool.set(userId, userPoolData);
+      
+      // Set a timeout to try again after delay
+      const timeoutId = setTimeout(() => {
+        if (connectedUsers.has(userId) && matchmakingPool.has(userId)) {
+          console.log(`Retrying match for user ${userId}`);
+          socket.emit('match:waiting', { message: 'Searching for a match...' });
+          findMatchForUser(socket);
+        }
+      }, 10000); // Try again in 10 seconds
+      
+      userTimeouts.set(userId, timeoutId);
       }
     }
   } catch (error) {
@@ -3444,36 +3450,66 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     // Get bot match data
     const botMatch = botMatches.get(matchId);
     if (!botMatch) {
-      console.error(`Bot match ${matchId} not found`);
+      error(`Bot match ${matchId} not found`);
       return;
     }
     
-    // Verify bot exists in database before proceeding
-    const botExists = await verifyBotExists(botMatch.botProfile.id);
-    if (!botExists) {
-      error(`Bot ${botMatch.botProfile.id} not found in database. Cannot send messages.`);
-      return;
-    }
+    const userId = socket.user.id;
     
     // Add user message to match history
     botMatch.messages.push({
-      senderId: socket.user.id,
+      senderId: userId,
       message: userMessage,
       timestamp: new Date().toISOString()
     });
     
+    // Log for debugging
+    info(`Generating bot response for matchId=${matchId}, userId=${userId}, botId=${botMatch.botProfile.id}`);
+    
     // Add a slight delay to make the response seem more natural
-    const responseDelay = 1000 + Math.random() * 3000; // 1-4 seconds
+    const responseDelay = 1000 + Math.random() * 2000; // 1-3 seconds
     
     setTimeout(async () => {
       try {
-        // Generate bot response - pass userId to enable database storage
-        const botResponse = await generateBotResponse(
-          userMessage,
-          botMatch.botProfile,
-          botMatch.preference,
-          socket.user.id // Pass user ID for database storage
-        );
+        info(`Generating bot response after delay for user ${userId}`);
+        
+        // Generate response directly to avoid DB errors stopping the process
+        let botResponse = '';
+        try {
+          const prompt = `
+            You are ${botMatch.botProfile.firstName} ${botMatch.botProfile.lastName}, a ${botMatch.botProfile.gender}, ${new Date().getFullYear() - new Date(botMatch.botProfile.date_of_birth).getFullYear()} years old from ${botMatch.botProfile.location}, India.
+            You work as a ${botMatch.botProfile.occupation} and have ${botMatch.botProfile.education}.
+            Your interests include ${botMatch.botProfile.interests.join(', ')}.
+            Your bio: "${botMatch.botProfile.bio}"
+            
+            You are chatting with someone on a ${botMatch.preference?.toLowerCase() || 'friendship'} app.
+            
+            Respond naturally and conversationally to this message from them: "${userMessage}"
+            
+            Keep your response short (1-3 sentences), friendly, and authentic.
+            Don't use emojis. Be conversational and very natural like a real human.
+            Don't mention that you are an AI.
+            Don't explain your behavior - just respond naturally.
+          `;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          botResponse = response.text().trim();
+          info(`Successfully generated AI response for user ${userId}`);
+        } catch (aiError) {
+          error(`Error generating AI content: ${aiError.message}`);
+          // Fallback responses
+          const fallbackResponses = [
+            `That's interesting! Tell me more about yourself.`,
+            `I'd love to hear more about that. What else do you like to do?`,
+            `I've been working as a ${botMatch.botProfile.occupation} for a while now. What about you?`,
+            `I'm from ${botMatch.botProfile.location}. Have you ever visited?`,
+            `I enjoy ${botMatch.botProfile.interests[0] || 'traveling'} too! What else are you into?`
+          ];
+          
+          botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+          info(`Using fallback response for user ${userId}`);
+        }
         
         // Generate a message ID for the bot's response
         const botMessageId = uuidv4();
@@ -3483,7 +3519,7 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
         const messageObject = {
           id: botMessageId,
           senderId: botMatch.botProfile.id,
-          senderName: botMatch.botProfile.username || `${botMatch.botProfile.firstName}`,
+          senderName: botMatch.botProfile.username || botMatch.botProfile.firstName,
           message: botResponse,
           timestamp
         };
@@ -3495,17 +3531,49 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
           timestamp
         });
         
-        // Get user socket ID
-        const userSocketId = connectedUsers.get(botMatch.userId);
-        if (userSocketId) {
-          // Send bot message to user
-          ioInstance.to(userSocketId).emit('match:message', messageObject);
+        // Try to save messages to database but don't block on it
+        try {
+          // Store messages in database (don't await to avoid blocking)
+          supabase
+            .from('messages')
+            .insert({
+              id: botMessageId,
+              sender_id: botMatch.botProfile.id,
+              receiver_id: userId,
+              content: botResponse,
+              is_read: false,
+              created_at: timestamp,
+              updated_at: timestamp
+            })
+            .then(() => {
+              info(`Saved bot message to database for user ${userId}`);
+            })
+            .catch((dbError) => {
+              error(`Database error saving bot message: ${dbError.message}`);
+            });
+        } catch (dbError) {
+          error(`Error setting up database save: ${dbError.message}`);
+          // Continue despite database error - message delivery is more important
         }
-      } catch (error) {
-        console.error('Error generating bot response:', error);
+        
+        // Get user socket ID and send message to user
+        const userSocketId = connectedUsers.get(userId);
+        if (userSocketId) {
+          info(`Sending bot message to user ${userId} via socket ${userSocketId}`);
+          try {
+            ioInstance.to(userSocketId).emit('match:message', messageObject);
+            info(`Successfully sent bot message to user ${userId}`);
+          } catch (socketError) {
+            error(`Socket error sending message to user ${userId}: ${socketError.message}`);
+          }
+        } else {
+          error(`User socket ID not found for user ${userId}`);
+        }
+      } catch (responseError) {
+        error(`Error in bot response generation: ${responseError.message}`);
       }
     }, responseDelay);
   } catch (error) {
-    console.error('Error handling bot response:', error);
+    error(`Error handling bot response: ${error.message}`);
   }
-};
+}; 

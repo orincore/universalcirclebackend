@@ -722,9 +722,28 @@ const createBotUserRecord = async (botProfile) => {
       created_at: botProfile.joinDate,
       updated_at: new Date().toISOString(),
       preference: 'Friendship', // Default preference
-      is_bot: true, // Mark as bot
       location: botProfile.location
     };
+    
+    // Try to add is_bot field if it exists in the schema
+    try {
+      // Check if 'is_bot' column exists by doing a test select
+      const { error: schemaError } = await supabase
+        .from('users')
+        .select('is_bot')
+        .limit(1);
+        
+      // If no error, the column exists, so add it
+      if (!schemaError) {
+        userRecord.is_bot = true;
+        info('Added is_bot field to user record');
+      } else {
+        info('is_bot field not available in schema, skipping');
+      }
+    } catch (schemaCheckError) {
+      // If error, the column doesn't exist, so don't add it
+      info(`is_bot field check failed: ${schemaCheckError.message}`);
+    }
     
     // Insert the bot as a user in the database
     const { data, error: insertError } = await supabase

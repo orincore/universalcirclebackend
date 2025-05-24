@@ -4,6 +4,27 @@ const router = express.Router();
 const apiKeyAuth = require('../middlewares/apiKeyAuth');
 const logger = require('../utils/logger');
 const { trackApiKeyUsage } = require('../services/apiKeyService');
+const fs = require('fs');
+const path = require('path');
+
+// Detect if we're running on a server (AWS, etc.) vs local environment
+const isServerEnvironment = process.env.NODE_ENV === 'production' || 
+                          process.env.IS_SERVER === 'true' ||
+                          process.platform === 'linux';
+
+// Log environment for debugging
+logger.info(`Meme API running in ${isServerEnvironment ? 'SERVER' : 'LOCAL'} environment on ${process.platform}`);
+
+// Implement in-memory caching for memes
+const memeCache = {
+  bySubreddit: {}, // Cache by subreddit
+  timestamp: {}, // When each subreddit was last fetched
+  randomMemes: [], // Cache for random memes endpoint
+  randomTimestamp: 0 // When random memes were last fetched
+};
+
+// Cache expiration time (in milliseconds)
+const CACHE_EXPIRATION = 30 * 60 * 1000; // 30 minutes
 
 // Add more variety to User-Agent to avoid Reddit blocking
 const USER_AGENTS = [
@@ -15,10 +36,45 @@ const USER_AGENTS = [
   'Mozilla/5.0 (compatible; UniversalCircleApp/1.0; +https://universalcircle.in)'
 ];
 
+// Free public proxies - rotate for better results
+// Note: These are examples and may not work consistently; consider using a paid proxy service in production
+const PUBLIC_PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?',
+  'https://cors-anywhere.herokuapp.com/'
+];
+
+// Local file paths for persistent caching (used as backup on server environments)
+const CACHE_DIR = path.join(__dirname, '../../cache');
+const RANDOM_CACHE_FILE = path.join(CACHE_DIR, 'random_memes_cache.json');
+const SUBREDDIT_CACHE_DIR = path.join(CACHE_DIR, 'subreddits');
+
+// Ensure cache directories exist
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(SUBREDDIT_CACHE_DIR)) {
+    fs.mkdirSync(SUBREDDIT_CACHE_DIR, { recursive: true });
+  }
+} catch (error) {
+  logger.warn(`Could not create cache directories: ${error.message}`);
+}
+
 // Get a random User-Agent
 function getRandomUserAgent() {
   const randomIndex = Math.floor(Math.random() * USER_AGENTS.length);
   return USER_AGENTS[randomIndex];
+}
+
+// Get a random proxy URL
+function getRandomProxy() {
+  // Only use proxies in server environment
+  if (!isServerEnvironment) {
+    return '';
+  }
+  const randomIndex = Math.floor(Math.random() * PUBLIC_PROXIES.length);
+  return PUBLIC_PROXIES[randomIndex];
 }
 
 // Configure axios defaults for Reddit API with improved User-Agent
@@ -30,6 +86,67 @@ const axiosInstance = axios.create({
   // Add timeout to avoid hanging requests
   timeout: 15000 // Extended timeout for slower connections
 });
+
+// Load from disk cache if available
+function loadCacheFromDisk() {
+  try {
+    // Try to load random memes cache
+    if (fs.existsSync(RANDOM_CACHE_FILE)) {
+      const cacheData = fs.readFileSync(RANDOM_CACHE_FILE, 'utf8');
+      const parsedCache = JSON.parse(cacheData);
+      memeCache.randomMemes = parsedCache.memes || [];
+      memeCache.randomTimestamp = parsedCache.timestamp || 0;
+      logger.info(`Loaded ${memeCache.randomMemes.length} random memes from disk cache`);
+    }
+    
+    // Try to load subreddit caches
+    if (fs.existsSync(SUBREDDIT_CACHE_DIR)) {
+      const files = fs.readdirSync(SUBREDDIT_CACHE_DIR);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const subreddit = file.replace('.json', '');
+          const cacheData = fs.readFileSync(path.join(SUBREDDIT_CACHE_DIR, file), 'utf8');
+          const parsedCache = JSON.parse(cacheData);
+          memeCache.bySubreddit[subreddit] = parsedCache.memes || [];
+          memeCache.timestamp[subreddit] = parsedCache.timestamp || 0;
+          logger.info(`Loaded ${memeCache.bySubreddit[subreddit].length} memes for r/${subreddit} from disk cache`);
+        }
+      }
+    }
+  } catch (error) {
+    logger.error(`Error loading cache from disk: ${error.message}`);
+  }
+}
+
+// Save cache to disk for persistence
+function saveCacheToDisk(subreddit = null) {
+  try {
+    if (!subreddit) {
+      // Save random memes cache
+      fs.writeFileSync(
+        RANDOM_CACHE_FILE,
+        JSON.stringify({
+          memes: memeCache.randomMemes,
+          timestamp: memeCache.randomTimestamp
+        })
+      );
+    } else {
+      // Save specific subreddit cache
+      fs.writeFileSync(
+        path.join(SUBREDDIT_CACHE_DIR, `${subreddit}.json`),
+        JSON.stringify({
+          memes: memeCache.bySubreddit[subreddit] || [],
+          timestamp: memeCache.timestamp[subreddit] || 0
+        })
+      );
+    }
+  } catch (error) {
+    logger.error(`Error saving cache to disk: ${error.message}`);
+  }
+}
+
+// Try to load cache at startup
+loadCacheFromDisk();
 
 // Fallback memes for when Reddit API fails completely
 const FALLBACK_MEMES = [
@@ -157,6 +274,13 @@ router.get('/status', (req, res) => {
   return res.json({
     success: true,
     message: 'Indian Meme API is operational',
+    environment: isServerEnvironment ? 'server' : 'local',
+    platform: process.platform,
+    cache_status: {
+      random_memes: memeCache.randomMemes.length,
+      cached_subreddits: Object.keys(memeCache.bySubreddit).length,
+      cache_size: Object.values(memeCache.bySubreddit).reduce((total, memes) => total + memes.length, 0) + memeCache.randomMemes.length
+    },
     endpoints: [
       {
         path: '/api/memes',
@@ -204,6 +328,36 @@ function getRandomItems(array, count) {
   return shuffled.slice(0, count);
 }
 
+// Special function for server environments that tries to use a proxy
+async function fetchWithProxy(url) {
+  if (!isServerEnvironment) {
+    // On local environment, just use direct request
+    return await axios.get(url, {
+      headers: { 'User-Agent': getRandomUserAgent() },
+      timeout: 15000
+    });
+  }
+  
+  // On server environment, try to use a proxy
+  const proxy = getRandomProxy();
+  const proxyUrl = `${proxy}${encodeURIComponent(url)}`;
+  
+  try {
+    return await axios.get(proxyUrl, {
+      headers: { 'User-Agent': getRandomUserAgent() },
+      timeout: 20000 // Extended timeout for proxy requests
+    });
+  } catch (error) {
+    logger.error(`Proxy fetch failed: ${error.message}`);
+    
+    // As a last resort, try direct request
+    return await axios.get(url, {
+      headers: { 'User-Agent': getRandomUserAgent() },
+      timeout: 15000
+    });
+  }
+}
+
 // Third-level fallback method using a different Reddit URL structure
 async function fetchSubredditPostsLastResort(subreddit) {
   try {
@@ -216,16 +370,8 @@ async function fetchSubredditPostsLastResort(subreddit) {
     logger.info(`Fetching memes from subreddit: ${subreddit} (last resort method)`);
     
     // Try using Reddit's old interface which might have different rate limiting
-    const response = await axios.get(
-      `https://old.reddit.com/r/${subreddit}/top.json?sort=top&t=week&limit=50`,
-      { 
-        timeout: 15000,
-        headers: {
-          'User-Agent': getRandomUserAgent()
-        },
-        validateStatus: status => status < 500
-      }
-    );
+    const url = `https://old.reddit.com/r/${subreddit}/top.json?sort=top&t=week&limit=50`;
+    const response = await fetchWithProxy(url);
     
     // Handle different status codes
     if (response.status !== 200) {
@@ -285,16 +431,8 @@ async function fetchSubredditPostsAlternative(subreddit) {
     logger.info(`Fetching memes from subreddit: ${subreddit} (alternative method)`);
     
     // Try the alternative approach using the public .json extension
-    const response = await axios.get(
-      `https://www.reddit.com/r/${subreddit}.json?limit=100`,
-      { 
-        timeout: 15000,
-        headers: {
-          'User-Agent': getRandomUserAgent()
-        },
-        validateStatus: status => status < 500
-      }
-    );
+    const url = `https://www.reddit.com/r/${subreddit}.json?limit=100`;
+    const response = await fetchWithProxy(url);
     
     // Handle different status codes
     if (response.status !== 200) {
@@ -340,6 +478,14 @@ async function fetchSubredditPostsAlternative(subreddit) {
 
 // Function to fetch posts from a subreddit with improved error handling
 async function fetchSubredditPosts(subreddit) {
+  // Check cache first
+  if (memeCache.bySubreddit[subreddit] && 
+      memeCache.timestamp[subreddit] && 
+      (Date.now() - memeCache.timestamp[subreddit] < CACHE_EXPIRATION)) {
+    logger.info(`Using cached memes for subreddit: ${subreddit}`);
+    return { success: true, posts: memeCache.bySubreddit[subreddit], fromCache: true };
+  }
+  
   try {
     // If this subreddit has been problematic, skip it
     if (problematicSubreddits.has(subreddit)) {
@@ -351,18 +497,8 @@ async function fetchSubredditPosts(subreddit) {
     
     try {
       // Use a new axios instance with a fresh random User-Agent for each request
-      const tempAxios = axios.create({
-        headers: {
-          'User-Agent': getRandomUserAgent()
-        },
-        timeout: 15000
-      });
-      
-      // First try the standard approach
-      const response = await tempAxios.get(
-        `https://www.reddit.com/r/${subreddit}/hot.json?limit=100`,
-        { validateStatus: status => status < 500 }
-      );
+      const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=100`;
+      const response = await fetchWithProxy(url);
       
       // Handle different status codes
       if (response.status !== 200) {
@@ -391,6 +527,13 @@ async function fetchSubredditPosts(subreddit) {
         logger.warn(`No valid image posts found in subreddit: ${subreddit}`);
         return await fetchSubredditPostsAlternative(subreddit);
       }
+      
+      // Update cache
+      memeCache.bySubreddit[subreddit] = posts;
+      memeCache.timestamp[subreddit] = Date.now();
+      
+      // Save to disk cache
+      saveCacheToDisk(subreddit);
       
       return { success: true, posts };
       
@@ -496,6 +639,7 @@ router.get('/:subreddit', async (req, res) => {
     return res.json({
       subreddit,
       count: memes.length,
+      source: result.fromCache ? "cache" : "reddit",
       memes
     });
   } catch (error) {
@@ -519,6 +663,17 @@ router.get('/', async (req, res) => {
   try {
     // Get count parameter, default to DEFAULT_MEME_COUNT, max 25
     const count = Math.min(parseInt(req.query.count || DEFAULT_MEME_COUNT), 25);
+    
+    // Check if we have a valid cache of random memes
+    if (memeCache.randomMemes.length >= count && 
+        (Date.now() - memeCache.randomTimestamp < CACHE_EXPIRATION)) {
+      logger.info(`Using cached random memes`);
+      return res.json({
+        count: count,
+        source: "cache",
+        memes: getRandomItems(memeCache.randomMemes, count)
+      });
+    }
     
     // For multiple memes, we'll randomize across different subreddits
     // We'll collect memes from multiple subreddits if needed
@@ -602,6 +757,11 @@ router.get('/', async (req, res) => {
       
       logger.info(`Successfully fetched ${allMemes.length} memes (${fallbackCount} from fallbacks)`);
       
+      // Update the random memes cache
+      memeCache.randomMemes = [...allMemes];
+      memeCache.randomTimestamp = Date.now();
+      saveCacheToDisk(); // Save random cache
+      
       return res.json({
         count: allMemes.length,
         source: "mixed",
@@ -611,6 +771,11 @@ router.get('/', async (req, res) => {
     }
     
     logger.info(`Successfully fetched ${allMemes.length} memes from Indian subreddits`);
+    
+    // Update the random memes cache
+    memeCache.randomMemes = [...allMemes];
+    memeCache.randomTimestamp = Date.now();
+    saveCacheToDisk(); // Save random cache
     
     // Return the collection of memes
     return res.json({

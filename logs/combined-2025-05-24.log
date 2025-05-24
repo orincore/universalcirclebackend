@@ -1307,3 +1307,54 @@
 {"timestamp":"2025-05-24T18:16:32.768Z","level":"info","message":"Added 10 memes from memes, total: 10/10"}
 {"timestamp":"2025-05-24T18:16:32.769Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
 {"timestamp":"2025-05-24T18:16:32.918Z","level":"debug","message":"Successfully updated API key usage. New count: 8"}
+{"timestamp":"2025-05-24T18:27:02.105Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-24T18:27:02.106Z","level":"info","message":"Successfully initialized Gemini AI model"}
+{"timestamp":"2025-05-24T18:27:02.461Z","level":"info","message":"Meme API running in LOCAL environment on darwin"}
+{"timestamp":"2025-05-24T18:27:02.465Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-24T18:27:02.465Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-24T18:27:02.465Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-24T18:27:02.507Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-24T18:27:02.509Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-24T18:27:02.511Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-24T18:27:02.511Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-24T18:27:02.514Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-24T18:27:02.516Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-24T18:27:02.518Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-24T18:27:02.519Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-24T18:27:02.519Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-24T18:27:02.546Z","level":"error","message":"(node:32068) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-24T18:27:02.553Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-24T18:27:03.098Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-24T18:27:03.098Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T18:27:03.098Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T18:27:03.098Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-24T18:27:04.210Z","level":"info","message":"Health check recorded successfully","cpuUsage":37,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":3.173635292},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-24T18:27:55.607Z","level":"debug","message":"Successfully updated API key usage. New count: 15"}
+{"timestamp":"2025-05-24T18:27:55.608Z","level":"info","message":"Fetching memes from subreddit: dankindianmemes"}
+{"timestamp":"2025-05-24T18:27:57.586Z","level":"info","message":"Added 10 memes from dankindianmemes, total: 10/10"}
+{"timestamp":"2025-05-24T18:27:57.586Z","level":"info","message":"Successfully fetched 10 memes from Indian subreddits"}
+{"timestamp":"2025-05-24T18:27:57.971Z","level":"debug","message":"Successfully updated API key usage. New count: 16"}
+{"timestamp":"2025-05-24T18:27:58.509Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-24T18:27:58.511Z","level":"info","message":"Successfully initialized Gemini AI model"}
+{"timestamp":"2025-05-24T18:27:58.821Z","level":"info","message":"Meme API running in LOCAL environment on darwin"}
+{"timestamp":"2025-05-24T18:27:58.821Z","level":"info","message":"Loaded 10 random memes from disk cache"}
+{"timestamp":"2025-05-24T18:27:58.822Z","level":"info","message":"Loaded 46 memes for r/dankindianmemes from disk cache"}
+{"timestamp":"2025-05-24T18:27:58.825Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-24T18:27:58.825Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-24T18:27:58.825Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-24T18:27:58.866Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-24T18:27:58.867Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-24T18:27:58.868Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-24T18:27:58.868Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-24T18:27:58.872Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-24T18:27:58.873Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-24T18:27:58.875Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-24T18:27:58.875Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-24T18:27:58.875Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-24T18:27:58.901Z","level":"error","message":"(node:32272) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-24T18:27:58.908Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-24T18:27:59.024Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-24T18:27:59.024Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T18:27:59.024Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-24T18:27:59.024Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-24T18:28:00.116Z","level":"info","message":"Health check recorded successfully","cpuUsage":18,"memoryUsage":99,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1.770030959},"databaseStatus":"healthy"}

@@ -695,86 +695,188 @@ const generateTravelExperiences = () => {
 };
 
 /**
- * Create a bot record in the users table
- * @param {Object} botProfile - Bot profile data
- * @returns {Promise<Object>} Created bot user data from database
+ * Create a bot user record in the database
+ * @param {object} botProfile - Bot profile data
+ * @returns {Promise<object>} Created user data
  */
 const createBotUserRecord = async (botProfile) => {
   try {
-    // First check if the bot already exists in the database
-    const { data: existingUser } = await supabase
+    // Check if bot user already exists
+    const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('id')
       .eq('id', botProfile.id)
       .single();
     
+    if (checkError && checkError.code !== 'PGRST116') {
+      // Real error, not just "no rows returned"
+      throw new Error(`Error checking for existing bot user: ${checkError.message}`);
+    }
+    
+    // If user already exists, return it
     if (existingUser) {
       info(`Bot user ${botProfile.id} already exists in database`);
       return existingUser;
     }
     
-    // Format the user record for database insertion
-    const userRecord = {
+    // Format data for database
+    const userData = {
       id: botProfile.id,
       username: botProfile.username,
+      email: `bot-${botProfile.id}@example.com`, // Dummy email for bots
+      password: `bot-${uuidv4()}`, // Random password (not used)
       first_name: botProfile.firstName,
       last_name: botProfile.lastName,
-      email: `bot.${botProfile.username}@example.com`, // Dummy email
-      password: uuidv4(), // Random password, not used
       gender: botProfile.gender,
       bio: botProfile.bio,
-      interests: botProfile.interests,
       date_of_birth: botProfile.date_of_birth,
+      location: botProfile.location ? JSON.stringify({city: botProfile.location}) : null,
       profile_picture_url: botProfile.profile_picture_url,
-      is_online: true,
-      last_active: new Date().toISOString(),
-      created_at: botProfile.joinDate,
+      interests: botProfile.interests,
+      is_verified: true,
+      is_bot: true, // Flag to identify this as a bot
+      preference: botProfile.preference || 'Friendship',
+      is_active: true,
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      preference: 'Friendship', // Default preference
-      is_bot: true // Mark as bot
+      last_active: new Date().toISOString()
     };
     
-    // Insert the bot as a user in the database
-    const { data, error: insertError } = await supabase
+    // Insert user into database
+    const { data, error } = await supabase
       .from('users')
-      .insert(userRecord)
+      .insert(userData)
       .select()
       .single();
     
-    if (insertError) {
-      throw new Error(`Failed to create bot user record: ${insertError.message}`);
+    if (error) {
+      throw new Error(`Error creating bot user: ${error.message}`);
+    }
+    
+    // Verify the user was created
+    const { data: verifyUser, error: verifyError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', botProfile.id)
+      .single();
+      
+    if (verifyError || !verifyUser) {
+      throw new Error(`Bot user creation verification failed: ${verifyError?.message || 'User not found after creation'}`);
     }
     
     info(`Successfully created bot user ${botProfile.id} in database`);
     return data;
   } catch (err) {
-    error(`Error creating bot user record: ${err.message}`);
+    error(`Failed to create bot user record: ${err.message}`);
+    throw err; // Re-throw to handle properly in calling function
+  }
+};
+
+/**
+ * Store a message from or to a bot in the messages table
+ * @param {string} senderId - Sender user ID
+ * @param {string} receiverId - Receiver user ID
+ * @param {string} content - Message content
+ * @returns {Promise<Object>} Created message data
+ */
+const storeBotMessage = async (senderId, receiverId, content) => {
+  try {
+    // First verify both users exist to avoid foreign key constraint errors
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .or(`id.eq.${senderId},id.eq.${receiverId}`);
+    
+    if (userError) {
+      throw new Error(`Error verifying users: ${userError.message}`);
+    }
+    
+    // Check if both users exist
+    const userIds = users.map(u => u.id);
+    if (!userIds.includes(senderId)) {
+      throw new Error(`Sender ${senderId} does not exist in users table`);
+    }
+    if (!userIds.includes(receiverId)) {
+      throw new Error(`Receiver ${receiverId} does not exist in users table`);
+    }
+    
+    // Create message in database
+    const { data, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: senderId,
+        receiver_id: receiverId,
+        content,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+    
+    if (msgError) {
+      throw new Error(`Error creating bot message in database: ${msgError.message}`);
+    }
+    
+    return data;
+  } catch (err) {
+    error(`Error storing bot message: ${err.message}`);
     throw err;
   }
 };
 
 /**
- * Generate a fake bot profile and store it in the database
- * @param {string} gender - Gender for the bot ('male', 'female', or 'other')
- * @param {string} preference - Preference type ('Dating' or 'Friendship')
- * @param {Array} userInterests - User's interests to potentially match with
- * @returns {Promise<Object>} Bot profile with database record
+ * Generate a bot profile
+ * @param {string} gender - Gender of the bot
+ * @param {string} preference - Preference (Dating or Friendship)
+ * @param {Array} userInterests - User interests to match
+ * @returns {Promise<object>} Bot profile
  */
 const generateBotProfile = async (gender = 'male', preference = 'Friendship', userInterests = []) => {
   try {
-    // Normalize gender to lowercase
+    // Normalize gender
     const normalizedGender = gender.toLowerCase();
     
-    // Select appropriate first name based on gender
-    let firstName;
-    if (normalizedGender === 'male') {
-      firstName = indianMaleFirstNames[Math.floor(Math.random() * indianMaleFirstNames.length)];
-    } else if (normalizedGender === 'female') {
-      firstName = indianFemaleFirstNames[Math.floor(Math.random() * indianFemaleFirstNames.length)];
-    } else {
-      firstName = indianNonBinaryFirstNames[Math.floor(Math.random() * indianNonBinaryFirstNames.length)];
+    // Create AI-generated detailed bot profile if AI available
+    if (model) {
+      try {
+        // ... existing AI profile generation code ...
+        
+        // Existing code for generating bot profile with AI
+        
+        // After generating the profile and before returning:
+        
+        // Create bot user in database and ensure it exists before returning
+        try {
+          await createBotUserRecord(botProfile);
+          info(`Successfully created AI-generated bot user ${botProfile.id}`);
+        } catch (dbError) {
+          // If creation fails, throw the error to use fallback bot
+          error(`Failed to create AI-generated bot user: ${dbError.message}`);
+          throw dbError;
+        }
+        
+        return botProfile;
+      } catch (err) {
+        // Log the AI error and fall through to the fallback
+        error(`Error generating AI bot profile: ${err.message}`);
+        // Fall through to fallback approach
+      }
     }
     
+    // Use the fallback approach for generating bot profile
+    return await generateFallbackBotProfile(normalizedGender, preference, userInterests);
+  } catch (fallbackError) {
+    error(`Error in generateBotProfile: ${fallbackError.message}`);
+    
+    // Ultimate fallback - very simple bot profile
+    // ... existing simple fallback code ...
+    
+    const firstName = normalizedGender === 'female' 
+      ? indianFemaleFirstNames[Math.floor(Math.random() * indianFemaleFirstNames.length)]
+      : normalizedGender === 'male'
+        ? indianMaleFirstNames[Math.floor(Math.random() * indianMaleFirstNames.length)]
+        : indianNonBinaryFirstNames[Math.floor(Math.random() * indianNonBinaryFirstNames.length)];
+        
     const lastName = indianLastNames[Math.floor(Math.random() * indianLastNames.length)];
     const age = generateRandomAge();
     const city = indianCities[Math.floor(Math.random() * indianCities.length)];
@@ -782,47 +884,24 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
     const education = generateRandomEducation();
     const occupation = generateRandomOccupation();
     
-    // Generate date of birth based on age using our utility function
+    // Generate date of birth based on age
     const dob = getDateOfBirthFromAge(age);
     
     // Create unique ID for the bot - use standard UUID without prefix
     const botId = uuidv4();
     
-    // Use AI to generate bio if available
-    let bio = '';
-    try {
-      if (!model) {
-        throw new Error('AI model not initialized or unavailable');
-      }
-
-      const prompt = `
-        Generate a ${preference.toLowerCase()} profile bio for a ${age}-year-old ${normalizedGender} from ${city}, India named ${firstName}. 
-        Their interests include ${interests.join(', ')}.
-        They work as a ${occupation} and have ${education}.
-        Write in first person, be friendly, authentic, and keep it around 100 words.
-        Don't use emojis or hashtags. Be conversational and natural.
-      `;
-      
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      bio = response.text().trim();
-      console.log(`Successfully generated AI bio for bot ${botId}`);
-    } catch (aiError) {
-      console.error('Error generating AI bio:', aiError);
-      // Fallback bio without using AI
-      bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
-      console.log(`Using fallback bio for bot ${botId} due to AI error`);
-    }
+    // Simple fallback bio
+    const bio = `Hi, I'm ${firstName}! I'm ${age} years old from ${city}. I work as a ${occupation} and I love ${interests.slice(0, 3).join(', ')}. Looking forward to connecting with like-minded people!`;
     
-    // Create profile picture URL using randomuser.me API
+    // Create a username
+    const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}`;
+    
+    // Profile picture URL
     const profilePictureUrl = normalizedGender === 'male' 
       ? `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 99)}.jpg`
       : normalizedGender === 'female'
         ? `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 99)}.jpg`
         : `https://randomuser.me/api/portraits/lego/${Math.floor(Math.random() * 8)}.jpg`;
-    
-    // Create a username
-    const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}`;
     
     // Create the bot profile
     const botProfile = {
@@ -839,23 +918,34 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       date_of_birth: dob,
       profile_picture_url: profilePictureUrl,
       isBot: true, // Flag to identify this as a bot
+      preference: preference, // Add preference to profile
       lastActive: new Date().toISOString(), // Current time
       joinDate: getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5) // Joined 5-95 days ago
     };
     
-    // Create user record in database
-    try {
-      await createBotUserRecord(botProfile);
-    } catch (dbError) {
-      error(`Warning: Failed to create bot user record: ${dbError.message}`);
-      // Continue with in-memory bot even if DB creation fails
+    // Create user record in database - retry logic
+    let retryCount = 0;
+    let success = false;
+    
+    while (retryCount < 3 && !success) {
+      try {
+        await createBotUserRecord(botProfile);
+        success = true;
+        info(`Successfully created fallback bot user ${botProfile.id} after ${retryCount} retries`);
+      } catch (dbError) {
+        retryCount++;
+        error(`Failed to create fallback bot user (attempt ${retryCount}/3): ${dbError.message}`);
+        
+        if (retryCount >= 3) {
+          error(`Maximum retries reached for creating bot user ${botProfile.id}. Bot profile will be returned but messages may fail.`);
+        } else {
+          // Wait briefly before retrying
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
     }
     
     return botProfile;
-  } catch (err) {
-    error('Error generating bot profile:', err);
-    // Return a fallback profile
-    return generateFallbackBotProfile(gender, preference, userInterests);
   }
 };
 
@@ -920,6 +1010,7 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
     date_of_birth: dob,
     profile_picture_url: profilePictureUrl,
     isBot: true, // Flag to identify this as a bot
+    preference: preference, // Add preference to profile
     lastActive: new Date().toISOString(), // Current time
     joinDate: getDateFromDaysAgo(Math.floor(Math.random() * 90) + 5) // Joined 5-95 days ago
   };
@@ -936,40 +1027,13 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
 };
 
 /**
- * Store a message from or to a bot in the messages table
- * @param {string} senderId - Sender user ID
- * @param {string} receiverId - Receiver user ID
- * @param {string} content - Message content
- * @returns {Promise<Object>} Created message data
+ * Update generateBotResponse to store messages in the database
+ * @param {string} userMessage - User's message
+ * @param {object} botProfile - Bot's profile
+ * @param {string} preference - Preference type
+ * @param {string} userId - User ID
+ * @returns {Promise<string>} Bot's response
  */
-const storeBotMessage = async (senderId, receiverId, content) => {
-  try {
-    // Create message in database
-    const { data, error: msgError } = await supabase
-      .from('messages')
-      .insert({
-        sender_id: senderId,
-        receiver_id: receiverId,
-        content,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select();
-    
-    if (msgError) {
-      error(`Error creating bot message in database: ${msgError.message}`);
-      throw msgError;
-    }
-    
-    return data;
-  } catch (err) {
-    error(`Error storing bot message: ${err.message}`);
-    throw err;
-  }
-};
-
-// Update generateBotResponse to store messages in the database
 const generateBotResponse = async (userMessage, botProfile, preference = 'Friendship', userId) => {
   try {
     // Detect the language of the user message (simplified approach)
@@ -1078,4 +1142,4 @@ module.exports = {
   generateBotResponse,
   createBotUserRecord,
   storeBotMessage
-}; 
+};

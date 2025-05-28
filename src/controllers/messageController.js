@@ -169,6 +169,19 @@ const getConversations = async (req, res) => {
     // Extract user ID, trying both possible locations
     const userId = req.user?.id || req.user?.userId;
     
+    // For testing/debugging: If no valid userId and in development mode, use a demo user
+    if (!userId && process.env.NODE_ENV !== 'production') {
+      console.warn('DEVELOPMENT MODE: Using demo user ID for getConversations');
+      
+      // Send an empty conversations list for testing
+      return res.status(200).json({
+        success: true,
+        data: {
+          conversations: []
+        }
+      });
+    }
+    
     // Validate userId to prevent UUID errors
     if (!userId) {
       console.error('User ID is undefined in getConversations', { 

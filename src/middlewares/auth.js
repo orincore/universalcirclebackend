@@ -34,6 +34,16 @@ const authenticate = async (req, res, next) => {
     // Verify the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
+    // Ensure user ID is present in the decoded token
+    if (!decoded.id && !decoded.userId) {
+      logger.warn('Token missing user ID', { decoded });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authentication token. Missing user ID.',
+        code: 'AUTH_INVALID'
+      });
+    }
+    
     // Set the user on the request object
     req.user = decoded;
     
@@ -45,14 +55,16 @@ const authenticate = async (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: 'Token expired. Please log in again.'
+        message: 'Token expired. Please log in again.',
+        code: 'AUTH_EXPIRED'
       });
     }
     
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token. Please log in again.'
+        message: 'Invalid token. Please log in again.',
+        code: 'AUTH_INVALID'
       });
     }
     

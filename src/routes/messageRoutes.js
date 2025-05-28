@@ -12,19 +12,32 @@ const { authenticate } = require('../middlewares/auth');
 // All message routes require authentication
 router.use(authenticate);
 
+// Middleware to ensure user is fully authenticated with valid ID
+const ensureValidUser = (req, res, next) => {
+  if (!req.user || !req.user.id) {
+    console.error('Authentication issue: Missing user ID in request');
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication failed. Please log in again.',
+      code: 'AUTH_EXPIRED'
+    });
+  }
+  next();
+};
+
 // Send a new message
-router.post('/', sendMessage);
+router.post('/', ensureValidUser, sendMessage);
 
 // Get messages between current user and another user
-router.get('/conversation/:userId', getConversation);
+router.get('/conversation/:userId', ensureValidUser, getConversation);
 
 // Get all conversations for the current user
-router.get('/conversations', getConversations);
+router.get('/conversations', ensureValidUser, getConversations);
 
 // Get pre-signed URL for message media upload
-router.post('/media-upload-url', getMessageMediaUploadUrl);
+router.post('/media-upload-url', ensureValidUser, getMessageMediaUploadUrl);
 
 // Delete conversation with another user
-router.delete('/conversation/:userId', deleteConversation);
+router.delete('/conversation/:userId', ensureValidUser, deleteConversation);
 
 module.exports = router; 

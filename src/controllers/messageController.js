@@ -166,14 +166,21 @@ const getConversation = async (req, res) => {
  */
 const getConversations = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    // Extract user ID, trying both possible locations
+    const userId = req.user?.id || req.user?.userId;
     
     // Validate userId to prevent UUID errors
     if (!userId) {
-      console.error('User ID is undefined in getConversations');
-      return res.status(400).json({
+      console.error('User ID is undefined in getConversations', { 
+        user: req.user,
+        headers: {
+          authorization: req.headers.authorization ? '[PRESENT]' : '[MISSING]'
+        }
+      });
+      return res.status(401).json({
         success: false,
-        message: 'User ID is required to fetch conversations'
+        message: 'User ID is required to fetch conversations',
+        code: 'AUTH_INVALID'
       });
     }
 

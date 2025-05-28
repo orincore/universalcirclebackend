@@ -68,7 +68,11 @@ const profileUpdateSchema = Joi.object({
     latitude: Joi.number(),
     longitude: Joi.number()
   }),
-  bio: Joi.string().max(500)
+  bio: Joi.string().max(500),
+  instagram_handle: Joi.string().max(30).allow(null, ''),
+  twitter_handle: Joi.string().max(15).allow(null, ''),
+  spotify_handle: Joi.string().max(30).allow(null, ''),
+  linkedin_handle: Joi.string().max(100).allow(null, '')
 });
 
 /**

@@ -33,10 +33,19 @@ const getUserProfile = async (req, res) => {
       user.voice_bio_url = await generateSignedUrl(user.voice_bio_url);
     }
 
+    // Ensure social media handles are included in the response
+    const profileData = {
+      ...user,
+      instagram_handle: user.instagram_handle || null,
+      twitter_handle: user.twitter_handle || null,
+      spotify_handle: user.spotify_handle || null,
+      linkedin_handle: user.linkedin_handle || null
+    };
+
     return res.status(200).json({
       success: true,
       data: {
-        profile: user
+        profile: profileData
       }
     });
   } catch (err) {
@@ -69,7 +78,12 @@ const updateProfile = async (req, res) => {
       gender,
       profile_picture_url,
       phone,
-      username
+      username,
+      // Add social media handles
+      instagram_handle,
+      twitter_handle,
+      spotify_handle,
+      linkedin_handle
     } = req.body;
 
     // Build update object with only provided fields
@@ -88,6 +102,12 @@ const updateProfile = async (req, res) => {
     if (profile_picture_url !== undefined) updates.profile_picture_url = profile_picture_url;
     if (phone !== undefined) updates.phone = phone;
     if (username !== undefined) updates.username = username;
+    
+    // Add social media handles to updates
+    if (instagram_handle !== undefined) updates.instagram_handle = instagram_handle;
+    if (twitter_handle !== undefined) updates.twitter_handle = twitter_handle;
+    if (spotify_handle !== undefined) updates.spotify_handle = spotify_handle;
+    if (linkedin_handle !== undefined) updates.linkedin_handle = linkedin_handle;
     
     console.log(`Updating profile for user ${userId} with fields:`, Object.keys(updates));
     console.log(`Full update data:`, updates);
@@ -142,6 +162,11 @@ const updateProfile = async (req, res) => {
           preferences: updatedUser.preferences,
           preference: updatedUser.preference,
           private_profile: updatedUser.private_profile,
+          // Include social media handles in response
+          instagram_handle: updatedUser.instagram_handle,
+          twitter_handle: updatedUser.twitter_handle,
+          spotify_handle: updatedUser.spotify_handle,
+          linkedin_handle: updatedUser.linkedin_handle,
           updated_at: updatedUser.updated_at
         },
         achievementsCompleted: completedAchievements

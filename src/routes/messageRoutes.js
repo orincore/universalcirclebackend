@@ -8,18 +8,45 @@ const {
   deleteConversation
 } = require('../controllers/messageController');
 const { authenticate } = require('../middlewares/auth');
+const supabase = require('../config/database');
 
 // Create a modified version of getConversations that doesn't require authentication
 const getConversationsWithoutAuth = async (req, res) => {
   try {
-    // Skip database query and return empty conversations list
-    // This avoids the UUID format issue entirely
-    return res.status(200).json({
-      success: true,
-      data: {
-        conversations: []
+    // Check if a test user ID was provided in query params
+    const userId = req.query.userId;
+    
+    // If not provided in query, try to get a valid user ID from the database
+    if (!userId) {
+      // Get a valid user ID from the database to use for testing
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1)
+        .single();
+      
+      if (error || !user) {
+        console.warn('Could not find a valid user ID for testing, returning empty conversations');
+        // If no valid user found, return empty conversations
+        return res.status(200).json({
+          success: true,
+          data: {
+            conversations: []
+          }
+        });
       }
-    });
+      
+      // Set the user object with a valid UUID from the database
+      req.user = { id: user.id };
+    } else {
+      // Use the provided userId if it was in the query string
+      req.user = { id: userId };
+    }
+    
+    console.log(`Using user ID for conversations: ${req.user.id}`);
+    
+    // Call the original controller function with the valid user ID
+    return await getConversations(req, res);
   } catch (error) {
     console.error('Error in getConversationsWithoutAuth:', error);
     return res.status(500).json({

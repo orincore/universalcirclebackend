@@ -37,7 +37,7 @@ const {
 } = require('../services/ai/aiCopilotService');
 
 // Import AI bot profile service
-const { generateBotProfile, generateBotResponse, storeBotMessage } = require('../services/ai/botProfileService');
+const { generateBotProfile, generateBotResponse, storeBotMessage, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
 
 // Track bot matches and their data
 const botMatches = new Map();
@@ -3550,7 +3550,7 @@ const createBotMatchForUser = async (socket) => {
     
     try {
       // Import the necessary service directly to avoid circular dependencies
-      const { generateBotProfile } = require('../services/ai/botProfileService');
+      const { generateBotProfile, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
       
       // Generate a bot profile matching user's preferences
       const botProfile = await generateBotProfile(
@@ -3559,18 +3559,13 @@ const createBotMatchForUser = async (socket) => {
         socket.user.interests || []
       );
       
-      // Verify bot user was created in the database
-      const { data: botUser, error: botCheckError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', botProfile.id)
-        .single();
-        
-      if (botCheckError || !botUser) {
-        console.error(`Bot user ${botProfile.id} was not found in database after creation. Match will likely fail.`);
-        // We will try recovery during messaging, but log the issue
-      } else {
-        console.log(`Verified bot user ${botProfile.id} exists in database for match with user ${userId}`);
+      // Immediately verify and ensure bot user exists in database
+      try {
+        await verifyAndRecoverBotUser(botProfile);
+        console.log(`Successfully verified bot user ${botProfile.id} exists in database`);
+      } catch (verifyError) {
+        console.error(`Warning: Bot user verification failed: ${verifyError.message}`);
+        // Continue with match creation - we'll try again during messaging
       }
       
       // Generate a matchId and create the match
@@ -3651,7 +3646,7 @@ const createBotMatchForUser = async (socket) => {
             console.error(`Maximum retries reached for creating match ${matchId} in database.`);
           } else {
             // Wait briefly before retrying
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
           }
         }
       }
@@ -3911,7 +3906,7 @@ module.exports = {
  */ 
 
 /**
- * Handle bot responses to user messages
+ * Handle bot responses to user messages with improved verification and reliability
  * @param {string} matchId - Match ID
  * @param {string} userMessage - Message from user
  * @param {object} socket - User's socket
@@ -3928,37 +3923,17 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     // Log the bot match details
     console.log(`Processing bot response for match ${matchId} - Bot ID: ${botMatch.botProfile.id}, User ID: ${socket.user.id}`);
     
-    // IMPORTANT: Verify bot user exists in database before proceeding
+    // Import directly here to avoid circular dependencies
+    const { generateBotResponse, storeBotMessage, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
+    
+    // IMPORTANT: Verify and recover bot user before attempting any database operations
     try {
-      const { data: botUser, error: botCheckError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', botMatch.botProfile.id)
-        .single();
-      
-      if (botCheckError || !botUser) {
-        console.warn(`Bot user ${botMatch.botProfile.id} not found in database. Attempting to create it now.`);
-        
-        // Try to create the bot user if it doesn't exist
-        const { createBotUserRecord } = require('../services/ai/botProfileService');
-        await createBotUserRecord(botMatch.botProfile);
-        
-        // Verify creation was successful
-        const { data: verifiedBot, error: verifyError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', botMatch.botProfile.id)
-          .single();
-          
-        if (verifyError || !verifiedBot) {
-          throw new Error(`Failed to create bot user ${botMatch.botProfile.id} during recovery: ${verifyError?.message || 'Unknown error'}`);
-        }
-        
-        console.log(`Successfully created missing bot user ${botMatch.botProfile.id} during recovery`);
-      }
+      // This will ensure the bot exists in the database and recreate it if needed
+      await verifyAndRecoverBotUser(botMatch.botProfile);
+      console.log(`Verified bot user ${botMatch.botProfile.id} exists in database for response to ${socket.user.id}`);
     } catch (botVerifyError) {
-      console.error(`Bot verification failed: ${botVerifyError.message}`);
-      // Continue with the response, but note it in logs - we'll attempt message storage with verification
+      console.error(`Critical error verifying/recovering bot user: ${botVerifyError.message}`);
+      // Even with verification error, continue with the response, but note it in logs
     }
     
     // Add user message to match history
@@ -3967,6 +3942,15 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
       message: userMessage,
       timestamp: new Date().toISOString()
     });
+    
+    // Store user's message in database
+    try {
+      await storeBotMessage(socket.user.id, botMatch.botProfile.id, userMessage);
+      console.log(`Successfully stored user message from ${socket.user.id} to bot ${botMatch.botProfile.id}`);
+    } catch (msgStoreError) {
+      console.error(`Error storing user message: ${msgStoreError.message}`);
+      // Continue despite error - we'll still try to generate a response
+    }
     
     // Send typing indicator to user for better UX
     const userSocketId = connectedUsers.get(botMatch.userId);
@@ -3979,21 +3963,22 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
       });
     }
     
-    // Add a random delay to make the response feel more natural
-    const typingDelay = 1000 + Math.floor(Math.random() * 3000); // 1-4 seconds
-    const messageLength = userMessage.length;
-    const responseDelay = Math.min(typingDelay, messageLength * 30); // Longer for longer messages
+    // Add a realistic random delay to make the response feel more natural
+    // Longer messages take longer to type
+    const baseTypingDelay = 1000 + Math.floor(Math.random() * 2000); // 1-3 seconds base
+    const characterTypingTime = userMessage.length * 25; // ~25ms per character
+    const maxTypingTime = 7000; // Cap at 7 seconds
+    const responseDelay = Math.min(baseTypingDelay + characterTypingTime, maxTypingTime);
+    
+    console.log(`Bot will respond in ${responseDelay}ms with a realistic typing delay`);
     
     setTimeout(async () => {
       try {
         // Generate bot response - pass userId to enable database storage
-        console.log(`Generating AI response for user message: "${userMessage}"`);
+        console.log(`Generating AI response to user message: "${userMessage}"`);
         
         let botResponse = "";
         try {
-          // Import directly here to avoid circular dependencies
-          const { generateBotResponse, storeBotMessage } = require('../services/ai/botProfileService');
-          
           // Try to generate bot response with AI
           botResponse = await generateBotResponse(
             userMessage,
@@ -4007,43 +3992,22 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
           
           // Fallback response if AI generation fails
           const fallbackResponses = [
-            "I'm interested in hearing more about that!",
-            "That's fascinating. Tell me more?",
-            "I'd love to continue this conversation. What else is on your mind?",
-            "That's a good point. I hadn't thought about it that way before.",
-            "I'm enjoying our chat. What else would you like to talk about?"
+            "That sounds interesting! Tell me more about yourself.",
+            "I'd like to know more about that. What else do you enjoy?",
+            "I'm curious about your interests. What do you like to do?",
+            "That's fascinating. Have you always been interested in that?",
+            "I've been thinking about trying something new. Any suggestions?"
           ];
           
           botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
           console.log(`Using fallback response: "${botResponse}"`);
           
-          // Manually store the messages since generateBotResponse couldn't do it
+          // Manually store the bot response message since generateBotResponse couldn't do it
           try {
-            // Verify both users exist before attempting to store messages
-            const { data: users, error: userError } = await supabase
-              .from('users')
-              .select('id')
-              .or(`id.eq.${socket.user.id},id.eq.${botMatch.botProfile.id}`);
-              
-            if (userError) {
-              throw new Error(`Error verifying users: ${userError.message}`);
-            }
-            
-            // Check if both users exist
-            const userIds = users.map(u => u.id);
-            if (userIds.length === 2 && 
-                userIds.includes(socket.user.id) && 
-                userIds.includes(botMatch.botProfile.id)) {
-              
-              // Store user message and bot response
-              await storeBotMessage(socket.user.id, botMatch.botProfile.id, userMessage);
-              await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
-              console.log('Successfully stored messages manually after AI error');
-            } else {
-              console.error(`Cannot store messages: Missing user(s) in database. Found: ${userIds.join(', ')}`);
-            }
+            await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
+            console.log(`Successfully stored fallback bot response in database`);
           } catch (storageError) {
-            console.error(`Error manually storing messages: ${storageError.message}`);
+            console.error(`Error manually storing bot response: ${storageError.message}`);
           }
         }
         
@@ -4077,7 +4041,7 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
             typing: false
           });
           
-          // Small delay after typing stops before message appears
+          // Small delay after typing stops before message appears (realistic)
           setTimeout(() => {
             // Send bot message directly to user's socket
             ioInstance.to(userSocketId).emit('match:message', messageObject);
@@ -4091,7 +4055,7 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
               deliveredAt: new Date().toISOString()
             });
             
-            // After a short delay, mark the message as read
+            // After a short delay, mark the message as read (looks more realistic)
             setTimeout(() => {
               ioInstance.to(userSocketId).emit('match:messageRead', {
                 messageId: botMessageId,
@@ -4106,7 +4070,7 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
       } catch (error) {
         console.error('Error in bot response generation:', error);
         
-        // Still try to send a simple message to keep the conversation going
+        // Still try to send a simple message to keep the conversation going even if everything else fails
         if (userSocketId) {
           const emergencyMessageId = uuidv4();
           const emergencyMessage = {
@@ -4121,6 +4085,14 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
           
           ioInstance.to(userSocketId).emit('match:message', emergencyMessage);
           console.log(`Sent emergency fallback message to user ${botMatch.userId}`);
+          
+          // Try to store this emergency message as well
+          try {
+            const { storeBotMessage } = require('../services/ai/botProfileService');
+            await storeBotMessage(botMatch.botProfile.id, socket.user.id, emergencyMessage.message);
+          } catch (emergencyStoreError) {
+            console.error(`Failed to store emergency message: ${emergencyStoreError.message}`);
+          }
         }
       }
     }, responseDelay);

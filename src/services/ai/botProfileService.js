@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const logger = require('../../utils/logger');
-const { info, error } = logger;
+const { info, error, warn } = logger;
 const supabase = require('../../config/database');
 
 // Initialize Google Generative AI client
@@ -695,136 +695,298 @@ const generateTravelExperiences = () => {
 };
 
 /**
- * Create a bot user record in the database
+ * Create a bot user record in the database - with robust error handling and verification
  * @param {object} botProfile - Bot profile data
  * @returns {Promise<object>} Created user data
  */
 const createBotUserRecord = async (botProfile) => {
-  try {
-    // Check if bot user already exists
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', botProfile.id)
-      .single();
-    
-    if (checkError && checkError.code !== 'PGRST116') {
-      // Real error, not just "no rows returned"
-      throw new Error(`Error checking for existing bot user: ${checkError.message}`);
-    }
-    
-    // If user already exists, return it
-    if (existingUser) {
-      info(`Bot user ${botProfile.id} already exists in database`);
-      return existingUser;
-    }
-    
-    // Format data for database - ensure snake_case for all field names
-    const userData = {
-      id: botProfile.id,
-      username: botProfile.username,
-      email: `bot-${botProfile.id}@example.com`, // Dummy email for bots
-      password: `bot-${uuidv4()}`, // Random password (not used)
-      first_name: botProfile.firstName,
-      last_name: botProfile.lastName,
-      gender: botProfile.gender,
-      bio: botProfile.bio,
-      date_of_birth: botProfile.date_of_birth,
-      location: botProfile.location ? JSON.stringify({city: botProfile.location}) : null,
-      profile_picture_url: botProfile.profile_picture_url,
-      interests: botProfile.interests || [],
-      is_verified: true,
-      is_bot: true, // Flag to identify this as a bot
-      preference: botProfile.preference || 'Friendship',
-      is_active: true,
-      is_online: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      last_active: new Date().toISOString()
-    };
-    
-    // Log the exact data being inserted
-    console.log(`Creating bot user with data: ${JSON.stringify(userData)}`);
-    
-    // Insert user into database
-    const { data, error } = await supabase
-      .from('users')
-      .insert(userData)
-      .select()
-      .single();
-    
-    if (error) {
-      throw new Error(`Error creating bot user: ${error.message}`);
-    }
-    
-    // Verify the user was created
-    const { data: verifyUser, error: verifyError } = await supabase
-      .from('users')
-      .select('id, username, first_name, last_name')
-      .eq('id', botProfile.id)
-      .single();
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (retryCount < maxRetries) {
+    try {
+      // First check if bot user already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('*')  // Get all user data, not just ID
+        .eq('id', botProfile.id)
+        .single();
       
-    if (verifyError || !verifyUser) {
-      throw new Error(`Bot user creation verification failed: ${verifyError?.message || 'User not found after creation'}`);
+      if (!checkError && existingUser) {
+        info(`Bot user ${botProfile.id} already exists in database`);
+        return existingUser;
+      }
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        // Real error, not just "no rows returned"
+        throw new Error(`Error checking for existing bot user: ${checkError.message}`);
+      }
+      
+      // Format data for database - ensure snake_case for all field names
+      // This ensures the bot user has all the same fields as regular users
+      const userData = {
+        id: botProfile.id,
+        username: botProfile.username || `bot_${botProfile.firstName.toLowerCase()}${Math.floor(Math.random() * 1000)}`,
+        email: `bot-${botProfile.id}@circleapp.io`, // Use a consistent domain
+        password: `${uuidv4()}-${uuidv4()}`, // Secure random password that can't be guessed
+        first_name: botProfile.firstName || botProfile.first_name,
+        last_name: botProfile.lastName || botProfile.last_name,
+        gender: botProfile.gender || 'other',
+        bio: botProfile.bio || `Hi! I'm ${botProfile.firstName || botProfile.first_name}. Let's chat!`,
+        date_of_birth: botProfile.date_of_birth,
+        location: botProfile.location ? 
+          (typeof botProfile.location === 'string' ? 
+            JSON.stringify({city: botProfile.location}) : 
+            JSON.stringify(botProfile.location)) : 
+          JSON.stringify({city: 'Mumbai'}),
+        profile_picture_url: botProfile.profile_picture_url,
+        interests: Array.isArray(botProfile.interests) ? botProfile.interests : [],
+        is_verified: true,
+        is_bot: true,
+        preference: botProfile.preference || 'Friendship',
+        is_active: true,
+        is_online: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_active: new Date().toISOString(),
+        
+        // Add additional fields that might be in the users table
+        email_verified: true,
+        phone: null,
+        private_profile: false,
+        stripe_customer_id: null,
+        instagram_handle: null,
+        twitter_handle: null,
+        spotify_handle: null,
+        linkedin_handle: null,
+      };
+      
+      // Log the exact data being inserted
+      info(`Creating bot user with data: ${JSON.stringify(userData)}`);
+      
+      // Start a transaction for the bot user creation
+      const { data, error } = await supabase
+        .from('users')
+        .insert(userData)
+        .select('*')  // Return all fields, not just id
+        .single();
+      
+      if (error) {
+        throw new Error(`Error creating bot user: ${error.message} (${error.code})`);
+      }
+      
+      if (!data || !data.id) {
+        throw new Error('Bot user created but no data returned');
+      }
+      
+      // Double-verify the user was created with a separate query
+      const { data: verifyUser, error: verifyError } = await supabase
+        .from('users')
+        .select('id, username, first_name, last_name, is_bot')
+        .eq('id', botProfile.id)
+        .single();
+      
+      if (verifyError || !verifyUser) {
+        throw new Error(`Bot user creation verification failed: ${verifyError?.message || 'User not found after creation'}`);
+      }
+      
+      if (!verifyUser.is_bot) {
+        // Ensure the is_bot flag is set
+        await supabase
+          .from('users')
+          .update({ is_bot: true })
+          .eq('id', botProfile.id);
+      }
+      
+      info(`✅ Successfully created bot user ${botProfile.id} in database: ${verifyUser.username} (${verifyUser.first_name} ${verifyUser.last_name})`);
+      
+      // Add a bot marker in a secondary table if needed
+      try {
+        await supabase
+          .from('bot_users')
+          .upsert({
+            user_id: botProfile.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            is_active: true
+          }, {
+            onConflict: 'user_id'
+          });
+      } catch (secondaryError) {
+        // Non-critical, just log it
+        error(`Note: Failed to add bot marker to secondary table: ${secondaryError.message}`);
+      }
+      
+      return data;
+    } catch (err) {
+      retryCount++;
+      error(`Failed to create bot user record (attempt ${retryCount}/${maxRetries}): ${err.message}`);
+      
+      if (retryCount >= maxRetries) {
+        error(`Maximum retries reached for creating bot user ${botProfile.id || 'unknown'}`);
+        throw err;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
     }
-    
-    info(`Successfully created bot user ${botProfile.id} in database: ${verifyUser.username} (${verifyUser.first_name} ${verifyUser.last_name})`);
-    return data;
-  } catch (err) {
-    error(`Failed to create bot user record: ${err.message}`);
-    throw err; // Re-throw to handle properly in calling function
   }
 };
 
 /**
- * Store a message from or to a bot in the messages table
+ * Verify bot user exists and recover if needed - use this before attempting any operations with a bot
+ * @param {object} botProfile - Bot profile data 
+ * @returns {Promise<object>} Verified bot user data
+ */
+const verifyAndRecoverBotUser = async (botProfile) => {
+  if (!botProfile || !botProfile.id) {
+    throw new Error('Invalid bot profile provided for verification');
+  }
+  
+  try {
+    // Check if bot exists
+    const { data: botUser, error: botCheckError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', botProfile.id)
+      .single();
+    
+    // If bot exists and has all required fields, return it
+    if (!botCheckError && botUser && botUser.is_bot) {
+      return botUser;
+    }
+    
+    // If bot exists but is missing the is_bot flag, fix it
+    if (!botCheckError && botUser && !botUser.is_bot) {
+      info(`Bot user ${botProfile.id} exists but is missing is_bot flag. Fixing...`);
+      await supabase
+        .from('users')
+        .update({ is_bot: true })
+        .eq('id', botProfile.id);
+      
+      return { ...botUser, is_bot: true };
+    }
+    
+    // Otherwise create the bot user
+    info(`Bot user ${botProfile.id} does not exist. Creating...`);
+    const newBotUser = await createBotUserRecord(botProfile);
+    return newBotUser;
+  } catch (err) {
+    error(`Error verifying/recovering bot user: ${err.message}`);
+    throw err;
+  }
+};
+
+/**
+ * Store a message between a bot and user with robust error handling and verification
  * @param {string} senderId - Sender user ID
  * @param {string} receiverId - Receiver user ID
  * @param {string} content - Message content
  * @returns {Promise<Object>} Created message data
  */
 const storeBotMessage = async (senderId, receiverId, content) => {
-  try {
-    // First verify both users exist to avoid foreign key constraint errors
-    const { data: users, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .or(`id.eq.${senderId},id.eq.${receiverId}`);
-    
-    if (userError) {
-      throw new Error(`Error verifying users: ${userError.message}`);
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (retryCount < maxRetries) {
+    try {
+      // First verify both users exist to avoid foreign key constraint errors
+      const { data: users, error: userError } = await supabase
+        .from('users')
+        .select('id, is_bot, first_name, last_name')
+        .or(`id.eq.${senderId},id.eq.${receiverId}`);
+      
+      if (userError) {
+        throw new Error(`Error verifying users: ${userError.message}`);
+      }
+      
+      // Check if both users exist
+      const userIds = users.map(u => u.id);
+      
+      // If sender is missing, we need to create it
+      if (!userIds.includes(senderId)) {
+        error(`Sender ${senderId} does not exist in users table. This is a critical error.`);
+        
+        // If this is a bot, try to recover
+        const senderIsBot = users.some(u => u.id === senderId && u.is_bot);
+        if (senderIsBot) {
+          const botProfile = {
+            id: senderId,
+            // Add minimal required fields to create a valid bot user
+            firstName: 'Bot',
+            lastName: 'User',
+            gender: 'other',
+            date_of_birth: new Date(2000, 0, 1).toISOString().split('T')[0],
+            interests: []
+          };
+          
+          info(`Attempting to recreate missing bot user ${senderId}`);
+          await createBotUserRecord(botProfile);
+        } else {
+          throw new Error(`Sender ${senderId} does not exist and is not a bot. Cannot create message.`);
+        }
+      }
+      
+      // If receiver is missing, we need to create it
+      if (!userIds.includes(receiverId)) {
+        error(`Receiver ${receiverId} does not exist in users table. This is a critical error.`);
+        
+        // If this is a bot, try to recover
+        const receiverIsBot = users.some(u => u.id === receiverId && u.is_bot);
+        if (receiverIsBot) {
+          const botProfile = {
+            id: receiverId,
+            // Add minimal required fields to create a valid bot user
+            firstName: 'Bot',
+            lastName: 'User',
+            gender: 'other',
+            date_of_birth: new Date(2000, 0, 1).toISOString().split('T')[0],
+            interests: []
+          };
+          
+          info(`Attempting to recreate missing bot user ${receiverId}`);
+          await createBotUserRecord(botProfile);
+        } else {
+          throw new Error(`Receiver ${receiverId} does not exist and is not a bot. Cannot create message.`);
+        }
+      }
+      
+      // Now create the message
+      const messageId = uuidv4();
+      const now = new Date().toISOString();
+      
+      const { data, error: msgError } = await supabase
+        .from('messages')
+        .insert({
+          id: messageId,
+          sender_id: senderId,
+          receiver_id: receiverId,
+          content,
+          is_read: false,
+          created_at: now,
+          updated_at: now,
+          is_bot_message: true
+        })
+        .select();
+      
+      if (msgError) {
+        throw new Error(`Error creating bot message in database: ${msgError.message} (${msgError.code})`);
+      }
+      
+      info(`Successfully stored message from ${senderId} to ${receiverId}`);
+      return data;
+    } catch (err) {
+      retryCount++;
+      error(`Error storing bot message (attempt ${retryCount}/${maxRetries}): ${err.message}`);
+      
+      if (retryCount >= maxRetries) {
+        error(`Maximum retries reached for storing message from ${senderId} to ${receiverId}`);
+        throw err;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
     }
-    
-    // Check if both users exist
-    const userIds = users.map(u => u.id);
-    if (!userIds.includes(senderId)) {
-      throw new Error(`Sender ${senderId} does not exist in users table`);
-    }
-    if (!userIds.includes(receiverId)) {
-      throw new Error(`Receiver ${receiverId} does not exist in users table`);
-    }
-    
-    // Create message in database
-    const { data, error: msgError } = await supabase
-      .from('messages')
-      .insert({
-        sender_id: senderId,
-        receiver_id: receiverId,
-        content,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select();
-    
-    if (msgError) {
-      throw new Error(`Error creating bot message in database: ${msgError.message}`);
-    }
-    
-    return data;
-  } catch (err) {
-    error(`Error storing bot message: ${err.message}`);
-    throw err;
   }
 };
 
@@ -1062,7 +1224,7 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
 };
 
 /**
- * Update generateBotResponse to store messages in the database
+ * Generate a bot response to a user message with improved Gemini AI integration
  * @param {string} userMessage - User's message
  * @param {object} botProfile - Bot's profile
  * @param {string} preference - Preference type
@@ -1071,84 +1233,142 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
  */
 const generateBotResponse = async (userMessage, botProfile, preference = 'Friendship', userId) => {
   try {
+    // First verify the bot user exists in the database
+    await verifyAndRecoverBotUser(botProfile);
+    
     // Detect the language of the user message (simplified approach)
-    const isEnglishMessage = /^[A-Za-z\s\d.,!?'"\-():;]+$/.test(userMessage);
+    const hasNonEnglishChars = /[^\x00-\x7F]/.test(userMessage);
+    const probableLanguage = hasNonEnglishChars ? 'non-english' : 'english';
+    
+    // Log message receipt
+    info(`Generating bot response from ${botProfile.id} to user ${userId}: "${userMessage}" (detected language: ${probableLanguage})`);
     
     let botResponse = '';
     
     // Check if AI model is available
     if (model) {
       try {
+        // Personality traits based on gender and preference
+        let personalityTraits = '';
+        
+        if (botProfile.gender === 'female') {
+          if (preference === 'Dating') {
+            personalityTraits = 'friendly, warm, engaging, slightly flirtatious but respectful';
+          } else {
+            personalityTraits = 'friendly, supportive, compassionate, thoughtful';
+          }
+        } else if (botProfile.gender === 'male') {
+          if (preference === 'Dating') {
+            personalityTraits = 'confident, charming, attentive, slightly flirtatious but respectful';
+          } else {
+            personalityTraits = 'friendly, reliable, thoughtful, supportive';
+          }
+        } else {
+          // Non-binary or other gender
+          personalityTraits = 'friendly, open-minded, thoughtful, authentic';
+        }
+        
+        // Enhanced prompt for better Gemini responses
         const prompt = `
-          You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${botProfile.location}, India.
-          You work as a ${botProfile.occupation} and have ${botProfile.education}.
-          Your interests include ${botProfile.interests.join(', ')}.
-          Your bio: "${botProfile.bio}"
+          You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${typeof botProfile.location === 'string' ? botProfile.location : JSON.parse(botProfile.location).city || 'Mumbai'}, India.
           
-          You are chatting with someone on a ${preference.toLowerCase()} app. You are having a conversation in a ${preference.toLowerCase()} context, not a romantic one.
+          YOUR PERSONALITY: You are ${personalityTraits}.
           
-          IMPORTANT: Respond in the SAME LANGUAGE that the person is using to talk to you. If they write in Hindi, respond in Hindi. If they write in Tamil, respond in Tamil. Match their language.
+          YOUR PROFILE:
+          - You work as a ${botProfile.occupation || 'professional'}
+          - You have ${botProfile.education || 'a college education'}
+          - Your interests include ${botProfile.interests.join(', ')}
+          - Your bio: "${botProfile.bio}"
           
-          Respond naturally and conversationally to this message from them: "${userMessage}"
+          CURRENT CONVERSATION:
+          - You are chatting with someone on a ${preference.toLowerCase()} app
+          - This is a ${preference.toLowerCase()} context interaction
+          - You should be authentic, relatable, and show genuine interest
           
-          Keep your response short (1-3 sentences), friendly, and authentic.
-          Don't use emojis or hashtags. Be conversational and very natural like a real human.
-          Don't mention that you are an AI.
-          Don't explain your behavior - just respond naturally.
+          IMPORTANT INSTRUCTIONS:
+          - Respond in the SAME LANGUAGE the person is using to talk to you. If they write in Hindi, respond in Hindi. Match their language.
+          - Keep your response natural, conversational and SHORT (1-3 sentences maximum)
+          - Show genuine interest in what they've shared
+          - Be warm and friendly but don't overdo the friendliness
+          - Don't use emojis
+          - Don't mention that you are an AI - respond as if you are a real person
+          - Don't explain your behavior or apologize
+          - Make your response feel like a genuine human message
+          
+          Respond naturally to this message: "${userMessage}"
         `;
         
-        const result = await model.generateContent(prompt);
+        const safetySettings = [
+          {
+            category: 'HARM_CATEGORY_HARASSMENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            category: 'HARM_CATEGORY_HATE_SPEECH',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          }
+        ];
+        
+        const generationConfig = {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 256,
+        };
+        
+        // Generate response with Gemini
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          safetySettings,
+          generationConfig
+        });
+        
         const response = await result.response;
         botResponse = response.text().trim();
-        console.log(`Successfully generated AI response for bot ${botProfile.id}`);
+        
+        // Ensure the response isn't too long
+        if (botResponse.length > 300) {
+          botResponse = botResponse.substring(0, 300).trim();
+          
+          // Find the last complete sentence
+          const lastPeriod = botResponse.lastIndexOf('.');
+          const lastQuestion = botResponse.lastIndexOf('?');
+          const lastExclamation = botResponse.lastIndexOf('!');
+          
+          const lastSentenceEnd = Math.max(lastPeriod, lastQuestion, lastExclamation);
+          
+          if (lastSentenceEnd > 150) {
+            botResponse = botResponse.substring(0, lastSentenceEnd + 1);
+          }
+        }
+        
+        info(`Successfully generated AI response: "${botResponse}"`);
       } catch (genError) {
-        console.error(`Error generating bot response with AI: ${genError.message}`);
+        error(`Error generating bot response with AI: ${genError.message}`);
         // Fall through to fallback responses
         botResponse = ''; // Ensure empty so we use fallback
       }
     } else {
-      console.warn('AI model not available for bot response generation, using fallback');
+      warn('AI model not available for bot response generation, using fallback');
     }
     
     // If no response was generated (due to error or no model), use fallback
     if (!botResponse) {
-      // Check if message is likely non-English
-      const isNonEnglish = /[^\x00-\x7F]/.test(userMessage);
+      // Use language-appropriate fallback responses
+      const fallbackResponses = hasNonEnglishChars ? 
+        getHindiFallbackResponses(botProfile) : 
+        getEnglishFallbackResponses(botProfile);
       
-      // Hindi fallback responses
-      const hindiFallbackResponses = [
-        "नमस्ते! आपसे बात करके अच्छा लगा। और बताइए अपने बारे में?",
-        "बहुत दिलचस्प! मुझे भी ऐसी चीज़ें पसंद हैं।",
-        "आप क्या करना पसंद करते हैं? मुझे ${botProfile.interests[0]} बहुत पसंद है।",
-        "वाह, यह तो बहुत अच्छा है! और सुनाइए?",
-        "मैं ${botProfile.location} में रहता/रहती हूँ। आप कहाँ से हैं?",
-        "ये बात मुझे पसंद आई! थोड़ा और बताइए?"
-      ];
-      
-      // English fallback responses
-      const englishFallbackResponses = [
-        `That's interesting! Tell me more about yourself.`,
-        `I enjoy ${botProfile.interests[0] || 'reading'} too! What else do you like to do?`,
-        `I've been working as a ${botProfile.occupation || 'professional'} for a while now. What about you?`,
-        `I'm from ${botProfile.location || 'Mumbai'}. Have you ever visited?`,
-        `That's cool! I'd love to hear more about your interests.`,
-        `I'm actually learning more about ${botProfile.interests[1] || 'traveling'} these days. Any recommendations?`,
-        `Thanks for sharing that! I've had similar experiences.`,
-        `That's a good point. I hadn't thought about it that way before.`,
-        `I'm curious to know more about your perspective on that.`,
-        `That sounds like fun! I should try that sometime.`
-      ];
-      
-      // Choose appropriate language fallbacks
-      const fallbackResponses = isNonEnglish ? hindiFallbackResponses : englishFallbackResponses;
-      
-      botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)]
-        .replace(/\${botProfile\.interests\[0\]}/g, botProfile.interests[0] || "reading")
-        .replace(/\${botProfile\.interests\[1\]}/g, botProfile.interests[1] || "traveling")
-        .replace(/\${botProfile\.location}/g, botProfile.location || "Mumbai")
-        .replace(/\${botProfile\.occupation}/g, botProfile.occupation || "professional");
-      
-      console.log(`Using fallback response for bot ${botProfile.id}`);
+      botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      info(`Using fallback response for bot ${botProfile.id}: "${botResponse}"`);
     }
     
     // Store both messages in the database if userId is provided
@@ -1156,25 +1376,86 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
       try {
         // Store user's message to bot
         await storeBotMessage(userId, botProfile.id, userMessage);
+        info(`Stored user message in database: from ${userId} to ${botProfile.id}`);
         
         // Store bot's response to user
         await storeBotMessage(botProfile.id, userId, botResponse);
+        info(`Stored bot response in database: from ${botProfile.id} to ${userId}`);
       } catch (dbError) {
-        console.error(`Failed to store bot messages in database: ${dbError.message}`);
+        error(`Failed to store bot messages in database: ${dbError.message}`);
         // Continue even if message storage fails
       }
     }
     
     return botResponse;
   } catch (err) {
-    console.error(`Error in bot response generation: ${err.message}`);
-    return "I'm sorry, I couldn't process that message. Can you try again?";
+    error(`Error in bot response generation: ${err.message}`);
+    // Return a generic response that won't break the conversation
+    return "I'm sorry, I was a bit distracted. What were you saying?";
   }
+};
+
+/**
+ * Get Hindi fallback responses with bot profile substitutions
+ * @param {object} botProfile - Bot profile data
+ * @returns {Array} Array of Hindi responses
+ */
+const getHindiFallbackResponses = (botProfile) => {
+  const name = botProfile.firstName || 'दोस्त';
+  const interest = botProfile.interests && botProfile.interests.length > 0 ? 
+    botProfile.interests[0] : 'बातचीत';
+  const location = typeof botProfile.location === 'string' ? 
+    botProfile.location : 
+    (botProfile.location ? JSON.parse(botProfile.location).city : 'मुंबई');
+  
+  return [
+    `नमस्ते! आपसे बात करके अच्छा लगा। और बताइए अपने बारे में?`,
+    `बहुत दिलचस्प! मुझे भी ऐसी चीज़ें पसंद हैं।`,
+    `आप क्या करना पसंद करते हैं? मुझे ${interest} बहुत पसंद है।`,
+    `वाह, यह तो बहुत अच्छा है! और सुनाइए?`,
+    `मैं ${location} में रहता/रहती हूँ। आप कहाँ से हैं?`,
+    `ये बात मुझे पसंद आई! थोड़ा और बताइए?`,
+    `मेरा नाम ${name} है। आपसे मिलकर खुशी हुई!`,
+    `क्या आप भी ${interest} पसंद करते हैं? मुझे बहुत शौक है इसका।`
+  ];
+};
+
+/**
+ * Get English fallback responses with bot profile substitutions
+ * @param {object} botProfile - Bot profile data
+ * @returns {Array} Array of English responses
+ */
+const getEnglishFallbackResponses = (botProfile) => {
+  const name = botProfile.firstName || 'friend';
+  const interest = botProfile.interests && botProfile.interests.length > 0 ? 
+    botProfile.interests[0] : 'conversations';
+  const interest2 = botProfile.interests && botProfile.interests.length > 1 ? 
+    botProfile.interests[1] : 'meeting new people';
+  const location = typeof botProfile.location === 'string' ? 
+    botProfile.location : 
+    (botProfile.location ? JSON.parse(botProfile.location).city : 'Mumbai');
+  const occupation = botProfile.occupation || 'professional';
+  
+  return [
+    `That's interesting! Tell me more about yourself.`,
+    `I enjoy ${interest} too! What else do you like to do?`,
+    `I've been working as a ${occupation} for a while now. What about you?`,
+    `I'm from ${location}. Have you ever visited?`,
+    `That's cool! I'd love to hear more about your interests.`,
+    `I'm actually learning more about ${interest2} these days. Any recommendations?`,
+    `Thanks for sharing that! I've had similar experiences.`,
+    `That's a good point. I hadn't thought about it that way before.`,
+    `I'm curious to know more about your perspective on that.`,
+    `That sounds fun! I should try that sometime.`,
+    `I'm ${name}, by the way. Nice to connect with you!`,
+    `Do you often spend time ${interest}? It's one of my favorite things to do.`
+  ];
 };
 
 module.exports = {
   generateBotProfile,
   generateBotResponse,
   createBotUserRecord,
-  storeBotMessage
+  storeBotMessage,
+  verifyAndRecoverBotUser
 };

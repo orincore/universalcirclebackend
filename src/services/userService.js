@@ -133,6 +133,37 @@ const updateUserProfile = async (userId, profileData) => {
       }
     }
     
+    // Handle singular preference field
+    if (safeProfileData.preference !== undefined) {
+      // Ensure preference is a string (if it's an object or something else, stringify it)
+      if (typeof safeProfileData.preference !== 'string') {
+        safeProfileData.preference = String(safeProfileData.preference);
+        console.log('Converted preference to string:', safeProfileData.preference);
+      }
+    }
+    
+    // Handle location object
+    if (safeProfileData.location !== undefined) {
+      // If location is a string, try to parse it as JSON
+      if (typeof safeProfileData.location === 'string') {
+        try {
+          safeProfileData.location = JSON.parse(safeProfileData.location);
+          console.log('Parsed location from string:', safeProfileData.location);
+        } catch (e) {
+          console.error('Failed to parse location string:', e.message);
+          // Keep as string if parsing fails
+        }
+      }
+      
+      // Ensure location has at least latitude and longitude
+      if (typeof safeProfileData.location === 'object' && safeProfileData.location !== null) {
+        // Check if it has the right properties
+        if (!safeProfileData.location.hasOwnProperty('latitude') || !safeProfileData.location.hasOwnProperty('longitude')) {
+          console.error('Location object missing required properties (latitude/longitude):', safeProfileData.location);
+        }
+      }
+    }
+    
     // Handle date fields
     if (safeProfileData.birth_date !== undefined && typeof safeProfileData.birth_date === 'string') {
       try {

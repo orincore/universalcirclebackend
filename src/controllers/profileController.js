@@ -63,6 +63,7 @@ const updateProfile = async (req, res) => {
       location,
       birth_date,
       preferences,
+      preference,
       private_profile,
       interests,
       gender,
@@ -80,6 +81,7 @@ const updateProfile = async (req, res) => {
     if (location !== undefined) updates.location = location;
     if (birth_date !== undefined) updates.birth_date = birth_date;
     if (preferences !== undefined) updates.preferences = preferences;
+    if (preference !== undefined) updates.preference = preference;
     if (private_profile !== undefined) updates.private_profile = private_profile;
     if (interests !== undefined) updates.interests = interests;
     if (gender !== undefined) updates.gender = gender;
@@ -88,8 +90,8 @@ const updateProfile = async (req, res) => {
     if (username !== undefined) updates.username = username;
     
     console.log(`Updating profile for user ${userId} with fields:`, Object.keys(updates));
-    if (interests) console.log(`Interests to update:`, interests);
-
+    console.log(`Full update data:`, updates);
+    
     // Validate required fields are not empty
     if ('first_name' in updates && !updates.first_name) {
       return res.status(400).json({
@@ -138,6 +140,7 @@ const updateProfile = async (req, res) => {
           phone: updatedUser.phone,
           location: updatedUser.location,
           preferences: updatedUser.preferences,
+          preference: updatedUser.preference,
           private_profile: updatedUser.private_profile,
           updated_at: updatedUser.updated_at
         },

@@ -131,7 +131,15 @@ const updateProfile = async (req, res) => {
           last_name: updatedUser.last_name,
           bio: updatedUser.bio,
           interests: updatedUser.interests,
-          profile_picture_url: updatedUser.profile_picture_url
+          gender: updatedUser.gender,
+          birth_date: updatedUser.birth_date,
+          profile_picture_url: updatedUser.profile_picture_url,
+          username: updatedUser.username,
+          phone: updatedUser.phone,
+          location: updatedUser.location,
+          preferences: updatedUser.preferences,
+          private_profile: updatedUser.private_profile,
+          updated_at: updatedUser.updated_at
         },
         achievementsCompleted: completedAchievements
       }

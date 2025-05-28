@@ -119,6 +119,38 @@ const updateUserProfile = async (userId, profileData) => {
       console.log('Final interests array:', safeProfileData.interests);
     }
     
+    // Handle preferences object (often used for notification settings, etc.)
+    if (safeProfileData.preferences !== undefined) {
+      // If preferences is a string, try to parse it as JSON
+      if (typeof safeProfileData.preferences === 'string') {
+        try {
+          safeProfileData.preferences = JSON.parse(safeProfileData.preferences);
+          console.log('Parsed preferences from string:', safeProfileData.preferences);
+        } catch (e) {
+          console.error('Failed to parse preferences string:', e.message);
+          // Keep as string if parsing fails
+        }
+      }
+    }
+    
+    // Handle date fields
+    if (safeProfileData.birth_date !== undefined && typeof safeProfileData.birth_date === 'string') {
+      try {
+        // Ensure it's a valid date
+        const date = new Date(safeProfileData.birth_date);
+        if (!isNaN(date.getTime())) {
+          // Convert to ISO string for database consistency
+          safeProfileData.birth_date = date.toISOString().split('T')[0];
+          console.log('Formatted birth_date:', safeProfileData.birth_date);
+        }
+      } catch (e) {
+        console.error('Failed to format birth_date:', e.message);
+      }
+    }
+    
+    // Log final data
+    console.log('Final update data:', JSON.stringify(safeProfileData));
+    
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
       .update(safeProfileData)

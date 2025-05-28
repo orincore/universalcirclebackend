@@ -2596,7 +2596,7 @@ const initializeSocket = (io) => {
       }
     });
 
-    // Handle match acceptance (this was previously at the end of the file)
+    // Handle match acceptance
     socket.on('match:accept', async (data) => {
       try {
         const { matchId } = data;
@@ -2611,6 +2611,16 @@ const initializeSocket = (io) => {
           const botMatch = botMatches.get(matchId);
           otherUserId = botMatch.botProfile.id;
           isBot = true;
+          
+          // Verify bot user exists in database before proceeding
+          try {
+            const { verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
+            await verifyAndRecoverBotUser(botMatch.botProfile);
+            console.log(`Verified bot ${otherUserId} exists for match:accept`);
+          } catch (botVerifyError) {
+            console.error(`Error verifying bot user for match acceptance: ${botVerifyError.message}`);
+            // We'll continue anyway - the verification tried its best to recover
+          }
           
           // Bot automatically accepts, so just update user acceptance
           if (activeMatches.has(matchId)) {
@@ -2651,7 +2661,8 @@ const initializeSocket = (io) => {
             .eq('id', matchId);
           
           if (updateError) {
-            throw new Error(`Database error: ${updateError.message}`);
+            console.warn(`Non-critical error updating match in database: ${updateError.message}`);
+            // Non-critical error, continue with the match
           }
         } catch (dbError) {
           console.error(`Error updating match in database: ${dbError.message}`);
@@ -2677,14 +2688,14 @@ const initializeSocket = (io) => {
             
             // Get greeting options based on preference
             const friendshipGreetings = [
-              `Hi there! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0]}. What do you enjoy most about it?`,
-              `Hey! Thanks for accepting the match. I'm excited to chat with someone who shares my interest in ${botMatch.botProfile.interests[0]}!`,
-              `Hello! Glad we matched. I noticed we both have ${botMatch.botProfile.interests[0]} in common. How did you get into that?`
+              `Hi there! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0] || 'meeting new people'}. What do you enjoy most about it?`,
+              `Hey! Thanks for accepting the match. I'm excited to chat with someone who shares my interests!`,
+              `Hello! Glad we matched. I noticed we have some common interests. How's your day going so far?`
             ];
             
             const datingGreetings = [
-              `Hi there! I'm glad we matched. I noticed we share an interest in ${botMatch.botProfile.interests[0]}. What else do you enjoy?`,
-              `Hello! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0]}. What attracted you to that?`,
+              `Hi there! I'm glad we matched. I noticed we share some interests. What else do you enjoy?`,
+              `Hello! Nice to connect with you. What attracted you to my profile?`,
               `Hey! Thanks for accepting the match. I'm looking forward to getting to know you better!`
             ];
             
@@ -2723,10 +2734,10 @@ const initializeSocket = (io) => {
                 
                 // Store message in database if needed
                 try {
-                  // If you have a function to store bot messages
-                  if (typeof storeBotMessage === 'function') {
-                    storeBotMessage(botMatch.botProfile.id, userId, welcomeMessage);
-                  }
+                  // Store bot message
+                  const { storeBotMessage } = require('../services/ai/botProfileService');
+                  storeBotMessage(botMatch.botProfile.id, userId, welcomeMessage)
+                    .catch(msgError => console.error(`Error storing bot welcome message: ${msgError.message}`));
                 } catch (msgError) {
                   console.error('Error storing bot welcome message:', msgError);
                 }
@@ -3635,23 +3646,50 @@ const createBotMatchForUser = async (socket) => {
       
       while (!matchCreated && retryCount < maxRetries) {
         try {
-          await createMatchInDatabase(matchId, userId, botProfile.id);
-          matchCreated = true;
-          console.log(`Successfully created bot match ${matchId} in database (attempt ${retryCount + 1})`);
+          // First verify bot user exists in database before creating match
+          // This double-check helps prevent foreign key constraint violations
+          const { data: botUserExists } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', botProfile.id)
+            .single();
+            
+          if (!botUserExists) {
+            throw new Error(`Bot user ${botProfile.id} not found in database before match creation`);
+          }
+          
+          // Now create the match
+          const result = await createMatchInDatabase(matchId, userId, botProfile.id);
+          
+          if (result && result.success) {
+            matchCreated = true;
+            console.log(`Successfully created bot match ${matchId} in database (attempt ${retryCount + 1})`);
+          } else {
+            throw new Error((result && result.error) ? result.error.message : 'Unknown error creating match');
+          }
         } catch (dbError) {
           retryCount++;
           error(`Error creating bot match in database (attempt ${retryCount}/${maxRetries}): ${dbError.message}`);
           
           if (retryCount >= maxRetries) {
             console.error(`Maximum retries reached for creating match ${matchId} in database.`);
+            
+            // If all database attempts failed, we'll continue with in-memory match only
+            console.warn(`Proceeding with in-memory match only for matchId ${matchId}`);
           } else {
-            // Wait briefly before retrying
-            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+            // Try to fix the bot user before retrying
+            try {
+              await verifyAndRecoverBotUser(botProfile);
+              console.log(`Repaired bot user ${botProfile.id} before retry ${retryCount+1}`);
+              
+              // Wait briefly before retrying
+              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+            } catch (repairError) {
+              console.error(`Failed to repair bot user: ${repairError.message}`);
+            }
           }
         }
       }
-      
-      // Even if match creation in database failed, continue with in-memory match
       
       // Notify user of the match
       const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);

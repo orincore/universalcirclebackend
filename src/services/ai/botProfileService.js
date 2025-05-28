@@ -723,7 +723,7 @@ const createBotUserRecord = async (botProfile) => {
       }
       
       // Format data for database - ensure snake_case for all field names
-      // This ensures the bot user has all the same fields as regular users
+      // Include ONLY fields that are known to exist in the database
       const userData = {
         id: botProfile.id,
         username: botProfile.username || `bot_${botProfile.firstName.toLowerCase()}${Math.floor(Math.random() * 1000)}`,
@@ -750,15 +750,15 @@ const createBotUserRecord = async (botProfile) => {
         updated_at: new Date().toISOString(),
         last_active: new Date().toISOString(),
         
-        // Add additional fields that might be in the users table
-        email_verified: true,
+        // Add only fields we know exist in the database
         phone: null,
         private_profile: false,
-        stripe_customer_id: null,
+        
+        // Social media handles (only if they exist in the database)
         instagram_handle: null,
         twitter_handle: null,
         spotify_handle: null,
-        linkedin_handle: null,
+        linkedin_handle: null
       };
       
       // Log the exact data being inserted
@@ -800,23 +800,6 @@ const createBotUserRecord = async (botProfile) => {
       
       info(`✅ Successfully created bot user ${botProfile.id} in database: ${verifyUser.username} (${verifyUser.first_name} ${verifyUser.last_name})`);
       
-      // Add a bot marker in a secondary table if needed
-      try {
-        await supabase
-          .from('bot_users')
-          .upsert({
-            user_id: botProfile.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            is_active: true
-          }, {
-            onConflict: 'user_id'
-          });
-      } catch (secondaryError) {
-        // Non-critical, just log it
-        error(`Note: Failed to add bot marker to secondary table: ${secondaryError.message}`);
-      }
-      
       return data;
     } catch (err) {
       retryCount++;
@@ -847,7 +830,7 @@ const verifyAndRecoverBotUser = async (botProfile) => {
     // Check if bot exists
     const { data: botUser, error: botCheckError } = await supabase
       .from('users')
-      .select('*')
+      .select('id, is_bot, first_name, last_name')
       .eq('id', botProfile.id)
       .single();
     
@@ -869,8 +852,56 @@ const verifyAndRecoverBotUser = async (botProfile) => {
     
     // Otherwise create the bot user
     info(`Bot user ${botProfile.id} does not exist. Creating...`);
-    const newBotUser = await createBotUserRecord(botProfile);
-    return newBotUser;
+    
+    // Ensure minimal required fields are present
+    const minimalBotProfile = {
+      id: botProfile.id,
+      firstName: botProfile.firstName || botProfile.first_name || 'Bot',
+      lastName: botProfile.lastName || botProfile.last_name || 'User',
+      username: botProfile.username || `bot_${Math.floor(Math.random() * 10000)}`,
+      gender: botProfile.gender || 'other',
+      date_of_birth: botProfile.date_of_birth || '2000-01-01',
+      interests: botProfile.interests || [],
+      preference: botProfile.preference || 'Friendship',
+      bio: botProfile.bio || `Hi! I'm a bot user. Let's chat!`,
+      location: botProfile.location || { city: 'Mumbai' }
+    };
+    
+    try {
+      const newBotUser = await createBotUserRecord(minimalBotProfile);
+      return newBotUser;
+    } catch (createError) {
+      // If we failed to create the bot user, try a simplified creation with absolute minimum fields
+      error(`Error creating bot user during recovery: ${createError.message}. Trying simplified creation...`);
+      
+      try {
+        // Create directly with supabase with minimum fields
+        const { data, error: directCreateError } = await supabase
+          .from('users')
+          .insert({
+            id: botProfile.id,
+            username: `bot_${Math.floor(Math.random() * 10000)}`,
+            email: `bot-${botProfile.id}@circleapp.io`,
+            password: `bot-${uuidv4()}`,
+            first_name: 'Bot',
+            last_name: 'User',
+            is_bot: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+          
+        if (directCreateError) {
+          throw new Error(`Failed simplified bot creation: ${directCreateError.message}`);
+        }
+        
+        return data;
+      } catch (simpleCreateError) {
+        error(`Failed simplified bot creation: ${simpleCreateError.message}`);
+        throw new Error(`Cannot create bot user: ${simpleCreateError.message}`);
+      }
+    }
   } catch (err) {
     error(`Error verifying/recovering bot user: ${err.message}`);
     throw err;

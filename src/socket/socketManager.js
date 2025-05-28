@@ -37,7 +37,7 @@ const {
 } = require('../services/ai/aiCopilotService');
 
 // Import AI bot profile service
-const { generateBotProfile, generateBotResponse } = require('../services/ai/botProfileService');
+const { generateBotProfile, generateBotResponse, storeBotMessage } = require('../services/ai/botProfileService');
 
 // Track bot matches and their data
 const botMatches = new Map();
@@ -3502,6 +3502,7 @@ const findMatchForUser = async (socket, forceBotMatch = false) => {
 /**
  * Create a bot match for a user
  * @param {object} socket - User's socket connection
+ * @returns {Promise<boolean>} Success indicator
  */
 const createBotMatchForUser = async (socket) => {
   try {
@@ -3548,12 +3549,29 @@ const createBotMatchForUser = async (socket) => {
     }
     
     try {
+      // Import the necessary service directly to avoid circular dependencies
+      const { generateBotProfile } = require('../services/ai/botProfileService');
+      
       // Generate a bot profile matching user's preferences
       const botProfile = await generateBotProfile(
         botGender, 
         userPreference, 
         socket.user.interests || []
       );
+      
+      // Verify bot user was created in the database
+      const { data: botUser, error: botCheckError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', botProfile.id)
+        .single();
+        
+      if (botCheckError || !botUser) {
+        console.error(`Bot user ${botProfile.id} was not found in database after creation. Match will likely fail.`);
+        // We will try recovery during messaging, but log the issue
+      } else {
+        console.log(`Verified bot user ${botProfile.id} exists in database for match with user ${userId}`);
+      }
       
       // Generate a matchId and create the match
       const matchId = uuidv4();
@@ -3615,14 +3633,30 @@ const createBotMatchForUser = async (socket) => {
         matchmakingPool.set(userId, userPoolData);
       }
       
-      // Create match in database
-      try {
-        await createMatchInDatabase(matchId, userId, botProfile.id);
-        console.log(`Successfully created bot match ${matchId} in database`);
-      } catch (dbError) {
-        error(`Error creating bot match in database: ${dbError.message}`);
-        // Continue despite database error - treat as non-critical
+      // Create match in database with retries
+      let matchCreated = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!matchCreated && retryCount < maxRetries) {
+        try {
+          await createMatchInDatabase(matchId, userId, botProfile.id);
+          matchCreated = true;
+          console.log(`Successfully created bot match ${matchId} in database (attempt ${retryCount + 1})`);
+        } catch (dbError) {
+          retryCount++;
+          error(`Error creating bot match in database (attempt ${retryCount}/${maxRetries}): ${dbError.message}`);
+          
+          if (retryCount >= maxRetries) {
+            console.error(`Maximum retries reached for creating match ${matchId} in database.`);
+          } else {
+            // Wait briefly before retrying
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
       }
+      
+      // Even if match creation in database failed, continue with in-memory match
       
       // Notify user of the match
       const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
@@ -3894,6 +3928,39 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     // Log the bot match details
     console.log(`Processing bot response for match ${matchId} - Bot ID: ${botMatch.botProfile.id}, User ID: ${socket.user.id}`);
     
+    // IMPORTANT: Verify bot user exists in database before proceeding
+    try {
+      const { data: botUser, error: botCheckError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', botMatch.botProfile.id)
+        .single();
+      
+      if (botCheckError || !botUser) {
+        console.warn(`Bot user ${botMatch.botProfile.id} not found in database. Attempting to create it now.`);
+        
+        // Try to create the bot user if it doesn't exist
+        const { createBotUserRecord } = require('../services/ai/botProfileService');
+        await createBotUserRecord(botMatch.botProfile);
+        
+        // Verify creation was successful
+        const { data: verifiedBot, error: verifyError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', botMatch.botProfile.id)
+          .single();
+          
+        if (verifyError || !verifiedBot) {
+          throw new Error(`Failed to create bot user ${botMatch.botProfile.id} during recovery: ${verifyError?.message || 'Unknown error'}`);
+        }
+        
+        console.log(`Successfully created missing bot user ${botMatch.botProfile.id} during recovery`);
+      }
+    } catch (botVerifyError) {
+      console.error(`Bot verification failed: ${botVerifyError.message}`);
+      // Continue with the response, but note it in logs - we'll attempt message storage with verification
+    }
+    
     // Add user message to match history
     botMatch.messages.push({
       senderId: socket.user.id,
@@ -3924,6 +3991,10 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
         
         let botResponse = "";
         try {
+          // Import directly here to avoid circular dependencies
+          const { generateBotResponse, storeBotMessage } = require('../services/ai/botProfileService');
+          
+          // Try to generate bot response with AI
           botResponse = await generateBotResponse(
             userMessage,
             botMatch.botProfile,
@@ -3945,6 +4016,35 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
           
           botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
           console.log(`Using fallback response: "${botResponse}"`);
+          
+          // Manually store the messages since generateBotResponse couldn't do it
+          try {
+            // Verify both users exist before attempting to store messages
+            const { data: users, error: userError } = await supabase
+              .from('users')
+              .select('id')
+              .or(`id.eq.${socket.user.id},id.eq.${botMatch.botProfile.id}`);
+              
+            if (userError) {
+              throw new Error(`Error verifying users: ${userError.message}`);
+            }
+            
+            // Check if both users exist
+            const userIds = users.map(u => u.id);
+            if (userIds.length === 2 && 
+                userIds.includes(socket.user.id) && 
+                userIds.includes(botMatch.botProfile.id)) {
+              
+              // Store user message and bot response
+              await storeBotMessage(socket.user.id, botMatch.botProfile.id, userMessage);
+              await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
+              console.log('Successfully stored messages manually after AI error');
+            } else {
+              console.error(`Cannot store messages: Missing user(s) in database. Found: ${userIds.join(', ')}`);
+            }
+          } catch (storageError) {
+            console.error(`Error manually storing messages: ${storageError.message}`);
+          }
         }
         
         // Generate a message ID for the bot's response

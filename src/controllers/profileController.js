@@ -63,7 +63,12 @@ const updateProfile = async (req, res) => {
       location,
       birth_date,
       preferences,
-      private_profile
+      private_profile,
+      interests,
+      gender,
+      profile_picture_url,
+      phone,
+      username
     } = req.body;
 
     // Build update object with only provided fields
@@ -76,6 +81,14 @@ const updateProfile = async (req, res) => {
     if (birth_date !== undefined) updates.birth_date = birth_date;
     if (preferences !== undefined) updates.preferences = preferences;
     if (private_profile !== undefined) updates.private_profile = private_profile;
+    if (interests !== undefined) updates.interests = interests;
+    if (gender !== undefined) updates.gender = gender;
+    if (profile_picture_url !== undefined) updates.profile_picture_url = profile_picture_url;
+    if (phone !== undefined) updates.phone = phone;
+    if (username !== undefined) updates.username = username;
+    
+    console.log(`Updating profile for user ${userId} with fields:`, Object.keys(updates));
+    if (interests) console.log(`Interests to update:`, interests);
 
     // Validate required fields are not empty
     if ('first_name' in updates && !updates.first_name) {
@@ -105,10 +118,21 @@ const updateProfile = async (req, res) => {
     // Check for profile completion achievement
     const completedAchievements = await achievementService.checkProfileCompletion(userId);
 
+    // Get updated user data to return in response
+    const updatedUser = await getUserById(userId);
+
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
       data: {
+        user: {
+          id: updatedUser.id,
+          first_name: updatedUser.first_name,
+          last_name: updatedUser.last_name,
+          bio: updatedUser.bio,
+          interests: updatedUser.interests,
+          profile_picture_url: updatedUser.profile_picture_url
+        },
         achievementsCompleted: completedAchievements
       }
     });

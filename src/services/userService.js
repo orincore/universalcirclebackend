@@ -92,6 +92,33 @@ const updateUserProfile = async (userId, profileData) => {
     
     safeProfileData.updated_at = new Date();
     
+    // Log the profile data being sent to the database
+    console.log(`Updating user ${userId} with profile data:`, JSON.stringify(safeProfileData));
+    
+    // Ensure interests is properly formatted as an array if present
+    if (safeProfileData.interests !== undefined) {
+      // If interests is a string, try to parse it as JSON
+      if (typeof safeProfileData.interests === 'string') {
+        try {
+          safeProfileData.interests = JSON.parse(safeProfileData.interests);
+          console.log('Parsed interests from string:', safeProfileData.interests);
+        } catch (e) {
+          console.error('Failed to parse interests string:', e.message);
+          // If parsing fails, split by comma as fallback
+          safeProfileData.interests = safeProfileData.interests.split(',').map(i => i.trim());
+          console.log('Split interests by comma:', safeProfileData.interests);
+        }
+      }
+      
+      // Make sure interests is an array
+      if (!Array.isArray(safeProfileData.interests)) {
+        console.log('Converting non-array interests to array:', safeProfileData.interests);
+        safeProfileData.interests = [safeProfileData.interests];
+      }
+      
+      console.log('Final interests array:', safeProfileData.interests);
+    }
+    
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
       .update(safeProfileData)

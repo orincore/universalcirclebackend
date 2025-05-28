@@ -24,7 +24,11 @@ const memeCache = {
 };
 
 // Cache expiration time (in milliseconds)
-const CACHE_EXPIRATION = 30 * 60 * 1000; // 30 minutes
+const CACHE_EXPIRATION = 30 * 1000; // 30 seconds
+
+// Cache size limits
+const MIN_CACHE_SIZE = 10; // Minimum memes in cache before refreshing
+const MAX_CACHE_SIZE = 50; // Maximum memes to store in cache
 
 // Add more variety to User-Agent to avoid Reddit blocking
 const USER_AGENTS = [
@@ -60,6 +64,10 @@ try {
 } catch (error) {
   logger.warn(`Could not create cache directories: ${error.message}`);
 }
+
+// Near the top of the file, add this flag to track background fetch status
+let isBatchFetchInProgress = false;
+let lastBatchFetchTime = 0;
 
 // Get a random User-Agent
 function getRandomUserAgent() {
@@ -358,122 +366,227 @@ async function fetchWithProxy(url) {
   }
 }
 
-// Third-level fallback method using a different Reddit URL structure
-async function fetchSubredditPostsLastResort(subreddit) {
+// Function to fetch a large batch of memes from multiple subreddits
+async function fetchLargeBatchOfMemes() {
+  // Prevent multiple concurrent batch operations
+  if (isBatchFetchInProgress) {
+    logger.info('Batch fetch already in progress, using existing cache');
+    return memeCache.randomMemes.length > 0 ? memeCache.randomMemes : FALLBACK_MEMES;
+  }
+  
+  // Rate limit batch operations to prevent overwhelming the server
+  const now = Date.now();
+  if (now - lastBatchFetchTime < 10000) { // 10 second cooldown between batch operations
+    logger.info('Batch fetch requested too soon after previous fetch, using existing cache');
+    return memeCache.randomMemes.length > 0 ? memeCache.randomMemes : FALLBACK_MEMES;
+  }
+  
+  isBatchFetchInProgress = true;
+  lastBatchFetchTime = now;
+  
   try {
-    // If this subreddit has been problematic, skip it
-    if (problematicSubreddits.has(subreddit)) {
-      logger.warn(`Skipping previously problematic subreddit: ${subreddit}`);
-      return { success: false, message: 'Subreddit previously failed' };
-    }
+    logger.info(`Fetching large batch of ${MAX_CACHE_SIZE}+ memes from multiple subreddits`);
+    const allMemes = [];
+    const attemptedSubreddits = new Set();
     
-    logger.info(`Fetching memes from subreddit: ${subreddit} (last resort method)`);
+    // Get only non-problematic subreddits
+    const availableSubreddits = INDIAN_MEME_SUBREDDITS.filter(sr => !problematicSubreddits.has(sr));
     
-    // Try using Reddit's old interface which might have different rate limiting
-    const url = `https://old.reddit.com/r/${subreddit}/top.json?sort=top&t=week&limit=50`;
-    const response = await fetchWithProxy(url);
-    
-    // Handle different status codes
-    if (response.status !== 200) {
-      if (response.status === 403 || response.status === 404) {
-        logger.warn(`Subreddit ${subreddit} is restricted or not found in last resort attempt. Adding to problematic list.`);
-        problematicSubreddits.add(subreddit);
-      } else {
-        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit} in last resort attempt`);
+    // If all subreddits are problematic, reset the problematic list and try again
+    if (availableSubreddits.length < 3) {
+      logger.warn('Too few available subreddits, resetting problematic list');
+      problematicSubreddits.clear();
+      // Re-filter available subreddits
+      const refreshedSubreddits = INDIAN_MEME_SUBREDDITS.filter(sr => !problematicSubreddits.has(sr));
+      
+      if (refreshedSubreddits.length === 0) {
+        logger.warn('All subreddits are problematic even after reset! Using fallback memes only.');
+        return FALLBACK_MEMES;
       }
-      return { success: false, status: response.status, message: `Reddit API returned status ${response.status}` };
     }
     
-    if (!response.data?.data?.children?.length) {
-      logger.warn(`No posts found in subreddit: ${subreddit} (last resort method)`);
-      return { success: false, message: 'No posts found' };
+    // Try with general memes subreddits if we're struggling to get content
+    const allAvailableSubreddits = [
+      ...INDIAN_MEME_SUBREDDITS.filter(sr => !problematicSubreddits.has(sr)),
+      // Add more general meme subreddits that might work
+      "memes", "dankmemes", "funny", "wholesomememes", "me_irl"
+    ];
+    
+    // Remove duplicates
+    const uniqueSubreddits = [...new Set(allAvailableSubreddits)];
+    
+    // Shuffle the available subreddits
+    const shuffledSubreddits = getRandomItems(uniqueSubreddits, uniqueSubreddits.length);
+    
+    // Try to fetch from each subreddit until we have at least MAX_CACHE_SIZE memes or tried all subreddits
+    // Do multiple rounds if needed to reach the target
+    const maxAttempts = 3; // Try up to 3 rounds of fetching
+    let attempts = 0;
+    
+    while (allMemes.length < MAX_CACHE_SIZE && attempts < maxAttempts) {
+      attempts++;
+      logger.info(`Batch fetch attempt ${attempts}/${maxAttempts}, current memes: ${allMemes.length}/${MAX_CACHE_SIZE}`);
+      
+      for (const subreddit of shuffledSubreddits) {
+        if (allMemes.length >= MAX_CACHE_SIZE) break;
+        if (attemptedSubreddits.has(subreddit)) continue;
+        
+        attemptedSubreddits.add(subreddit);
+        logger.info(`Batch-fetching memes from r/${subreddit}, progress: ${allMemes.length}/${MAX_CACHE_SIZE}`);
+        
+        try {
+          // Try to fetch up to 100 memes from this subreddit
+          const result = await fetchSubredditPosts(subreddit);
+          
+          if (result.success) {
+            // Extract meme data for each post and filter out duplicates
+            const existingUrls = new Set(allMemes.map(meme => meme.image_url));
+            const newMemes = result.posts
+              .map(post => extractMemeData(post))
+              .filter(meme => !existingUrls.has(meme.image_url));
+            
+            allMemes.push(...newMemes);
+            logger.info(`Added ${newMemes.length} unique memes from ${subreddit}, total: ${allMemes.length}/${MAX_CACHE_SIZE}`);
+          }
+        } catch (error) {
+          logger.error(`Error batch-fetching from ${subreddit}: ${error.message}`);
+          // Continue to next subreddit
+        }
+      }
+      
+      // If we've tried all subreddits but still don't have enough memes,
+      // we'll retry some of them in the next attempt with different sorting
+      if (allMemes.length < MAX_CACHE_SIZE && attempts < maxAttempts) {
+        // Reset attempted subreddits for next round but keep the ones that gave errors
+        const failedSubreddits = [...attemptedSubreddits].filter(sr => problematicSubreddits.has(sr));
+        attemptedSubreddits.clear();
+        failedSubreddits.forEach(sr => attemptedSubreddits.add(sr));
+      }
     }
     
-    // Filter for image posts with more flexible criteria
-    const posts = response.data.data.children.filter(post => 
-      !post.data.stickied && 
-      (post.data.url.endsWith('.jpg') || 
-       post.data.url.endsWith('.png') || 
-       post.data.url.endsWith('.gif') || 
-       post.data.url.endsWith('.jpeg') ||
-       post.data.url.includes('i.redd.it') ||
-       post.data.url.includes('imgur.com') ||
-       (post.data.post_hint && post.data.post_hint.includes('image')))
-    );
-    
-    if (posts.length === 0) {
-      logger.warn(`No valid image posts found in subreddit: ${subreddit} (last resort method)`);
-      return { success: false, message: 'No valid image posts found' };
+    // If we couldn't get any memes, use fallbacks
+    if (allMemes.length === 0) {
+      logger.warn('Could not fetch any memes during batch operation! Using fallbacks.');
+      return FALLBACK_MEMES;
     }
     
-    return { success: true, posts };
+    // If we got some memes but not enough, fill the rest with fallbacks
+    if (allMemes.length < MIN_CACHE_SIZE) {
+      const remaining = MAX_CACHE_SIZE - allMemes.length;
+      const fallbacks = getRandomItems(FALLBACK_MEMES, Math.min(remaining, FALLBACK_MEMES.length));
+      allMemes.push(...fallbacks);
+      logger.info(`Added ${fallbacks.length} fallback memes to complete the batch`);
+    }
+    
+    logger.info(`Successfully fetched ${allMemes.length} memes in large batch operation after ${attempts} attempt(s)`);
+    return allMemes;
   } catch (error) {
-    logger.error(`Error fetching from subreddit ${subreddit} (last resort): ${error.message}`);
-    
-    // If the request was blocked or failed, mark this subreddit as problematic
-    if (error.response?.status === 403 || error.response?.status === 404) {
-      problematicSubreddits.add(subreddit);
-    }
-    
-    return { success: false, message: error.message };
+    logger.error(`Error in batch fetch operation: ${error.message}`);
+    return memeCache.randomMemes.length > 0 ? memeCache.randomMemes : FALLBACK_MEMES;
+  } finally {
+    isBatchFetchInProgress = false;
   }
 }
 
-// Alternative method to fetch Reddit content using .json approach
-async function fetchSubredditPostsAlternative(subreddit) {
-  try {
-    // If this subreddit has been problematic, skip it
-    if (problematicSubreddits.has(subreddit)) {
-      logger.warn(`Skipping previously problematic subreddit: ${subreddit}`);
-      return { success: false, message: 'Subreddit previously failed' };
-    }
-    
-    logger.info(`Fetching memes from subreddit: ${subreddit} (alternative method)`);
-    
-    // Try the alternative approach using the public .json extension
-    const url = `https://www.reddit.com/r/${subreddit}.json?limit=100`;
-    const response = await fetchWithProxy(url);
-    
-    // Handle different status codes
-    if (response.status !== 200) {
-      if (response.status === 403 || response.status === 404) {
-        logger.warn(`Subreddit ${subreddit} is restricted or not found. Trying last resort method before giving up.`);
-        return await fetchSubredditPostsLastResort(subreddit);
-      } else {
-        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit}. Trying last resort method.`);
-        return await fetchSubredditPostsLastResort(subreddit);
-      }
-    }
-    
-    if (!response.data?.data?.children?.length) {
-      logger.warn(`No posts found in subreddit: ${subreddit}. Trying last resort method.`);
-      return await fetchSubredditPostsLastResort(subreddit);
-    }
-    
-    // Filter for image posts
-    const posts = response.data.data.children.filter(post => 
-      !post.data.stickied && 
-      (post.data.url.endsWith('.jpg') || 
-      post.data.url.endsWith('.png') || 
-      post.data.url.endsWith('.gif') || 
-      post.data.url.endsWith('.jpeg') ||
-      post.data.url.includes('i.redd.it') ||
-      post.data.url.includes('imgur.com'))
-    );
-    
-    if (posts.length === 0) {
-      logger.warn(`No valid image posts found in subreddit: ${subreddit}. Trying last resort method.`);
-      return await fetchSubredditPostsLastResort(subreddit);
-    }
-    
-    return { success: true, posts };
-  } catch (error) {
-    logger.error(`Error fetching from subreddit ${subreddit} (alternative): ${error.message}`);
-    
-    // Try the last resort method before giving up
-    logger.warn(`Alternative method failed for ${subreddit}, trying last resort method...`);
-    return await fetchSubredditPostsLastResort(subreddit);
+// Function to trigger a background cache refresh without blocking the response
+function triggerBackgroundCacheRefresh() {
+  if (isBatchFetchInProgress) {
+    logger.info('Skipping background refresh as batch operation is already in progress');
+    return;
   }
+  
+  // Use setTimeout to make this non-blocking
+  setTimeout(async () => {
+    try {
+      logger.info('Starting background cache refresh');
+      const batchMemes = await fetchLargeBatchOfMemes();
+      
+      // Update the cache with new memes
+      if (batchMemes.length > 0) {
+        // Add new memes to cache, avoiding duplicates
+        let newCache = [];
+        const existingUrls = new Set();
+        
+        // First add all new memes that aren't duplicates of each other
+        for (const meme of batchMemes) {
+          if (!existingUrls.has(meme.image_url)) {
+            newCache.push(meme);
+            existingUrls.add(meme.image_url);
+          }
+        }
+        
+        // Then add some old memes that aren't duplicates of new ones
+        if (memeCache.randomMemes.length > 0) {
+          const oldMemes = memeCache.randomMemes
+            .filter(meme => !existingUrls.has(meme.image_url))
+            .slice(0, Math.floor(MAX_CACHE_SIZE * 0.3)); // Keep up to 30% of old cache
+          
+          // Add non-duplicates
+          for (const meme of oldMemes) {
+            newCache.push(meme);
+            existingUrls.add(meme.image_url);
+          }
+          
+          logger.info(`Background refresh: added ${batchMemes.length} new memes, kept ${oldMemes.length} old memes, total unique: ${newCache.length}/${MAX_CACHE_SIZE}`);
+        }
+        
+        // Ensure we don't exceed max size
+        if (newCache.length > MAX_CACHE_SIZE) {
+          newCache = newCache.slice(0, MAX_CACHE_SIZE);
+        }
+        
+        // Update the cache
+        memeCache.randomMemes = newCache;
+        memeCache.randomTimestamp = Date.now();
+        saveCacheToDisk(); // Save random cache
+        
+        // Log the size change
+        logger.info(`Cache size changed from ${memeCache.randomMemes.length} to ${newCache.length}`);
+      }
+    } catch (error) {
+      logger.error(`Error in background cache refresh: ${error.message}`);
+    }
+  }, 0);
+}
+
+// Special forced refresh function that ensures completely new content
+function forcedVarietyRefresh() {
+  if (isBatchFetchInProgress) {
+    logger.info('Skipping forced variety refresh as batch operation is already in progress');
+    return Promise.resolve(memeCache.randomMemes);
+  }
+  
+  return new Promise(async (resolve) => {
+    try {
+      logger.info('Starting forced variety refresh to get completely new memes');
+      
+      // Temporarily clear problematic subreddits to try all sources again
+      const oldProblematic = new Set([...problematicSubreddits]);
+      problematicSubreddits.clear();
+      
+      // Get fresh memes with new sources
+      const batchMemes = await fetchLargeBatchOfMemes();
+      
+      // Restore previously problematic subreddits
+      oldProblematic.forEach(sr => problematicSubreddits.add(sr));
+      
+      if (batchMemes.length > 0) {
+        // Replace the entire cache with new content
+        memeCache.randomMemes = batchMemes;
+        memeCache.randomTimestamp = Date.now();
+        saveCacheToDisk();
+        
+        logger.info(`Forced variety refresh: replaced entire cache with ${batchMemes.length} new memes`);
+        resolve(batchMemes);
+      } else {
+        logger.warn('Forced variety refresh failed to get new memes');
+        resolve(memeCache.randomMemes);
+      }
+    } catch (error) {
+      logger.error(`Error in forced variety refresh: ${error.message}`);
+      resolve(memeCache.randomMemes);
+    }
+  });
 }
 
 // Function to fetch posts from a subreddit with improved error handling
@@ -555,6 +668,124 @@ async function fetchSubredditPosts(subreddit) {
   }
 }
 
+// Alternative method to fetch Reddit content using .json approach
+async function fetchSubredditPostsAlternative(subreddit) {
+  try {
+    // If this subreddit has been problematic, skip it
+    if (problematicSubreddits.has(subreddit)) {
+      logger.warn(`Skipping previously problematic subreddit: ${subreddit}`);
+      return { success: false, message: 'Subreddit previously failed' };
+    }
+    
+    logger.info(`Fetching memes from subreddit: ${subreddit} (alternative method)`);
+    
+    // Try the alternative approach using the public .json extension
+    const url = `https://www.reddit.com/r/${subreddit}.json?limit=100`;
+    const response = await fetchWithProxy(url);
+    
+    // Handle different status codes
+    if (response.status !== 200) {
+      if (response.status === 403 || response.status === 404) {
+        logger.warn(`Subreddit ${subreddit} is restricted or not found. Trying last resort method before giving up.`);
+        return await fetchSubredditPostsLastResort(subreddit);
+      } else {
+        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit}. Trying last resort method.`);
+        return await fetchSubredditPostsLastResort(subreddit);
+      }
+    }
+    
+    if (!response.data?.data?.children?.length) {
+      logger.warn(`No posts found in subreddit: ${subreddit}. Trying last resort method.`);
+      return await fetchSubredditPostsLastResort(subreddit);
+    }
+    
+    // Filter for image posts
+    const posts = response.data.data.children.filter(post => 
+      !post.data.stickied && 
+      (post.data.url.endsWith('.jpg') || 
+      post.data.url.endsWith('.png') || 
+      post.data.url.endsWith('.gif') || 
+      post.data.url.endsWith('.jpeg') ||
+      post.data.url.includes('i.redd.it') ||
+      post.data.url.includes('imgur.com'))
+    );
+    
+    if (posts.length === 0) {
+      logger.warn(`No valid image posts found in subreddit: ${subreddit}. Trying last resort method.`);
+      return await fetchSubredditPostsLastResort(subreddit);
+    }
+    
+    return { success: true, posts };
+  } catch (error) {
+    logger.error(`Error fetching from subreddit ${subreddit} (alternative): ${error.message}`);
+    
+    // Try the last resort method before giving up
+    logger.warn(`Alternative method failed for ${subreddit}, trying last resort method...`);
+    return await fetchSubredditPostsLastResort(subreddit);
+  }
+}
+
+// Third-level fallback method using a different Reddit URL structure
+async function fetchSubredditPostsLastResort(subreddit) {
+  try {
+    // If this subreddit has been problematic, skip it
+    if (problematicSubreddits.has(subreddit)) {
+      logger.warn(`Skipping previously problematic subreddit: ${subreddit}`);
+      return { success: false, message: 'Subreddit previously failed' };
+    }
+    
+    logger.info(`Fetching memes from subreddit: ${subreddit} (last resort method)`);
+    
+    // Try using Reddit's old interface which might have different rate limiting
+    const url = `https://old.reddit.com/r/${subreddit}/top.json?sort=top&t=week&limit=50`;
+    const response = await fetchWithProxy(url);
+    
+    // Handle different status codes
+    if (response.status !== 200) {
+      if (response.status === 403 || response.status === 404) {
+        logger.warn(`Subreddit ${subreddit} is restricted or not found in last resort attempt. Adding to problematic list.`);
+        problematicSubreddits.add(subreddit);
+      } else {
+        logger.warn(`Unexpected status ${response.status} from subreddit ${subreddit} in last resort attempt`);
+      }
+      return { success: false, status: response.status, message: `Reddit API returned status ${response.status}` };
+    }
+    
+    if (!response.data?.data?.children?.length) {
+      logger.warn(`No posts found in subreddit: ${subreddit} (last resort method)`);
+      return { success: false, message: 'No posts found' };
+    }
+    
+    // Filter for image posts with more flexible criteria
+    const posts = response.data.data.children.filter(post => 
+      !post.data.stickied && 
+      (post.data.url.endsWith('.jpg') || 
+       post.data.url.endsWith('.png') || 
+       post.data.url.endsWith('.gif') || 
+       post.data.url.endsWith('.jpeg') ||
+       post.data.url.includes('i.redd.it') ||
+       post.data.url.includes('imgur.com') ||
+       (post.data.post_hint && post.data.post_hint.includes('image')))
+    );
+    
+    if (posts.length === 0) {
+      logger.warn(`No valid image posts found in subreddit: ${subreddit} (last resort method)`);
+      return { success: false, message: 'No valid image posts found' };
+    }
+    
+    return { success: true, posts };
+  } catch (error) {
+    logger.error(`Error fetching from subreddit ${subreddit} (last resort): ${error.message}`);
+    
+    // If the request was blocked or failed, mark this subreddit as problematic
+    if (error.response?.status === 403 || error.response?.status === 404) {
+      problematicSubreddits.add(subreddit);
+    }
+    
+    return { success: false, message: error.message };
+  }
+}
+
 // Custom middleware to track API key usage
 const trackUsage = async (req, res, next) => {
   // Store the original json method
@@ -591,6 +822,8 @@ router.get('/:subreddit', async (req, res) => {
     const subreddit = req.params.subreddit;
     // Get count parameter, default to DEFAULT_MEME_COUNT, max 25
     const count = Math.min(parseInt(req.query.count || DEFAULT_MEME_COUNT), 25);
+    // Check for force_refresh parameter
+    const forceRefresh = req.query.force_refresh === 'true';
     
     // If this is a known problematic subreddit
     if (problematicSubreddits.has(subreddit)) {
@@ -606,6 +839,12 @@ router.get('/:subreddit', async (req, res) => {
         requested_subreddit: subreddit,
         memes: fallbackMemes
       });
+    }
+    
+    // Skip cache if force_refresh is true
+    if (forceRefresh) {
+      logger.info(`Force refresh requested for subreddit ${subreddit}, bypassing cache`);
+      memeCache.timestamp[subreddit] = 0; // Invalidate cache
     }
     
     const result = await fetchSubredditPosts(subreddit);
@@ -664,128 +903,106 @@ router.get('/', async (req, res) => {
     // Get count parameter, default to DEFAULT_MEME_COUNT, max 25
     const count = Math.min(parseInt(req.query.count || DEFAULT_MEME_COUNT), 25);
     
-    // Check if we have a valid cache of random memes
-    if (memeCache.randomMemes.length >= count && 
-        (Date.now() - memeCache.randomTimestamp < CACHE_EXPIRATION)) {
-      logger.info(`Using cached random memes`);
+    // Check for special parameters
+    const forceRefresh = req.query.force_refresh === 'true';
+    const forceVariety = req.query.force_variety === 'true'; // New parameter for complete refresh
+    
+    // Handle special force_variety parameter
+    if (forceVariety) {
+      logger.info('Force variety requested - getting completely new memes');
+      const freshMemes = await forcedVarietyRefresh();
+      const returnMemes = getRandomItems(freshMemes, count);
+      
       return res.json({
-        count: count,
-        source: "cache",
-        memes: getRandomItems(memeCache.randomMemes, count)
+        count: returnMemes.length,
+        source: "forced_variety",
+        cache_size: freshMemes.length,
+        memes: returnMemes
       });
     }
     
-    // For multiple memes, we'll randomize across different subreddits
-    // We'll collect memes from multiple subreddits if needed
-    const memesNeeded = count;
-    const allMemes = [];
-    const attemptedSubreddits = new Set();
-    
-    // Get only non-problematic subreddits
-    const availableSubreddits = INDIAN_MEME_SUBREDDITS.filter(sr => !problematicSubreddits.has(sr));
-    
-    // If all subreddits are problematic or we're running in a degraded state, use fallback memes
-    if (availableSubreddits.length === 0) {
-      logger.warn(`All subreddits are problematic! Using fallback memes.`);
+    // FAST PATH: If we have any memes in cache, respond immediately while refreshing in background
+    // This ensures users always get a quick response
+    if (memeCache.randomMemes.length > 0) {
+      const randomSelection = getRandomItems(memeCache.randomMemes, count);
       
-      // Use our static fallback memes
-      const fallbackCount = Math.min(count, FALLBACK_MEMES.length);
-      const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
+      // Check if cache is stale or force refresh requested
+      const isCacheStale = Date.now() - memeCache.randomTimestamp > CACHE_EXPIRATION;
+      const needsRefresh = isCacheStale || forceRefresh || memeCache.randomMemes.length < MIN_CACHE_SIZE;
       
-      return res.json({
-        count: fallbackMemes.length,
-        source: "fallback_all_problematic",
-        memes: fallbackMemes
-      });
-    }
-    
-    // Shuffle the available subreddits to randomize where we get memes from
-    const shuffledSubreddits = getRandomItems(availableSubreddits, availableSubreddits.length);
-    
-    // Try to fetch from each subreddit until we have enough memes
-    for (const subreddit of shuffledSubreddits) {
-      if (allMemes.length >= memesNeeded) break;
-      if (attemptedSubreddits.has(subreddit)) continue;
-      
-      attemptedSubreddits.add(subreddit);
-      const result = await fetchSubredditPosts(subreddit);
-      
-      if (!result.success) {
-        continue; // Try next subreddit
+      // Trigger background refresh if needed, but don't wait for it
+      if (needsRefresh) {
+        logger.info(`Cache needs refresh (${memeCache.randomMemes.length}/${MIN_CACHE_SIZE}, age: ${Math.floor((Date.now() - memeCache.randomTimestamp)/1000)}s), triggering background update`);
+        triggerBackgroundCacheRefresh();
       }
       
-      // Determine how many more memes we need
-      const memesStillNeeded = memesNeeded - allMemes.length;
-      const memeCountFromThisSubreddit = Math.min(memesStillNeeded, result.posts.length);
-      
-      // Get random posts from this subreddit
-      const randomPosts = getRandomItems(result.posts, memeCountFromThisSubreddit);
-      
-      // Extract and add memes to our collection
-      randomPosts.forEach(post => {
-        allMemes.push(extractMemeData(post));
-      });
-      
-      logger.info(`Added ${randomPosts.length} memes from ${subreddit}, total: ${allMemes.length}/${memesNeeded}`);
-    }
-    
-    // If we couldn't get any memes from Reddit, use fallback memes
-    if (allMemes.length === 0) {
-      logger.warn(`Could not fetch any memes from Reddit! Using fallback memes.`);
-      
-      // Use our static fallback memes
-      const fallbackCount = Math.min(count, FALLBACK_MEMES.length);
-      const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
-      
+      // Return immediately with what we have
       return res.json({
-        count: fallbackMemes.length,
-        source: "fallback_fetch_failed",
-        memes: fallbackMemes
+        count: randomSelection.length,
+        source: "cache" + (needsRefresh ? "_refreshing" : ""),
+        cache_size: memeCache.randomMemes.length,
+        cache_age_seconds: Math.floor((Date.now() - memeCache.randomTimestamp)/1000),
+        needs_variety: memeCache.randomTimestamp < Date.now() - (60 * 60 * 1000), // Suggest variety refresh after 1 hour
+        memes: randomSelection
       });
     }
     
-    // If we got some memes but not enough, fill the rest with fallbacks
-    if (allMemes.length < memesNeeded && FALLBACK_MEMES.length > 0) {
-      logger.info(`Only got ${allMemes.length}/${memesNeeded} memes, adding fallbacks to complete the request`);
-      
-      const needFallbacks = memesNeeded - allMemes.length;
-      const fallbackCount = Math.min(needFallbacks, FALLBACK_MEMES.length);
-      const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
-      
-      // Add fallbacks to the collection
-      allMemes.push(...fallbackMemes);
-      
-      logger.info(`Successfully fetched ${allMemes.length} memes (${fallbackCount} from fallbacks)`);
-      
-      // Update the random memes cache
-      memeCache.randomMemes = [...allMemes];
-      memeCache.randomTimestamp = Date.now();
-      saveCacheToDisk(); // Save random cache
-      
-      return res.json({
-        count: allMemes.length,
-        source: "mixed",
-        fallback_count: fallbackCount,
-        memes: allMemes
-      });
-    }
+    // SLOW PATH: Only reached on first run or if cache is completely empty
+    logger.info('Cache is empty, fetching initial batch of memes (may take a moment)');
     
-    logger.info(`Successfully fetched ${allMemes.length} memes from Indian subreddits`);
+    // For first run or completely empty cache, we need to wait for the fetch
+    const batchMemes = await fetchLargeBatchOfMemes();
     
-    // Update the random memes cache
-    memeCache.randomMemes = [...allMemes];
+    // Replace cache with the new batch
+    memeCache.randomMemes = batchMemes;
     memeCache.randomTimestamp = Date.now();
-    saveCacheToDisk(); // Save random cache
+    saveCacheToDisk();
     
-    // Return the collection of memes
+    // Return the requested number of memes
+    const returnMemes = getRandomItems(batchMemes, count);
+    
     return res.json({
-      count: allMemes.length,
-      memes: allMemes
+      count: returnMemes.length,
+      source: "fresh_batch",
+      cache_size: batchMemes.length,
+      memes: returnMemes
     });
   } catch (error) {
     logger.error('Error fetching memes:', error.message);
     
     // Even in case of catastrophic error, still return fallback memes
+    const fallbackCount = Math.min(DEFAULT_MEME_COUNT, FALLBACK_MEMES.length);
+    const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
+    
+    return res.json({
+      count: fallbackMemes.length,
+      source: "fallback_error",
+      memes: fallbackMemes,
+      error_details: error.message
+    });
+  }
+});
+
+// Also expose a variety endpoint for completely refreshed content
+router.get('/variety', async (req, res) => {
+  try {
+    const count = Math.min(parseInt(req.query.count || DEFAULT_MEME_COUNT), 25);
+    
+    // Perform a forced variety refresh
+    logger.info('Variety endpoint called - getting completely new memes');
+    const freshMemes = await forcedVarietyRefresh();
+    const returnMemes = getRandomItems(freshMemes, count);
+    
+    return res.json({
+      count: returnMemes.length,
+      source: "variety_endpoint",
+      cache_size: freshMemes.length,
+      memes: returnMemes
+    });
+  } catch (error) {
+    logger.error('Error in variety endpoint:', error.message);
+    
+    // Return fallbacks on error
     const fallbackCount = Math.min(DEFAULT_MEME_COUNT, FALLBACK_MEMES.length);
     const fallbackMemes = getRandomItems(FALLBACK_MEMES, fallbackCount);
     

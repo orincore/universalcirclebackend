@@ -166,7 +166,16 @@ const getConversation = async (req, res) => {
  */
 const getConversations = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    
+    // Validate userId to prevent UUID errors
+    if (!userId) {
+      console.error('User ID is undefined in getConversations');
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required to fetch conversations'
+      });
+    }
 
     // First get all accepted matches for the user
     const { data: matches, error: matchError } = await supabase

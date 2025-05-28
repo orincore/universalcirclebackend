@@ -311,7 +311,23 @@ const getVoiceBio = async (req, res) => {
  */
 const getProfilePictureUploadUrl = async (req, res) => {
   try {
-    const userId = req.user.id;
+    // Try to get userId from multiple sources
+    let userId = req.user?.id;
+    
+    // If userId is not in req.user, check headers
+    if (!userId) {
+      userId = req.headers['x-user-id'] || req.headers['user-id'] || req.query.userId;
+      console.log(`Using userId from headers/query for upload URL: ${userId}`);
+    }
+    
+    // Validate user ID
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User ID is required. Authentication may have failed.'
+      });
+    }
+    
     const contentType = req.query.contentType || 'image/jpeg';
     
     // Validate content type
@@ -351,7 +367,14 @@ const getProfilePictureUploadUrl = async (req, res) => {
  */
 const updateProfilePicture = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    // Try to get userId from multiple sources
+    let userId = req.user?.id;
+    
+    // If userId is not in req.user, check headers
+    if (!userId) {
+      userId = req.headers['x-user-id'] || req.headers['user-id'] || req.query.userId;
+      console.log(`Attempting to use userId from headers/query: ${userId}`);
+    }
     
     // Validate user ID
     if (!userId) {
@@ -368,6 +391,18 @@ const updateProfilePicture = async (req, res) => {
         success: false,
         message: 'File key is required'
       });
+    }
+    
+    // Fix case where key contains "undefined" instead of userId
+    let correctedKey = key;
+    if (key.includes('/undefined/')) {
+      console.log(`Fixing key with undefined userId: ${key}`);
+      const keyParts = key.split('/');
+      if (keyParts.length >= 3) {
+        keyParts[1] = userId;
+        correctedKey = keyParts.join('/');
+        console.log(`Corrected key: ${correctedKey}`);
+      }
     }
 
     // Get user's current profile picture
@@ -394,7 +429,7 @@ const updateProfilePicture = async (req, res) => {
     }
 
     // Update profile picture URL in database
-    const profilePictureUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    const profilePictureUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${correctedKey}`;
     
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')

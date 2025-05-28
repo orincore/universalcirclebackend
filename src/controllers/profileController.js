@@ -386,7 +386,11 @@ const updateProfilePicture = async (req, res) => {
 
     const { key } = req.body;
     
-    if (!key) {
+    // Check if this is a delete operation (key is explicitly null)
+    const isDeleteOperation = key === null;
+    
+    // Only require key for update operations, not for delete operations
+    if (!isDeleteOperation && !key) {
       return res.status(400).json({
         success: false,
         message: 'File key is required'
@@ -395,7 +399,7 @@ const updateProfilePicture = async (req, res) => {
     
     // Fix case where key contains "undefined" instead of userId
     let correctedKey = key;
-    if (key.includes('/undefined/')) {
+    if (!isDeleteOperation && key.includes('/undefined/')) {
       console.log(`Fixing key with undefined userId: ${key}`);
       const keyParts = key.split('/');
       if (keyParts.length >= 3) {
@@ -428,15 +432,24 @@ const updateProfilePicture = async (req, res) => {
       }
     }
 
-    // Update profile picture URL in database
-    const profilePictureUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${correctedKey}`;
+    // Prepare the update data
+    let updateData = {
+      updated_at: new Date()
+    };
     
+    // If this is a delete operation, set profile_picture_url to null
+    if (isDeleteOperation) {
+      updateData.profile_picture_url = null;
+      console.log('Deleting profile picture, setting URL to null');
+    } else {
+      // Otherwise set to the new URL
+      updateData.profile_picture_url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${correctedKey}`;
+    }
+    
+    // Update profile picture URL in database
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
-      .update({
-        profile_picture_url: profilePictureUrl,
-        updated_at: new Date()
-      })
+      .update(updateData)
       .eq('id', userId)
       .select()
       .single();

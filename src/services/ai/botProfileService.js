@@ -722,18 +722,30 @@ const createBotUserRecord = async (botProfile) => {
         throw new Error(`Error checking for existing bot user: ${checkError.message}`);
       }
       
-      // Format data for database - ensure snake_case for all field names
-      // Include ONLY fields that are known to exist in the database
+      // Get schema information to determine which fields exist
+      const { data: schemaData, error: schemaError } = await supabase
+        .from('users')
+        .select('*')
+        .limit(1);
+      
+      if (schemaError) {
+        throw new Error(`Error getting schema information: ${schemaError.message}`);
+      }
+      
+      // Create a sample user object to check available fields
+      const sampleUser = schemaData && schemaData.length > 0 ? schemaData[0] : null;
+      
+      // Base userData with only guaranteed fields
       const userData = {
         id: botProfile.id,
         username: botProfile.username || `bot_${botProfile.firstName.toLowerCase()}${Math.floor(Math.random() * 1000)}`,
-        email: `bot-${botProfile.id}@circleapp.io`, // Use a consistent domain
-        password: `${uuidv4()}-${uuidv4()}`, // Secure random password that can't be guessed
+        email: `bot-${botProfile.id}@circleapp.io`,
+        password: `${uuidv4()}-${uuidv4()}`,
         first_name: botProfile.firstName || botProfile.first_name,
         last_name: botProfile.lastName || botProfile.last_name,
         gender: botProfile.gender || 'other',
         bio: botProfile.bio || `Hi! I'm ${botProfile.firstName || botProfile.first_name}. Let's chat!`,
-        date_of_birth: botProfile.date_of_birth,
+        date_of_birth: botProfile.date_of_birth || '2000-01-01', // Ensure we always have a date of birth
         location: botProfile.location ? 
           (typeof botProfile.location === 'string' ? 
             JSON.stringify({city: botProfile.location}) : 
@@ -744,22 +756,22 @@ const createBotUserRecord = async (botProfile) => {
         is_verified: true,
         is_bot: true,
         preference: botProfile.preference || 'Friendship',
-        is_active: true,
-        is_online: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_active: new Date().toISOString(),
-        
-        // Add only fields we know exist in the database
-        phone: null,
-        private_profile: false,
-        
-        // Social media handles (only if they exist in the database)
-        instagram_handle: null,
-        twitter_handle: null,
-        spotify_handle: null,
-        linkedin_handle: null
       };
+      
+      // Only add fields if they exist in the schema (based on sample user)
+      if (sampleUser) {
+        if ('is_active' in sampleUser) userData.is_active = true;
+        if ('is_online' in sampleUser) userData.is_online = true;
+        if ('phone' in sampleUser) userData.phone = null;
+        if ('private_profile' in sampleUser) userData.private_profile = false;
+        if ('instagram_handle' in sampleUser) userData.instagram_handle = null;
+        if ('twitter_handle' in sampleUser) userData.twitter_handle = null;
+        if ('spotify_handle' in sampleUser) userData.spotify_handle = null;
+        if ('linkedin_handle' in sampleUser) userData.linkedin_handle = null;
+      }
       
       // Log the exact data being inserted
       info(`Creating bot user with data: ${JSON.stringify(userData)}`);
@@ -875,7 +887,10 @@ const verifyAndRecoverBotUser = async (botProfile) => {
       error(`Error creating bot user during recovery: ${createError.message}. Trying simplified creation...`);
       
       try {
-        // Create directly with supabase with minimum fields
+        // Create directly with supabase with minimum fields, especially include date_of_birth
+        const currentDate = new Date().toISOString();
+        const dob = '2000-01-01'; // Ensure we have a valid date of birth
+        
         const { data, error: directCreateError } = await supabase
           .from('users')
           .insert({
@@ -883,13 +898,21 @@ const verifyAndRecoverBotUser = async (botProfile) => {
             username: `bot_${Math.floor(Math.random() * 10000)}`,
             email: `bot-${botProfile.id}@circleapp.io`,
             password: `bot-${uuidv4()}`,
-            first_name: 'Bot',
-            last_name: 'User',
+            first_name: botProfile.firstName || botProfile.first_name || 'Bot',
+            last_name: botProfile.lastName || botProfile.last_name || 'User',
             is_bot: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            gender: botProfile.gender || 'other',
+            date_of_birth: dob,
+            bio: 'Hi there! I\'m excited to chat with you.',
+            // Don't include fields that might not exist in schema
+            // is_active: true,
+            created_at: currentDate,
+            updated_at: currentDate,
+            last_active: currentDate,
+            location: JSON.stringify({city: 'Mumbai'}),
+            interests: []
           })
-          .select('id')
+          .select('id, first_name, last_name, is_bot')
           .single();
           
         if (directCreateError) {
@@ -1265,7 +1288,12 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
 const generateBotResponse = async (userMessage, botProfile, preference = 'Friendship', userId) => {
   try {
     // First verify the bot user exists in the database
-    await verifyAndRecoverBotUser(botProfile);
+    try {
+      await verifyAndRecoverBotUser(botProfile);
+    } catch (verifyError) {
+      error(`Failed to repair bot user: ${verifyError.message}`);
+      // Continue anyway - we'll try to generate a response even if the bot user doesn't exist
+    }
     
     // Detect the language of the user message (simplified approach)
     const hasNonEnglishChars = /[^\x00-\x7F]/.test(userMessage);
@@ -1322,9 +1350,10 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
           - Show genuine interest in what they've shared
           - Be warm and friendly but don't overdo the friendliness
           - Don't use emojis
-          - Don't mention that you are an AI - respond as if you are a real person
-          - Don't explain your behavior or apologize
+          - NEVER mention that you are an AI, bot, or program - respond as a real person would
+          - Don't apologize for anything
           - Make your response feel like a genuine human message
+          - NEVER mention that you're here to help or assist - you're having a normal conversation
           
           Respond naturally to this message: "${userMessage}"
         `;
@@ -1381,6 +1410,11 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
           }
         }
         
+        // Filter out any phrases that might reveal this is an AI/bot
+        botResponse = botResponse
+          .replace(/As an AI|As a bot|As a virtual|I'm an AI|I'm a bot|I'm not a real person|I don't have|I cannot|I'm unable to|I'm here to help|I'm here to assist|I'm designed to|I was created|I was made|I was programmed|How can I assist you|How can I help you/gi, '')
+          .replace(/\s{2,}/g, ' ').trim();
+        
         info(`Successfully generated AI response: "${botResponse}"`);
       } catch (genError) {
         error(`Error generating bot response with AI: ${genError.message}`);
@@ -1422,7 +1456,7 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
   } catch (err) {
     error(`Error in bot response generation: ${err.message}`);
     // Return a generic response that won't break the conversation
-    return "I'm sorry, I was a bit distracted. What were you saying?";
+    return "I'm curious to hear more about that. What have you been up to lately?";
   }
 };
 

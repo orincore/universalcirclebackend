@@ -37,7 +37,7 @@ const {
 } = require('../services/ai/aiCopilotService');
 
 // Import AI bot profile service
-const { generateBotProfile, generateBotResponse, storeBotMessage, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
+const { generateBotProfile, generateBotResponse, storeBotMessage, verifyAndRecoverBotUser, createBotUserRecord } = require('../services/ai/botProfileService');
 
 // Track bot matches and their data
 const botMatches = new Map();
@@ -3559,193 +3559,309 @@ const createBotMatchForUser = async (socket) => {
       }
     }
     
-    try {
-      // Import the necessary service directly to avoid circular dependencies
-      const { generateBotProfile, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
-      
-      // Generate a bot profile matching user's preferences
-      const botProfile = await generateBotProfile(
-        botGender, 
-        userPreference, 
-        socket.user.interests || []
-      );
-      
-      // Immediately verify and ensure bot user exists in database
+    // Import the necessary services directly to avoid circular dependencies
+    const { generateBotProfile, verifyAndRecoverBotUser, createBotUserRecord } = require('../services/ai/botProfileService');
+    
+    let botProfile = null;
+    let botCreationAttempts = 0;
+    const maxBotCreationAttempts = 3;
+    
+    // Keep trying to create a bot until successful or max attempts reached
+    while (!botProfile && botCreationAttempts < maxBotCreationAttempts) {
       try {
-        await verifyAndRecoverBotUser(botProfile);
-        console.log(`Successfully verified bot user ${botProfile.id} exists in database`);
-      } catch (verifyError) {
-        console.error(`Warning: Bot user verification failed: ${verifyError.message}`);
-        // Continue with match creation - we'll try again during messaging
-      }
-      
-      // Generate a matchId and create the match
-      const matchId = uuidv4();
-      
-      // Store bot match data for response handling
-      botMatches.set(matchId, {
-        matchId,
-        userId: socket.user.id,
-        botProfile,
-        preference: userPreference,
-        messages: [],
-        createdAt: new Date()
-      });
-      
-      // Format bot as a user to fit into the existing flow
-      const botAsUser = {
-        id: botProfile.id,
-        username: botProfile.username,
-        first_name: botProfile.firstName,
-        last_name: botProfile.lastName,
-        gender: botProfile.gender,
-        bio: botProfile.bio,
-        date_of_birth: botProfile.date_of_birth,
-        profile_picture_url: botProfile.profile_picture_url,
-        interests: botProfile.interests,
-        preference: userPreference
-      };
-      
-      // Create shared interests based on user's interests and bot's interests
-      const sharedInterests = socket.user.interests 
-        ? socket.user.interests.filter(interest => botProfile.interests.includes(interest))
-        : [];
-      
-      // Ensure at least one shared interest
-      if (sharedInterests.length === 0 && botProfile.interests.length > 0) {
-        sharedInterests.push(botProfile.interests[0]);
-      }
-      
-      // Add to active matches
-      activeMatches.set(matchId, {
-        users: [userId, botProfile.id],
-        acceptances: {
-          [userId]: false,
-          [botProfile.id]: true // Bot automatically accepts
-        },
-        sharedInterests,
-        preference: userPreference,
-        createdAt: new Date(),
-        isBot: true
-      });
-      
-      // Remove user from matchmaking pool
-      matchmakingPool.delete(userId);
-      
-      // Reset processing flag if user was in pool
-      if (matchmakingPool.has(userId)) {
-        const userPoolData = matchmakingPool.get(userId);
-        userPoolData.isBeingProcessed = false;
-        matchmakingPool.set(userId, userPoolData);
-      }
-      
-      // Create match in database with retries
-      let matchCreated = false;
-      let retryCount = 0;
-      const maxRetries = 3;
-      
-      while (!matchCreated && retryCount < maxRetries) {
+        // Generate a bot profile matching user's preferences
+        botProfile = await generateBotProfile(
+          botGender, 
+          userPreference, 
+          socket.user.interests || []
+        );
+        
+        // Add explicit date_of_birth if missing
+        if (!botProfile.date_of_birth) {
+          const randomAge = Math.floor(Math.random() * 15) + 20; // 20-35 years old
+          const today = new Date();
+          const birthYear = today.getFullYear() - randomAge;
+          const birthMonth = Math.floor(Math.random() * 12);
+          const birthDay = Math.floor(Math.random() * 28) + 1;
+          botProfile.date_of_birth = `${birthYear}-${String(birthMonth + 1).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+          console.log(`Added missing date_of_birth to bot: ${botProfile.date_of_birth}`);
+        }
+        
+        // Explicitly create the bot user in the database
         try {
-          // First verify bot user exists in database before creating match
-          // This double-check helps prevent foreign key constraint violations
-          const { data: botUserExists } = await supabase
-            .from('users')
-            .select('id')
-            .eq('id', botProfile.id)
-            .single();
-            
-          if (!botUserExists) {
-            throw new Error(`Bot user ${botProfile.id} not found in database before match creation`);
+          await createBotUserRecord(botProfile);
+          console.log(`Successfully created bot user ${botProfile.id} in database`);
+        } catch (createError) {
+          console.error(`Error creating bot user record: ${createError.message}`);
+          
+          // Try verification/recovery as a fallback
+          try {
+            await verifyAndRecoverBotUser(botProfile);
+            console.log(`Successfully recovered bot user ${botProfile.id} after failed creation`);
+          } catch (verifyError) {
+            console.error(`Bot user verification also failed: ${verifyError.message}`);
+            throw new Error(`Could not create or verify bot user: ${verifyError.message}`);
           }
+        }
+      } catch (error) {
+        botCreationAttempts++;
+        console.error(`Bot creation attempt ${botCreationAttempts}/${maxBotCreationAttempts} failed: ${error.message}`);
+        
+        // Sleep between attempts
+        if (botCreationAttempts < maxBotCreationAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          console.error(`Failed to create bot after ${maxBotCreationAttempts} attempts`);
           
-          // Now create the match
-          const result = await createMatchInDatabase(matchId, userId, botProfile.id);
+          // If all attempts fail, create a minimal bot profile as a last resort
+          botProfile = {
+            id: uuidv4(),
+            firstName: botGender === 'female' ? 'Sarah' : 'David',
+            lastName: 'Smith',
+            username: botGender === 'female' ? 'sarah_smith' : 'david_smith',
+            gender: botGender,
+            bio: `Hi! I'm ${botGender === 'female' ? 'Sarah' : 'David'}. Nice to meet you!`,
+            interests: socket.user.interests ? [...socket.user.interests] : ['Travel', 'Music', 'Movies'],
+            date_of_birth: '2000-01-01',
+            profile_picture_url: botGender === 'female' 
+              ? `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 99)}.jpg`
+              : `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 99)}.jpg`,
+            isBot: true,
+            is_bot: true,
+            preference: userPreference
+          };
           
-          if (result && result.success) {
-            matchCreated = true;
-            console.log(`Successfully created bot match ${matchId} in database (attempt ${retryCount + 1})`);
-          } else {
-            throw new Error((result && result.error) ? result.error.message : 'Unknown error creating match');
-          }
-        } catch (dbError) {
-          retryCount++;
-          error(`Error creating bot match in database (attempt ${retryCount}/${maxRetries}): ${dbError.message}`);
-          
-          if (retryCount >= maxRetries) {
-            console.error(`Maximum retries reached for creating match ${matchId} in database.`);
-            
-            // If all database attempts failed, we'll continue with in-memory match only
-            console.warn(`Proceeding with in-memory match only for matchId ${matchId}`);
-          } else {
-            // Try to fix the bot user before retrying
-            try {
-              await verifyAndRecoverBotUser(botProfile);
-              console.log(`Repaired bot user ${botProfile.id} before retry ${retryCount+1}`);
-              
-              // Wait briefly before retrying
-              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
-            } catch (repairError) {
-              console.error(`Failed to repair bot user: ${repairError.message}`);
-            }
+          // Try one last database creation
+          try {
+            await createBotUserRecord(botProfile);
+            console.log(`Created emergency fallback bot user ${botProfile.id}`);
+          } catch (finalError) {
+            console.error(`Even fallback bot creation failed: ${finalError.message}`);
+            // Continue anyway with in-memory only bot
           }
         }
       }
-      
-      // Notify user of the match
-      const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
-      socket.emit('match:found', { match: userMatchData });
-      
-      console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
-      
-      // Clear user timeout
-      clearMatchmakingTimeouts(userId);
-      
-      // Set timeout for match acceptance (even though bot auto-accepts)
-      const timeoutId = setTimeout(() => {
-        // Check if match still exists and hasn't been accepted by the user
-        if (activeMatches.has(matchId)) {
-          const matchData = activeMatches.get(matchId);
-          const userAccepted = matchData.acceptances[userId];
-          
-          if (!userAccepted) {
-            console.log(`Bot match ${matchId} timed out due to no user response`);
-            
-            // Notify user
-            const socketId = connectedUsers.get(userId);
-            if (socketId) {
-              ioInstance.to(socketId).emit('match:timeout', {
-                matchId,
-                message: 'Match timed out due to no response'
-              });
-            }
-            
-            // Clean up
-            activeMatches.delete(matchId);
-            botMatches.delete(matchId);
-          }
-        }
-      }, MATCH_ACCEPTANCE_TIMEOUT);
-      
-      userTimeouts.set(userId, timeoutId);
-      
-      return true;
-    } catch (error) {
-      console.error('Error creating bot match:', error);
-      
-      // Fallback to standard behavior
-      socket.emit('match:notFound', { message: 'No suitable matches found at this time' });
-      
-      // Keep user in pool for future matches
-      if (matchmakingPool.has(userId)) {
-        const userPoolData = matchmakingPool.get(userId);
-        userPoolData.isBeingProcessed = false;
-        matchmakingPool.set(userId, userPoolData);
-      }
-      
-      return false;
     }
+    
+    if (!botProfile) {
+      throw new Error('Failed to create valid bot profile after multiple attempts');
+    }
+    
+    // Generate a matchId and create the match
+    const matchId = uuidv4();
+    
+    // Store bot match data for response handling
+    botMatches.set(matchId, {
+      matchId,
+      userId: socket.user.id,
+      botProfile,
+      preference: userPreference,
+      messages: [],
+      createdAt: new Date()
+    });
+    
+    // Format bot as a user to fit into the existing flow
+    const botAsUser = {
+      id: botProfile.id,
+      username: botProfile.username,
+      first_name: botProfile.firstName || botProfile.first_name,
+      last_name: botProfile.lastName || botProfile.last_name,
+      gender: botProfile.gender,
+      bio: botProfile.bio,
+      date_of_birth: botProfile.date_of_birth,
+      profile_picture_url: botProfile.profile_picture_url,
+      interests: botProfile.interests,
+      preference: userPreference
+    };
+    
+    // Create shared interests based on user's interests and bot's interests
+    const sharedInterests = socket.user.interests 
+      ? socket.user.interests.filter(interest => botProfile.interests.includes(interest))
+      : [];
+    
+    // Ensure at least one shared interest
+    if (sharedInterests.length === 0 && botProfile.interests.length > 0) {
+      sharedInterests.push(botProfile.interests[0]);
+    }
+    
+    // Add to active matches
+    activeMatches.set(matchId, {
+      users: [userId, botProfile.id],
+      acceptances: {
+        [userId]: false,
+        [botProfile.id]: true // Bot automatically accepts
+      },
+      sharedInterests,
+      preference: userPreference,
+      createdAt: new Date(),
+      isBot: true
+    });
+    
+    // Remove user from matchmaking pool
+    matchmakingPool.delete(userId);
+    
+    // Reset processing flag if user was in pool
+    if (matchmakingPool.has(userId)) {
+      const userPoolData = matchmakingPool.get(userId);
+      userPoolData.isBeingProcessed = false;
+      matchmakingPool.set(userId, userPoolData);
+    }
+    
+    // Create match in database with retries
+    let matchCreated = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!matchCreated && retryCount < maxRetries) {
+      try {
+        // First verify bot user exists in database before creating match
+        // This double-check helps prevent foreign key constraint violations
+        const { data: botUserExists } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', botProfile.id)
+          .single();
+          
+        if (!botUserExists) {
+          throw new Error(`Bot user ${botProfile.id} not found in database before match creation`);
+        }
+        
+        // Now create the match
+        const result = await createMatchInDatabase(matchId, userId, botProfile.id);
+        
+        if (result && result.success) {
+          matchCreated = true;
+          console.log(`Successfully created bot match ${matchId} in database (attempt ${retryCount + 1})`);
+        } else {
+          throw new Error((result && result.error) ? result.error.message : 'Unknown error creating match');
+        }
+      } catch (dbError) {
+        retryCount++;
+        error(`Error creating bot match in database (attempt ${retryCount}/${maxRetries}): ${dbError.message}`);
+        
+        if (retryCount >= maxRetries) {
+          console.error(`Maximum retries reached for creating match ${matchId} in database.`);
+          
+          // If all database attempts failed, we'll continue with in-memory match only
+          console.warn(`Proceeding with in-memory match only for matchId ${matchId}`);
+        } else {
+          // Try to fix the bot user before retrying
+          try {
+            await verifyAndRecoverBotUser(botProfile);
+            console.log(`Repaired bot user ${botProfile.id} before retry ${retryCount+1}`);
+            
+            // Wait briefly before retrying
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+          } catch (repairError) {
+            console.error(`Failed to repair bot user: ${repairError.message}`);
+          }
+        }
+      }
+    }
+    
+    // Notify user of the match
+    const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
+    socket.emit('match:found', { match: userMatchData });
+    
+    console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
+    
+    // Add initial welcome message after a short delay to make it look more natural
+    setTimeout(async () => {
+      try {
+        // Send typing indicator
+        const userSocketId = connectedUsers.get(userId);
+        if (userSocketId) {
+          ioInstance.to(userSocketId).emit('match:typing', {
+            matchId: matchId,
+            senderId: botProfile.id,
+            typing: true
+          });
+        }
+        
+        // Wait a bit before sending the message (simulating typing)
+        setTimeout(async () => {
+          // Generate welcome messages based on preference
+          const welcomeMessages = userPreference === 'Dating' ? [
+            `Hi there! I'm ${botProfile.first_name || botProfile.firstName}. Your profile caught my eye. How's your day going?`,
+            `Hey! I'm excited we matched. What are you looking for on this app?`,
+            `Hello! I liked your interests. I'm into ${botProfile.interests[0]} too. What do you enjoy most about it?`,
+            `Hi! Nice to connect with you. What made you swipe right on my profile?`,
+            `Hey there! I'm ${botProfile.first_name || botProfile.firstName}. What's something interesting about you that's not in your profile?`
+          ] : [
+            `Hi there! I'm ${botProfile.first_name || botProfile.firstName}. Always looking to make new friends. What brings you to this app?`,
+            `Hey! I see we both like ${sharedInterests[0] || botProfile.interests[0]}. What else are you into?`,
+            `Hello! I'm new to this area. Any recommendations for good places to hang out?`,
+            `Hi! Nice to connect with someone new. What do you usually do for fun on weekends?`,
+            `Hey there! I'm ${botProfile.first_name || botProfile.firstName}. I'm always excited to meet new people. Tell me a bit about yourself!`
+          ];
+          
+          const welcomeMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+          
+          // Generate message ID
+          const messageId = uuidv4();
+          const timestamp = new Date().toISOString();
+          
+          // Create message object
+          const messageObject = {
+            id: messageId,
+            matchId: matchId,
+            senderId: botProfile.id,
+            senderName: `${botProfile.firstName || botProfile.first_name} ${botProfile.lastName || botProfile.last_name}`,
+            message: welcomeMessage,
+            timestamp,
+            isDelivered: true
+          };
+          
+          // Store message in bot match history
+          const botMatch = botMatches.get(matchId);
+          if (botMatch) {
+            botMatch.messages.push({
+              senderId: botProfile.id,
+              message: welcomeMessage,
+              timestamp
+            });
+          }
+          
+          // Stop typing indicator
+          if (userSocketId) {
+            ioInstance.to(userSocketId).emit('match:typing', {
+              matchId: matchId,
+              senderId: botProfile.id,
+              typing: false
+            });
+            
+            // Send welcome message with slight delay after typing stops
+            setTimeout(() => {
+              ioInstance.to(userSocketId).emit('match:message', messageObject);
+              
+              // Send delivery status
+              ioInstance.to(userSocketId).emit('match:messageDeliveryStatus', {
+                messageId: messageId,
+                matchId: matchId,
+                deliveryStatus: 'delivered',
+                deliveredAt: timestamp
+              });
+              
+              // Try to store the message in database
+              try {
+                const { storeBotMessage } = require('../services/ai/botProfileService');
+                storeBotMessage(botProfile.id, userId, welcomeMessage)
+                  .then(() => console.log(`Stored welcome message in database for match ${matchId}`))
+                  .catch(err => console.error(`Failed to store welcome message: ${err.message}`));
+              } catch (msgError) {
+                console.error(`Error storing welcome message: ${msgError.message}`);
+              }
+            }, 200);
+          }
+        }, 1500 + Math.random() * 2000); // 1.5-3.5 seconds of "typing"
+      } catch (welcomeError) {
+        console.error(`Error sending welcome message: ${welcomeError.message}`);
+      }
+    }, 2000 + Math.random() * 3000); // 2-5 seconds after match
+    
+    return true;
   } catch (error) {
-    console.error('Fatal error creating bot match:', error);
+    console.error(`Error in createBotMatchForUser: ${error.message}`);
     return false;
   }
 };
@@ -3964,16 +4080,6 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     // Import directly here to avoid circular dependencies
     const { generateBotResponse, storeBotMessage, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
     
-    // IMPORTANT: Verify and recover bot user before attempting any database operations
-    try {
-      // This will ensure the bot exists in the database and recreate it if needed
-      await verifyAndRecoverBotUser(botMatch.botProfile);
-      console.log(`Verified bot user ${botMatch.botProfile.id} exists in database for response to ${socket.user.id}`);
-    } catch (botVerifyError) {
-      console.error(`Critical error verifying/recovering bot user: ${botVerifyError.message}`);
-      // Even with verification error, continue with the response, but note it in logs
-    }
-    
     // Add user message to match history
     botMatch.messages.push({
       senderId: socket.user.id,
@@ -3981,13 +4087,27 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
       timestamp: new Date().toISOString()
     });
     
-    // Store user's message in database
+    // IMPORTANT: Verify and recover bot user before attempting any database operations
+    let botVerified = false;
     try {
-      await storeBotMessage(socket.user.id, botMatch.botProfile.id, userMessage);
-      console.log(`Successfully stored user message from ${socket.user.id} to bot ${botMatch.botProfile.id}`);
-    } catch (msgStoreError) {
-      console.error(`Error storing user message: ${msgStoreError.message}`);
-      // Continue despite error - we'll still try to generate a response
+      // This will ensure the bot exists in the database and recreate it if needed
+      await verifyAndRecoverBotUser(botMatch.botProfile);
+      console.log(`Verified bot user ${botMatch.botProfile.id} exists in database for response to ${socket.user.id}`);
+      botVerified = true;
+    } catch (botVerifyError) {
+      console.error(`Failed to verify/recover bot user: ${botVerifyError.message}`);
+      // Even with verification error, continue with the response, but note it in logs
+    }
+    
+    // Store user's message in database if bot is verified
+    if (botVerified) {
+      try {
+        await storeBotMessage(socket.user.id, botMatch.botProfile.id, userMessage);
+        console.log(`Successfully stored user message from ${socket.user.id} to bot ${botMatch.botProfile.id}`);
+      } catch (msgStoreError) {
+        console.error(`Error storing user message: ${msgStoreError.message}`);
+        // Continue despite error - we'll still try to generate a response
+      }
     }
     
     // Send typing indicator to user for better UX
@@ -4034,19 +4154,36 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
             "I'd like to know more about that. What else do you enjoy?",
             "I'm curious about your interests. What do you like to do?",
             "That's fascinating. Have you always been interested in that?",
-            "I've been thinking about trying something new. Any suggestions?"
+            "I've been thinking about trying something new. Any suggestions?",
+            "I really enjoy talking with you. What are your plans for this weekend?",
+            "That's a great point! I hadn't thought of it that way before.",
+            "I've been wanting to try that too! How did you get started with it?",
+            "Your perspective on this is refreshing. I'd love to hear more.",
+            "That reminds me of something similar I experienced recently."
           ];
           
           botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
           console.log(`Using fallback response: "${botResponse}"`);
           
           // Manually store the bot response message since generateBotResponse couldn't do it
-          try {
-            await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
-            console.log(`Successfully stored fallback bot response in database`);
-          } catch (storageError) {
-            console.error(`Error manually storing bot response: ${storageError.message}`);
+          if (botVerified) {
+            try {
+              await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
+              console.log(`Successfully stored fallback bot response in database`);
+            } catch (storageError) {
+              console.error(`Error manually storing bot response: ${storageError.message}`);
+            }
           }
+        }
+        
+        // Remove any "AI-like" phrases from the response
+        botResponse = botResponse
+          .replace(/As an AI|As a bot|As a virtual|I'm an AI|I'm a bot|I'm not a real person|I don't have|I cannot|I'm unable to|I'm here to help|I'm here to assist|I'm designed to|I was created|I was made|I was programmed|How can I assist you|How can I help you/gi, '')
+          .replace(/\s{2,}/g, ' ').trim();
+          
+        // If botResponse is empty after filtering, use a fallback
+        if (!botResponse) {
+          botResponse = "I'm curious to know more about you! What do you enjoy doing in your free time?";
         }
         
         // Generate a message ID for the bot's response
@@ -4061,7 +4198,7 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
           senderName: `${botMatch.botProfile.firstName} ${botMatch.botProfile.lastName}`,
           message: botResponse,
           timestamp,
-          isBot: true // Indicate this is from a bot for client-side handling
+          isDelivered: true
         };
         
         // Add bot message to match history
@@ -4100,41 +4237,14 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
                 matchId: matchId,
                 readAt: new Date().toISOString()
               });
-            }, 1000 + Math.random() * 3000); // 1-4 second delay before reading
-          }, 300);
-        } else {
-          console.error(`User socket ID not found for user ${botMatch.userId}`);
+            }, 800 + Math.random() * 1200); // 800-2000ms delay
+          }, 200 + Math.random() * 300); // 200-500ms delay
         }
-      } catch (error) {
-        console.error('Error in bot response generation:', error);
-        
-        // Still try to send a simple message to keep the conversation going even if everything else fails
-        if (userSocketId) {
-          const emergencyMessageId = uuidv4();
-          const emergencyMessage = {
-            id: emergencyMessageId,
-            matchId: matchId,
-            senderId: botMatch.botProfile.id,
-            senderName: `${botMatch.botProfile.firstName} ${botMatch.botProfile.lastName}`,
-            message: "I'm enjoying our conversation. What else would you like to talk about?",
-            timestamp: new Date().toISOString(),
-            isBot: true
-          };
-          
-          ioInstance.to(userSocketId).emit('match:message', emergencyMessage);
-          console.log(`Sent emergency fallback message to user ${botMatch.userId}`);
-          
-          // Try to store this emergency message as well
-          try {
-            const { storeBotMessage } = require('../services/ai/botProfileService');
-            await storeBotMessage(botMatch.botProfile.id, socket.user.id, emergencyMessage.message);
-          } catch (emergencyStoreError) {
-            console.error(`Failed to store emergency message: ${emergencyStoreError.message}`);
-          }
-        }
+      } catch (err) {
+        console.error(`Error sending bot response: ${err.message}`);
       }
     }, responseDelay);
-  } catch (error) {
-    console.error('Error handling bot response:', error);
+  } catch (err) {
+    console.error(`Unexpected error in handleBotResponse: ${err.message}`);
   }
 };

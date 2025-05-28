@@ -362,14 +362,19 @@ const updateProfilePicture = async (req, res) => {
     }
 
     // Get user's current profile picture
-    const { data: user } = await supabase
+    const { data: user, error: userError } = await supabase
       .from('users')
       .select('profile_picture_url')
       .eq('id', userId)
       .single();
 
+    // Check if user exists
+    if (userError || !user) {
+      console.error('Error fetching user:', userError);
+      // Continue with update even if we can't find the current profile picture
+    }
     // Delete old profile picture if exists
-    if (user.profile_picture_url) {
+    else if (user.profile_picture_url) {
       try {
         const oldKey = user.profile_picture_url.split('/').slice(3).join('/');
         await deleteFile(oldKey);

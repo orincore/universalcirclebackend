@@ -2595,6 +2595,204 @@ const initializeSocket = (io) => {
         });
       }
     });
+
+    // Handle match acceptance (this was previously at the end of the file)
+    socket.on('match:accept', async (data) => {
+      try {
+        const { matchId } = data;
+        const userId = socket.user.id;
+        
+        // Get match data
+        let otherUserId;
+        let isBot = false;
+        
+        // Check if this is a bot match
+        if (botMatches.has(matchId)) {
+          const botMatch = botMatches.get(matchId);
+          otherUserId = botMatch.botProfile.id;
+          isBot = true;
+          
+          // Bot automatically accepts, so just update user acceptance
+          if (activeMatches.has(matchId)) {
+            const matchData = activeMatches.get(matchId);
+            matchData.acceptances[userId] = true;
+            activeMatches.set(matchId, matchData);
+          }
+        } else if (activeMatches.has(matchId)) {
+          // Regular match between users
+          const matchData = activeMatches.get(matchId);
+          otherUserId = matchData.users.find(id => id !== userId);
+          
+          // Update user acceptance
+          matchData.acceptances[userId] = true;
+          activeMatches.set(matchId, matchData);
+        } else {
+          socket.emit('error', {
+            source: 'match:accept',
+            message: 'Match not found'
+          });
+          return;
+        }
+        
+        // Join match room if not already in it
+        if (!socket.rooms.has(matchId)) {
+          socket.join(matchId);
+        }
+        
+        // Update match in database
+        try {
+          const { error: updateError } = await supabase
+            .from('matches')
+            .update({
+              status: 'accepted',
+              accepted_at: new Date(),
+              updated_at: new Date()
+            })
+            .eq('id', matchId);
+          
+          if (updateError) {
+            throw new Error(`Database error: ${updateError.message}`);
+          }
+        } catch (dbError) {
+          console.error(`Error updating match in database: ${dbError.message}`);
+          // Non-critical error, continue
+        }
+        
+        // For bot matches, immediately have the bot send a welcome message
+        if (isBot) {
+          // Get the bot profile
+          const botMatch = botMatches.get(matchId);
+          
+          // Send confirmation to user
+          socket.emit('match:accepted', {
+            matchId,
+            userId: otherUserId,
+            status: 'accepted'
+          });
+          
+          // Have bot send welcome message after a delay
+          setTimeout(() => {
+            const botMessageId = uuidv4();
+            const timestamp = new Date().toISOString();
+            
+            // Get greeting options based on preference
+            const friendshipGreetings = [
+              `Hi there! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0]}. What do you enjoy most about it?`,
+              `Hey! Thanks for accepting the match. I'm excited to chat with someone who shares my interest in ${botMatch.botProfile.interests[0]}!`,
+              `Hello! Glad we matched. I noticed we both have ${botMatch.botProfile.interests[0]} in common. How did you get into that?`
+            ];
+            
+            const datingGreetings = [
+              `Hi there! I'm glad we matched. I noticed we share an interest in ${botMatch.botProfile.interests[0]}. What else do you enjoy?`,
+              `Hello! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0]}. What attracted you to that?`,
+              `Hey! Thanks for accepting the match. I'm looking forward to getting to know you better!`
+            ];
+            
+            const greetings = botMatch.preference === 'Dating' ? datingGreetings : friendshipGreetings;
+            const welcomeMessage = greetings[Math.floor(Math.random() * greetings.length)];
+            
+            // First show bot typing
+            socket.emit('match:typing', {
+              matchId: matchId,
+              senderId: botMatch.botProfile.id,
+              typing: true
+            });
+            
+            // Send message after typing delay
+            setTimeout(() => {
+              // Stop typing
+              socket.emit('match:typing', {
+                matchId: matchId,
+                senderId: botMatch.botProfile.id,
+                typing: false
+              });
+              
+              // Send welcome message
+              setTimeout(() => {
+                const messageObject = {
+                  id: botMessageId,
+                  matchId: matchId,
+                  senderId: botMatch.botProfile.id,
+                  senderName: `${botMatch.botProfile.firstName} ${botMatch.botProfile.lastName}`,
+                  message: welcomeMessage,
+                  timestamp,
+                  isBot: true
+                };
+                
+                socket.emit('match:message', messageObject);
+                
+                // Store message in database if needed
+                try {
+                  // If you have a function to store bot messages
+                  if (typeof storeBotMessage === 'function') {
+                    storeBotMessage(botMatch.botProfile.id, userId, welcomeMessage);
+                  }
+                } catch (msgError) {
+                  console.error('Error storing bot welcome message:', msgError);
+                }
+                
+                // Add to match history
+                botMatch.messages.push({
+                  senderId: botMatch.botProfile.id,
+                  message: welcomeMessage,
+                  timestamp
+                });
+              }, 300);
+            }, 1500 + Math.random() * 1000);
+          }, 1000);
+        } else {
+          // Regular match processing for real users
+          // Notify other user
+          const otherUserSocketId = connectedUsers.get(otherUserId);
+          if (otherUserSocketId) {
+            ioInstance.to(otherUserSocketId).emit('match:userAccepted', {
+              matchId,
+              userId
+            });
+          }
+          
+          // Send confirmation to user
+          socket.emit('match:accepted', {
+            matchId,
+            userId: otherUserId,
+            status: 'accepted'
+          });
+          
+          // Check if both users have accepted
+          if (activeMatches.has(matchId)) {
+            const matchData = activeMatches.get(matchId);
+            const bothAccepted = matchData.users.every(uid => matchData.acceptances[uid]);
+            
+            if (bothAccepted) {
+              // Clear timeout
+              const timeoutId = userTimeouts.get(userId);
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+                userTimeouts.delete(userId);
+              }
+              
+              // Notify both users that match is confirmed
+              matchData.users.forEach(uid => {
+                const userSocketId = connectedUsers.get(uid);
+                if (userSocketId) {
+                  ioInstance.to(userSocketId).emit('match:confirmed', {
+                    matchId,
+                    users: matchData.users,
+                    status: 'confirmed'
+                  });
+                }
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error accepting match:', error);
+        socket.emit('error', {
+          source: 'match:accept',
+          message: 'Error accepting match'
+        });
+      }
+    });
   });
 
   return io;
@@ -3830,157 +4028,3 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     console.error('Error handling bot response:', error);
   }
 };
-
-// Modify match:accept to handle bot matches properly
-socket.on('match:accept', async (data) => {
-  try {
-    const { matchId } = data;
-    const userId = socket.user.id;
-    
-    // Get match data
-    let otherUserId;
-    let isBot = false;
-    
-    // Check if this is a bot match
-    if (botMatches.has(matchId)) {
-      const botMatch = botMatches.get(matchId);
-      otherUserId = botMatch.botProfile.id;
-      isBot = true;
-      
-      // Bot automatically accepts, so just update user acceptance
-      if (activeMatches.has(matchId)) {
-        const matchData = activeMatches.get(matchId);
-        matchData.acceptances[userId] = true;
-        activeMatches.set(matchId, matchData);
-      }
-    } else if (activeMatches.has(matchId)) {
-      // Regular match between users
-      const matchData = activeMatches.get(matchId);
-      otherUserId = matchData.users.find(id => id !== userId);
-      
-      // Update user acceptance
-      matchData.acceptances[userId] = true;
-      activeMatches.set(matchId, matchData);
-    } else {
-      socket.emit('error', {
-        source: 'match:accept',
-        message: 'Match not found'
-      });
-      return;
-    }
-    
-    // Join match room if not already in it
-    if (!socket.rooms.has(matchId)) {
-      socket.join(matchId);
-    }
-    
-    // Update match in database
-    try {
-      const { error: updateError } = await supabase
-        .from('matches')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date(),
-          updated_at: new Date()
-        })
-        .eq('id', matchId);
-      
-      if (updateError) {
-        throw new Error(`Database error: ${updateError.message}`);
-      }
-    } catch (dbError) {
-      console.error(`Error updating match in database: ${dbError.message}`);
-      // Non-critical error, continue
-    }
-    
-    // For bot matches, immediately have the bot send a welcome message
-    if (isBot) {
-      // Get the bot profile
-      const botMatch = botMatches.get(matchId);
-      
-      // Send confirmation to user
-      socket.emit('match:accepted', {
-        matchId,
-        userId: otherUserId,
-        status: 'accepted'
-      });
-      
-      // Have bot send welcome message after a delay
-      setTimeout(() => {
-        const botMessageId = uuidv4();
-        const timestamp = new Date().toISOString();
-        
-        // Get greeting options based on preference
-        const friendshipGreetings = [
-          `Hi there! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0]}. What do you enjoy most about it?`,
-          `Hey! Thanks for accepting the match. I'm excited to chat with someone who shares my interest in ${botMatch.botProfile.interests[0]}!`,
-          `Hello! Glad we matched. I noticed we both have ${botMatch.botProfile.interests[0]} in common. How did you get into that?`
-        ];
-        
-        const datingGreetings = [
-          `Hi there! I'm glad we matched. I noticed we share an interest in ${botMatch.botProfile.interests[0]}. What else do you enjoy?`,
-          `Hello! Nice to connect with you. I see we both like ${botMatch.botProfile.interests[0]}. What attracted you to that?`,
-          `Hey! Thanks for accepting the match. I'm looking forward to getting to know you better!`
-        ];
-        
-        const greetings = botMatch.preference === 'Dating' ? datingGreetings : friendshipGreetings;
-        const welcomeMessage = greetings[Math.floor(Math.random() * greetings.length)];
-        
-        // First show bot typing
-        socket.emit('match:typing', {
-          matchId: matchId,
-          senderId: botMatch.botProfile.id,
-          typing: true
-        });
-        
-        // Send message after typing delay
-        setTimeout(() => {
-          // Stop typing
-          socket.emit('match:typing', {
-            matchId: matchId,
-            senderId: botMatch.botProfile.id,
-            typing: false
-          });
-          
-          // Send welcome message
-          setTimeout(() => {
-            const messageObject = {
-              id: botMessageId,
-              matchId: matchId,
-              senderId: botMatch.botProfile.id,
-              senderName: `${botMatch.botProfile.firstName} ${botMatch.botProfile.lastName}`,
-              message: welcomeMessage,
-              timestamp,
-              isBot: true
-            };
-            
-            socket.emit('match:message', messageObject);
-            
-            // Store message in database
-            try {
-              storeBotMessage(botMatch.botProfile.id, userId, welcomeMessage);
-            } catch (msgError) {
-              console.error('Error storing bot welcome message:', msgError);
-            }
-            
-            // Add to match history
-            botMatch.messages.push({
-              senderId: botMatch.botProfile.id,
-              message: welcomeMessage,
-              timestamp
-            });
-          }, 300);
-        }, 1500 + Math.random() * 1000);
-      }, 1000);
-    } else {
-      // Regular match processing for real users
-      // ... existing code ...
-    }
-  } catch (error) {
-    console.error('Error accepting match:', error);
-    socket.emit('error', {
-      source: 'match:accept',
-      message: 'Error accepting match'
-    });
-  }
-});

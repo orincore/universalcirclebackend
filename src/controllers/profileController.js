@@ -351,7 +351,16 @@ const getProfilePictureUploadUrl = async (req, res) => {
  */
 const updateProfilePicture = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    
+    // Validate user ID
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User ID is required. Authentication may have failed.'
+      });
+    }
+
     const { key } = req.body;
     
     if (!key) {

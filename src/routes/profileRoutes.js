@@ -24,6 +24,7 @@ const upload = multer({
 // Profile routes
 router.get('/', authenticate, getUserProfile);
 router.put('/', authenticate, updateProfile);
+router.patch('/', authenticate, updateProfile); // Add PATCH support for partial updates
 
 // Voice bio routes
 router.post('/voice-bio', authenticate, upload.single('audio'), uploadVoiceBio);

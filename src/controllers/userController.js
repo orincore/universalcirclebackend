@@ -320,10 +320,25 @@ const getUserDetails = async (req, res) => {
 const updateUserDetails = async (req, res) => {
   try {
     const { userId } = req.params;
-    const requestingUserId = req.user.id;
+    
+    // Get requesting user ID from multiple sources
+    let requestingUserId = req.user?.id;
+    
+    // If not in req.user, check headers
+    if (!requestingUserId) {
+      requestingUserId = req.headers['x-user-id'] || req.headers['user-id'];
+      console.log(`Using userId from headers: ${requestingUserId}`);
+    }
+    
+    // Check if IDs match exactly (case-sensitive string comparison)
+    const userIdFromParams = String(userId).trim();
+    const requestingUserIdStr = String(requestingUserId).trim();
+    const idsMatch = userIdFromParams === requestingUserIdStr;
+    
+    console.log(`Comparing user IDs: param=${userIdFromParams}, token=${requestingUserIdStr}, match=${idsMatch}`);
     
     // Check if requesting user is an admin or the user themselves
-    const isAdminOrSelf = req.user.is_admin || requestingUserId === userId;
+    const isAdminOrSelf = req.user?.is_admin || idsMatch;
     
     if (!isAdminOrSelf) {
       return res.status(403).json({

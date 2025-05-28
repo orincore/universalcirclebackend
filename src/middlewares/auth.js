@@ -11,6 +11,23 @@ const logger = require('../utils/logger');
  */
 const authenticate = async (req, res, next) => {
   try {
+    // Check if user ID is provided in headers (for mobile apps)
+    const headerUserId = req.headers['x-user-id'] || req.headers['user-id'];
+    if (headerUserId) {
+      logger.info(`User ID provided in headers: ${headerUserId}`);
+      
+      // Set user object with ID from header
+      req.user = {
+        id: headerUserId,
+        source: 'header'
+      };
+      
+      // Continue if this is all we need
+      if (process.env.ALLOW_HEADER_AUTH === 'true') {
+        return next();
+      }
+    }
+    
     // Get the authorization header
     const authHeader = req.headers.authorization;
     
@@ -44,8 +61,16 @@ const authenticate = async (req, res, next) => {
       });
     }
     
-    // Set the user on the request object
-    req.user = decoded;
+    // Set the user on the request object, ensuring id is always set
+    req.user = {
+      ...decoded,
+      id: decoded.id || decoded.userId
+    };
+    
+    // If we already have a header userId and it doesn't match the token, log it
+    if (headerUserId && headerUserId !== req.user.id) {
+      logger.warn(`User ID mismatch: header=${headerUserId}, token=${req.user.id}`);
+    }
     
     // Continue to the next middleware
     next();

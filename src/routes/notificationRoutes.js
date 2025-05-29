@@ -1,24 +1,41 @@
+/**
+ * Notification routes
+ */
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middlewares/auth');
-const notificationController = require('../controllers/notificationController');
+const {
+  getUserNotifications,
+  markNotificationAsRead,
+  deleteNotification,
+  markAllNotificationsAsRead,
+  getUnreadCount,
+  registerDeviceToken,
+  unregisterDeviceToken,
+  getNotificationSettings,
+  updateNotificationSettings,
+  sendTestNotification
+} = require('../controllers/notificationController');
 
 // All notification routes require authentication
 router.use(authenticate);
 
-// Get user notifications
-router.get('/', notificationController.getUserNotifications);
+// User notification routes
+router.get('/', getUserNotifications);
+router.get('/unread/count', getUnreadCount);
+router.patch('/:notificationId/read', markNotificationAsRead);
+router.delete('/:notificationId', deleteNotification);
+router.patch('/read-all', markAllNotificationsAsRead);
 
-// Mark notification as read
-router.put('/:notificationId/read', notificationController.markNotificationAsRead);
+// Push notification device token routes
+router.post('/device-token', registerDeviceToken);
+router.delete('/device-token', unregisterDeviceToken);
 
-// Delete notification
-router.delete('/:notificationId', notificationController.deleteNotification);
+// Notification settings routes
+router.get('/settings', getNotificationSettings);
+router.patch('/settings', updateNotificationSettings);
 
-// Mark all notifications as read
-router.put('/read-all', notificationController.markAllNotificationsAsRead);
-
-// Get unread notification count
-router.get('/count', notificationController.getUnreadCount);
+// Test notification route (for development/testing)
+router.post('/test', sendTestNotification);
 
 module.exports = router; 

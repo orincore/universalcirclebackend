@@ -1,5 +1,7 @@
 const supabase = require('../config/database');
-const { activeMatches, matchmakingPool } = require('../socket/socketManager');
+const { activeMatches, matchmakingPool, cleanupUserConnections } = require('../socket/socketManager');
+const logger = require('../utils/logger');
+const { sendBroadcastNotification } = require('../services/firebase/notificationService');
 
 /**
  * Get all users with pagination
@@ -632,6 +634,310 @@ const updateSystemSettings = async (req, res) => {
   }
 };
 
+/**
+ * Delete a user and all associated data (admin only)
+ * This endpoint uses the standard authentication flow:
+ * 1. The authenticate middleware verifies the JWT token
+ * 2. The isAdmin middleware ensures the authenticated user has admin privileges
+ * 3. The admin's ID is available as req.user.id
+ * 
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const adminId = req.user.id;
+    // Default to soft delete unless hard_delete=true is specified
+    const hardDelete = req.query.hard_delete === 'true';
+    
+    logger.info(`Admin ${adminId} initiated ${hardDelete ? 'hard' : 'soft'} delete for user ${userId}`);
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, username, email, first_name, last_name')
+      .eq('id', userId)
+      .single();
+    
+    if (userError || !user) {
+      logger.warn(`Admin ${adminId} attempted to delete non-existent user ${userId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Clean up any active socket connections for this user
+    try {
+      cleanupUserConnections(userId);
+      logger.info(`Cleaned up socket connections for user ${userId}`);
+    } catch (socketError) {
+      logger.warn(`Error cleaning up socket connections for user ${userId}:`, socketError);
+      // Continue with deletion even if socket cleanup fails
+    }
+
+    // If soft delete, just mark the user as deleted and anonymize their data
+    if (!hardDelete) {
+      const anonymizedData = {
+        username: `deleted_${Date.now()}`,
+        email: `deleted_${Date.now()}@deleted.com`,
+        first_name: 'Deleted',
+        last_name: 'User',
+        profile_picture_url: null,
+        bio: null,
+        is_deleted: true,
+        deleted_at: new Date(),
+        deleted_by: adminId
+      };
+      
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(anonymizedData)
+        .eq('id', userId);
+        
+      if (updateError) {
+        logger.error(`Failed to soft delete user ${userId}:`, updateError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to soft delete user',
+          details: updateError.message
+        });
+      }
+      
+      logger.info(`User ${userId} (${user.username}) successfully soft deleted by admin ${adminId}`);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'User successfully soft deleted',
+        data: {
+          userId,
+          username: user.username,
+          deletionType: 'soft'
+        }
+      });
+    }
+    
+    // If we reach here, we're doing a hard delete
+    logger.info(`Proceeding with hard delete for user ${userId} (${user.username})`);
+    
+    // First, delete all messages where user is sender or receiver
+    const { error: messagesError } = await supabase
+      .from('messages')
+      .delete()
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+    
+    if (messagesError) {
+      logger.error(`Error deleting messages for user ${userId}:`, messagesError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete user messages',
+        details: messagesError.message
+      });
+    }
+    
+    logger.info(`Deleted all messages for user ${userId}`);
+
+    // Delete user's reactions to messages
+    const { error: reactionsError } = await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (reactionsError) {
+      logger.error(`Error deleting message reactions for user ${userId}:`, reactionsError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete message reactions',
+        details: reactionsError.message
+      });
+    }
+    
+    logger.info(`Deleted message reactions for user ${userId}`);
+
+    // Delete matches involving this user
+    const { error: matchesError } = await supabase
+      .from('matches')
+      .delete()
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+    
+    if (matchesError) {
+      logger.error(`Error deleting matches for user ${userId}:`, matchesError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete user matches',
+        details: matchesError.message
+      });
+    }
+    
+    logger.info(`Deleted matches for user ${userId}`);
+
+    // Delete user's reports (both submitted and received)
+    const { error: reportsError } = await supabase
+      .from('reports')
+      .delete()
+      .or(`reporter_id.eq.${userId},reported_user_id.eq.${userId}`);
+    
+    if (reportsError) {
+      logger.error(`Error deleting reports for user ${userId}:`, reportsError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete user reports',
+        details: reportsError.message
+      });
+    }
+    
+    logger.info(`Deleted reports for user ${userId}`);
+
+    // Finally, delete the user
+    const { error: deleteError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId);
+    
+    if (deleteError) {
+      logger.error(`Error permanently deleting user ${userId}:`, deleteError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete user',
+        details: deleteError.message
+      });
+    }
+
+    logger.info(`User ${userId} (${user.username}) successfully hard deleted by admin ${adminId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'User and associated data successfully deleted',
+      data: {
+        userId,
+        username: user.username,
+        deletionType: 'hard'
+      }
+    });
+  } catch (error) {
+    logger.error(`Error in deleteUser for userId ${req.params.userId}:`, error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while deleting user',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Send a broadcast notification to all users (admin only)
+ * 
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const sendAdminBroadcast = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const { title, body, data = {}, senderName } = req.body;
+    
+    if (!title || !body) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and body are required'
+      });
+    }
+    
+    // Add admin info to the notification data
+    const notificationData = {
+      ...data,
+      adminId,
+      senderName: senderName || 'Universal Circle Team',
+      type: 'admin_broadcast'
+    };
+    
+    const notification = {
+      title,
+      body
+    };
+    
+    logger.info(`Admin ${adminId} is sending broadcast notification: "${title}"`);
+    
+    const result = await sendBroadcastNotification(notification, notificationData);
+    
+    if (!result.success) {
+      logger.error(`Failed to send broadcast notification: ${result.error}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send broadcast notification',
+        error: result.error
+      });
+    }
+    
+    return res.json({
+      success: true,
+      message: 'Broadcast notification sent successfully',
+      data: {
+        usersReached: result.usersReached,
+        successCount: result.successCount,
+        failureCount: result.failureCount
+      }
+    });
+  } catch (error) {
+    logger.error('Error in sendAdminBroadcast:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send broadcast notification',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get all admin broadcast notifications (with pagination)
+ * 
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ */
+const getAdminBroadcasts = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+    
+    // Get broadcast notifications with pagination
+    const { data, error, count } = await supabase
+      .from('admin_notifications')
+      .select('*, sent_by:sent_by(id, username, first_name, last_name)', { count: 'exact' })
+      .order('sent_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    
+    if (error) {
+      logger.error(`Error fetching admin broadcasts: ${error.message}`);
+      throw error;
+    }
+    
+    return res.json({
+      success: true,
+      data,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit)
+      }
+    });
+  } catch (error) {
+    logger.error('Error in getAdminBroadcasts:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch broadcast notifications',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getAllUsersBulk,
@@ -642,5 +948,8 @@ module.exports = {
   getServerHealth,
   deletePost,
   getSystemSettings,
-  updateSystemSettings
+  updateSystemSettings,
+  deleteUser,
+  sendAdminBroadcast,
+  getAdminBroadcasts
 }; 

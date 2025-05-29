@@ -2,6 +2,7 @@ const { verifyToken } = require('../utils/jwt');
 const supabase = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { info, error, warn } = require('../utils/logger');
+const { sendMessageNotification } = require('../services/firebase/notificationService');
 
 // Track connected users and their socket IDs
 const connectedUsers = new Map();
@@ -992,6 +993,40 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             matchId,
             deliveryStatus: 'sent'
           });
+          
+          // Check if recipient is connected/online
+          const isRecipientOnline = connectedUsers.has(recipientId);
+          
+          // If recipient is not online, send a push notification
+          if (!isRecipientOnline) {
+            try {
+              // Get notification settings for recipient
+              const { data: settings } = await supabase
+                .from('user_notification_settings')
+                .select('messages_enabled')
+                .eq('user_id', recipientId)
+                .single();
+              
+              // Send notification if enabled (or if settings don't exist yet - default is enabled)
+              if (!settings || settings.messages_enabled !== false) {
+                await sendMessageNotification(recipientId, {
+                  id: messageId,
+                  sender: {
+                    id: userId,
+                    username: socket.user.username || 'User'
+                  },
+                  content: message,
+                  matchId
+                });
+                console.log(`Push notification sent to user ${recipientId} for message ${messageId}`);
+              } else {
+                console.log(`Push notifications disabled for user ${recipientId}, skipping notification`);
+              }
+            } catch (notifError) {
+              console.log(`Error sending push notification: ${notifError.message}`);
+              // Continue anyway, push notifications are optional
+            }
+          }
           
           // Execute callback if provided
           if (typeof callback === 'function') {
@@ -4410,6 +4445,75 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
   }
 };
 
+/**
+ * Clean up all socket connections and references for a deleted user
+ * @param {string} userId - The ID of the user being deleted
+ */
+const cleanupUserConnections = (userId) => {
+  try {
+    if (!userId || !ioInstance) {
+      return;
+    }
+
+    // Find socket ID for this user
+    const socketId = connectedUsers.get(userId);
+    
+    if (socketId) {
+      // Get the socket instance
+      const socket = ioInstance.sockets.sockets.get(socketId);
+      
+      // If socket exists, force disconnect
+      if (socket) {
+        // Notify other users this user will no longer be available
+        socket.broadcast.emit('user:status', {
+          userId,
+          online: false,
+          lastSeen: new Date().toISOString(),
+          reason: 'user_deleted'
+        });
+
+        // Disconnect the socket
+        socket.disconnect(true);
+        console.log(`Forced disconnect for deleted user ${userId}`);
+      }
+    }
+
+    // Remove from any active matches
+    if (activeMatches) {
+      activeMatches.forEach((match, matchId) => {
+        if (match.user1Id === userId || match.user2Id === userId) {
+          console.log(`Removing deleted user ${userId} from match ${matchId}`);
+          activeMatches.delete(matchId);
+        }
+      });
+    }
+    
+    // Remove from matchmaking pool
+    if (matchmakingPool) {
+      console.log(`Removing deleted user ${userId} from matchmaking pool`);
+      matchmakingPool.delete(userId);
+    }
+
+    // Remove from connected users map
+    connectedUsers.delete(userId);
+
+    // Cancel any pending timeouts
+    if (global.disconnectTimeouts && global.disconnectTimeouts.has(userId)) {
+      clearTimeout(global.disconnectTimeouts.get(userId));
+      global.disconnectTimeouts.delete(userId);
+    }
+
+    // Clean up any user-specific data in memory
+    if (global.userMessageBuffers && global.userMessageBuffers.has(userId)) {
+      global.userMessageBuffers.delete(userId);
+    }
+
+    console.log(`Completed socket cleanup for deleted user ${userId}`);
+  } catch (error) {
+    console.error(`Error cleaning up socket connections for user ${userId}:`, error);
+  }
+};
+
 // Export essential functions
 module.exports = {
   initializeSocket,
@@ -4428,5 +4532,8 @@ module.exports = {
   startGlobalMatchmaking,
   stopGlobalMatchmaking,
   cleanMatchmakingPool,
-  clearMatchmakingTimeouts
+  clearMatchmakingTimeouts,
+  cleanupUserConnections,
+  activeMatches,
+  matchmakingPool
 }; 

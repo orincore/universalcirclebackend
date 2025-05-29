@@ -1277,8 +1277,14 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
   }
 };
 
+// Create a map to store conversation history for bot chats
+const botConversationHistory = new Map();
+
+// Maximum number of messages to keep in history
+const MAX_CONVERSATION_HISTORY = 10;
+
 /**
- * Generate a bot response to a user message with improved Gemini AI integration
+ * Generate a bot response to a user message with direct Gemini AI integration
  * @param {string} userMessage - User's message
  * @param {object} botProfile - Bot's profile
  * @param {string} preference - Preference type
@@ -1299,8 +1305,30 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
     const hasNonEnglishChars = /[^\x00-\x7F]/.test(userMessage);
     const probableLanguage = hasNonEnglishChars ? 'non-english' : 'english';
     
+    // Create a unique conversation ID for this user-bot pair
+    const conversationId = `${userId}-${botProfile.id}`;
+    
     // Log message receipt
     info(`Generating bot response from ${botProfile.id} to user ${userId}: "${userMessage}" (detected language: ${probableLanguage})`);
+    
+    // Get or initialize conversation history
+    if (!botConversationHistory.has(conversationId)) {
+      botConversationHistory.set(conversationId, []);
+    }
+    
+    // Get the conversation history
+    const conversationHistory = botConversationHistory.get(conversationId);
+    
+    // Add user message to history
+    conversationHistory.push({
+      role: 'user',
+      parts: [{ text: userMessage }]
+    });
+    
+    // Limit history size
+    while (conversationHistory.length > MAX_CONVERSATION_HISTORY) {
+      conversationHistory.shift();
+    }
     
     let botResponse = '';
     
@@ -1327,36 +1355,40 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
           personalityTraits = 'friendly, open-minded, thoughtful, authentic';
         }
         
-        // Enhanced prompt for better Gemini responses
-        const prompt = `
-          You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${typeof botProfile.location === 'string' ? botProfile.location : JSON.parse(botProfile.location).city || 'Mumbai'}, India.
-          
-          YOUR PERSONALITY: You are ${personalityTraits}.
-          
-          YOUR PROFILE:
-          - You work as a ${botProfile.occupation || 'professional'}
-          - You have ${botProfile.education || 'a college education'}
-          - Your interests include ${botProfile.interests.join(', ')}
-          - Your bio: "${botProfile.bio}"
-          
-          CURRENT CONVERSATION:
-          - You are chatting with someone on a ${preference.toLowerCase()} app
-          - This is a ${preference.toLowerCase()} context interaction
-          - You should be authentic, relatable, and show genuine interest
-          
-          IMPORTANT INSTRUCTIONS:
-          - Respond in the SAME LANGUAGE the person is using to talk to you. If they write in Hindi, respond in Hindi. Match their language.
-          - Keep your response natural, conversational and SHORT (1-3 sentences maximum)
-          - Show genuine interest in what they've shared
-          - Be warm and friendly but don't overdo the friendliness
-          - Don't use emojis
-          - NEVER mention that you are an AI, bot, or program - respond as a real person would
-          - Don't apologize for anything
-          - Make your response feel like a genuine human message
-          - NEVER mention that you're here to help or assist - you're having a normal conversation
-          
-          Respond naturally to this message: "${userMessage}"
-        `;
+        // Build full conversation history for context
+        const systemPrompt = {
+          role: 'system',
+          parts: [{
+            text: `You are ${botProfile.firstName} ${botProfile.lastName}, a ${botProfile.gender}, ${new Date().getFullYear() - new Date(botProfile.date_of_birth).getFullYear()} years old from ${typeof botProfile.location === 'string' ? botProfile.location : JSON.parse(botProfile.location).city || 'Mumbai'}, India.
+            
+YOUR PERSONALITY: You are ${personalityTraits}.
+
+YOUR PROFILE:
+- You work as a ${botProfile.occupation || 'professional'}
+- You have ${botProfile.education || 'a college education'}
+- Your interests include ${botProfile.interests.join(', ')}
+- Your bio: "${botProfile.bio}"
+
+CURRENT CONVERSATION:
+- You are chatting with someone on a ${preference.toLowerCase()} app
+- This is a ${preference.toLowerCase()} context interaction
+- You should be authentic, relatable, and show genuine interest
+
+IMPORTANT INSTRUCTIONS:
+- Respond in the SAME LANGUAGE the person is using to talk to you. If they write in Hindi, respond in Hindi. Match their language.
+- Keep your response natural, conversational and SHORT (1-3 sentences maximum)
+- Show genuine interest in what they've shared
+- Be warm and friendly but don't overdo the friendliness
+- Don't use emojis
+- NEVER mention that you are an AI, bot, or program - respond as a real person would
+- Don't apologize for anything
+- Make your response feel like a genuine human message
+- NEVER mention that you're here to help or assist - you're having a normal conversation`
+          }]
+        };
+        
+        // Add system prompt to beginning of conversation
+        const fullConversation = [systemPrompt, ...conversationHistory];
         
         const safetySettings = [
           {
@@ -1378,21 +1410,30 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
         ];
         
         const generationConfig = {
-          temperature: 0.7,
+          temperature: 0.8,  // Slightly higher for more variability
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 256,
         };
         
-        // Generate response with Gemini
+        // Generate response with Gemini using chat mode for more natural conversation
         const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: fullConversation,
           safetySettings,
           generationConfig
         });
         
         const response = await result.response;
         botResponse = response.text().trim();
+        
+        // Add bot response to conversation history
+        conversationHistory.push({
+          role: 'model',
+          parts: [{ text: botResponse }]
+        });
+        
+        // Update the conversation history
+        botConversationHistory.set(conversationId, conversationHistory);
         
         // Ensure the response isn't too long
         if (botResponse.length > 300) {
@@ -1434,6 +1475,15 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
       
       botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
       info(`Using fallback response for bot ${botProfile.id}: "${botResponse}"`);
+      
+      // Add fallback response to conversation history
+      conversationHistory.push({
+        role: 'model',
+        parts: [{ text: botResponse }]
+      });
+      
+      // Update the conversation history
+      botConversationHistory.set(conversationId, conversationHistory);
     }
     
     // Store both messages in the database if userId is provided
@@ -1517,10 +1567,22 @@ const getEnglishFallbackResponses = (botProfile) => {
   ];
 };
 
+/**
+ * Clear conversation history for a specific user-bot pair
+ * @param {string} userId - User ID
+ * @param {string} botId - Bot ID
+ */
+const clearBotConversationHistory = (userId, botId) => {
+  const conversationId = `${userId}-${botId}`;
+  botConversationHistory.delete(conversationId);
+  info(`Cleared conversation history for ${conversationId}`);
+};
+
 module.exports = {
   generateBotProfile,
   generateBotResponse,
   createBotUserRecord,
   storeBotMessage,
-  verifyAndRecoverBotUser
+  verifyAndRecoverBotUser,
+  clearBotConversationHistory
 };

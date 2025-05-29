@@ -811,8 +811,8 @@ const createBotUserRecord = async (botProfile) => {
       
       if (verifyError || !verifyUser) {
         throw new Error(`Bot user creation verification failed: ${verifyError?.message || 'User not found after creation'}`);
-      }
-      
+    }
+    
       if (!verifyUser.is_bot) {
         // Ensure the is_bot flag is set
         await supabase
@@ -1107,7 +1107,7 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
       : normalizedGender === 'male'
         ? indianMaleFirstNames[Math.floor(Math.random() * indianMaleFirstNames.length)]
         : indianNonBinaryFirstNames[Math.floor(Math.random() * indianNonBinaryFirstNames.length)];
-        
+    
     const lastName = indianLastNames[Math.floor(Math.random() * indianLastNames.length)];
     const age = generateRandomAge();
     const city = indianCities[Math.floor(Math.random() * indianCities.length)];
@@ -1256,8 +1256,8 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
       is_active: true,
       is_online: true,
       is_verified: true
-    };
-    
+  };
+  
     // Create user record in database with retry logic
     let retryCount = 0;
     const maxRetries = 3;
@@ -1319,7 +1319,7 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
     // Get or initialize conversation history
     if (!botConversationHistory.has(conversationId)) {
       botConversationHistory.set(conversationId, []);
-    }
+  }
     
     // Get the conversation history
     const conversationHistory = botConversationHistory.get(conversationId);
@@ -1373,12 +1373,12 @@ YOUR PROFILE:
 - You have ${botProfile.education || 'a college education'}
 - Your interests include ${botProfile.interests.join(', ')}
 - Your bio: "${botProfile.bio}"
-
+          
 CURRENT CONVERSATION:
 - You are chatting with someone on a ${preference.toLowerCase()} app
 - This is a ${preference.toLowerCase()} context interaction
 - You should be authentic, relatable, and show genuine interest
-
+          
 IMPORTANT INSTRUCTIONS:
 - Respond in the SAME LANGUAGE the person is using to talk to you. If they write in Hindi, respond in Hindi. Match their language.
 - Keep your response natural, conversational and SHORT (1-3 sentences maximum)
@@ -1430,8 +1430,8 @@ IMPORTANT INSTRUCTIONS:
             generationConfig
           });
           
-          const response = await result.response;
-          botResponse = response.text().trim();
+        const response = await result.response;
+        botResponse = response.text().trim();
           console.log(`Successfully received response from Gemini AI: "${botResponse.substring(0, 30)}..."`);
         } catch (geminiError) {
           console.error(`Gemini API error details:`, geminiError);

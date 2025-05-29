@@ -1,48 +1,146 @@
-# Setting Up Gemini AI for Universal Circle
 
-## API Key Setup Instructions
+# Bot Chat API Documentation
 
-The Universal Circle platform uses Google's Gemini AI for content moderation and matchmaking. To ensure these features work correctly, follow these steps to set up your Gemini API key:
+## 1. Send Message to Bot
 
-### Step 1: Create or Sign In to Google AI Studio
+This endpoint allows you to send a message to a bot and receive an immediate response.
 
-1. Go to [Google AI Studio](https://makersuite.google.com/)
-2. Sign in with your Google account
-3. Accept the terms of service
+**Endpoint:** `POST /api/botchat/send`
 
-### Step 2: Get Your API Key
+**Headers:**
+```
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+```
 
-1. Click on "Get API key" in the top-right menu or go to [API Keys](https://makersuite.google.com/app/apikey)
-2. Create a new API key and copy it
-3. Keep this key secure - it has usage limits and should not be shared
+**Request Body:**
+```json
+{
+  "botId": "BOT_USER_ID_HERE",
+  "message": "Hello bot, how are you?"
+}
+```
 
-### Step 3: Set Up in Universal Circle Backend
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "userMessage": {
+      "id": "message-uuid-here",
+      "senderId": "your-user-id",
+      "receiverId": "bot-user-id",
+      "message": "Hello bot, how are you?",
+      "timestamp": "2025-05-29T12:00:00.000Z",
+      "isRead": true
+    },
+    "botMessage": {
+      "id": "bot-message-uuid-here",
+      "senderId": "bot-user-id",
+      "receiverId": "your-user-id",
+      "senderName": "Bot Name",
+      "message": "I'm doing well, thank you! How can I help you today?",
+      "timestamp": "2025-05-29T12:00:01.000Z",
+      "isRead": false
+    }
+  }
+}
+```
 
-1. Add the API key to your `.env` file:
-   ```
-   GEMINI_API_KEY=your_api_key_here
-   ```
-2. Make sure you're using the **correct model name**:
-   - The code now uses `gemini-2.0-flash` (the current recommended model)
-   - The API endpoint is `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`
+## 2. Get Conversation with Bot
 
-### Step 4: Test the Connection
+This endpoint allows you to retrieve the conversation history with a specific bot.
 
-1. Restart your server after setting the API key
-2. Monitor server logs for any Gemini API connection errors
-3. Try testing a content moderation report to verify functionality
+**Endpoint:** `GET /api/botchat/conversation/:botId`
 
-### Common Issues
+**Headers:**
+```
+Authorization: Bearer YOUR_JWT_TOKEN
+```
 
-- **404 Not Found Error**: Make sure you're using an up-to-date model name. As of May 2025, `gemini-2.0-flash` is the recommended model.
-- **API Key Invalid**: Verify your API key is correct and hasn't expired
-- **Rate Limits**: Google applies usage limits to Gemini API keys. For production use, consider upgrading to a paid plan.
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "message-uuid-1",
+      "senderId": "your-user-id",
+      "receiverId": "bot-user-id",
+      "message": "Hello there!",
+      "timestamp": "2025-05-29T11:55:00.000Z",
+      "isRead": true
+    },
+    {
+      "id": "message-uuid-2",
+      "senderId": "bot-user-id",
+      "receiverId": "your-user-id",
+      "message": "Hi! How can I help you today?",
+      "timestamp": "2025-05-29T11:55:01.000Z",
+      "isRead": true
+    },
+    {
+      "id": "message-uuid-3",
+      "senderId": "your-user-id",
+      "receiverId": "bot-user-id",
+      "message": "Tell me about yourself",
+      "timestamp": "2025-05-29T11:56:00.000Z",
+      "isRead": true
+    },
+    {
+      "id": "message-uuid-4",
+      "senderId": "bot-user-id",
+      "receiverId": "your-user-id",
+      "message": "I'm a friendly AI assistant that loves to chat!",
+      "timestamp": "2025-05-29T11:56:01.000Z",
+      "isRead": true
+    }
+  ]
+}
+```
 
-### Getting Help
+## Example Usage with JavaScript/Axios
 
-If you continue to experience issues with Gemini AI integration, check:
-1. [Official Google Gemini API Documentation](https://ai.google.dev/gemini-api/docs/quickstart?lang=rest)
-2. [API Reference](https://ai.google.dev/api/)
-3. Contact the Universal Circle development team
+```javascript
+// Function to send message to bot
+async function sendMessageToBot(botId, message) {
+  try {
+    const response = await axios.post(
+      'https://your-api-url.com/api/botchat/send',
+      { botId, message },
+      { 
+        headers: { 
+          Authorization: `Bearer ${YOUR_TOKEN}`,
+          'Content-Type': 'application/json' 
+        } 
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error sending message to bot:', error);
+    throw error;
+  }
+}
 
-Remember to never commit API keys to version control. Always use environment variables or secure storage solutions for keeping API keys confidential. 
+// Function to get conversation history
+async function getBotConversation(botId) {
+  try {
+    const response = await axios.get(
+      `https://your-api-url.com/api/botchat/conversation/${botId}`,
+      { 
+        headers: { 
+          Authorization: `Bearer ${YOUR_TOKEN}`
+        } 
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching bot conversation:', error);
+    throw error;
+  }
+}
+```
+
+This new API provides a simpler, more direct way to communicate with bot users instead of the previous socket-based approach, which was causing issues.

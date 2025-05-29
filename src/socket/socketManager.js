@@ -4437,153 +4437,111 @@ const cleanupUserMatches = (userId) => {
 };
 
 /**
- * Handle bot responses to user messages - simplified and bulletproof implementation
+ * Simple bot response handler - streamlined implementation
  * @param {string} matchId - Match ID
  * @param {string} userMessage - Message from user
  * @param {object} socket - User's socket
  */
 const handleBotResponse = async (matchId, userMessage, socket) => {
-  console.log(`===== SIMPLIFIED BOT RESPONSE SYSTEM =====`);
-  console.log(`[BOT] Starting bot response for matchId: ${matchId}`);
-  console.log(`[BOT] Processing user message: "${userMessage}"`);
-  
   try {
-    // STEP 1: VALIDATE DATA
-    if (!socket || !socket.user || !socket.user.id) {
-      console.log(`[BOT ERROR] Invalid socket or missing user.id`);
-      return;
-    }
+    // Basic validation
+    if (!socket?.user?.id || !matchId || !userMessage) return;
     
     const userId = socket.user.id;
-    console.log(`[BOT] User ID: ${userId}`);
     
     // Get bot match data
     const botMatch = botMatches.get(matchId);
-    if (!botMatch) {
-      console.log(`[BOT ERROR] Bot match ${matchId} not found`);
+    if (!botMatch || !botMatch.botProfile) {
+      console.log(`Bot match ${matchId} not found`);
       return;
     }
     
     const botId = botMatch.botProfile.id;
-    console.log(`[BOT] Bot ID: ${botId}`);
+    const botName = `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`;
     
-    // STEP 2: HANDLE TYPING INDICATORS
-    console.log(`[BOT] Sending typing indicator`);
-    socket.emit('match:typing', {
-      matchId: matchId,
-      senderId: botId,
-      typing: true
+    // Show typing indicator
+    socket.emit('match:typing', { 
+      matchId, 
+      senderId: botId, 
+      typing: true 
     });
     
-    // STEP 3: GENERATE RESPONSE
-    console.log(`[BOT] Generating AI response`);
-    let botResponse = '';
-    
+    // Generate response from Gemini AI
+    let botResponse;
     try {
-      // Import Gemini service
       const { generateBotResponse } = require('../services/ai/botProfileService');
-      
       botResponse = await generateBotResponse(
         userMessage,
         botMatch.botProfile,
         botMatch.preference || 'Friendship',
         userId
       );
-      
-      console.log(`[BOT] Generated response: "${botResponse}"`);
     } catch (aiError) {
-      console.log(`[BOT ERROR] AI response generation failed: ${aiError.message}`);
-      
-      // Use fallback response
+      console.log(`AI response generation failed: ${aiError.message}`);
+      // Use fallback if AI fails
       const fallbacks = [
         "That's interesting! Tell me more.",
-        "I'm not sure I understand. Can you explain more?",
-        "Let's talk about something else. What are your interests?",
-        "Sorry, I got distracted. What were you saying?",
-        "I'd love to hear more about that!"
+        "I'd love to hear more about that.",
+        "Tell me more about yourself.",
+        "What else do you enjoy doing?",
+        "That's cool. What are your other interests?"
       ];
-      
       botResponse = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-      console.log(`[BOT] Using fallback response: "${botResponse}"`);
     }
     
-    // Add a reasonable delay to simulate thinking
-    const thinkingTime = Math.min(500 + userMessage.length * 10, 1500);
-    console.log(`[BOT] Waiting ${thinkingTime}ms before typing`);
-    await new Promise(resolve => setTimeout(resolve, thinkingTime));
-    
-    // STEP 4: SIMULATE TYPING
-    const typingTime = Math.min(500 + botResponse.length * 25, 3000);
-    console.log(`[BOT] Simulating typing for ${typingTime}ms`);
-    await new Promise(resolve => setTimeout(resolve, typingTime));
+    // Add a small delay before response
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Stop typing indicator
-    socket.emit('match:typing', {
-      matchId: matchId,
-      senderId: botId,
-      typing: false
+    socket.emit('match:typing', { 
+      matchId, 
+      senderId: botId, 
+      typing: false 
     });
     
-    // STEP 5: SEND MESSAGE
-    // Always use a proper UUID for the messageId to ensure database compatibility
+    // Create message with UUID
     const messageId = uuidv4();
     const timestamp = new Date().toISOString();
     
-    const messageObject = {
+    // Send message to user
+    socket.emit('match:message', {
       id: messageId,
-      matchId: matchId,
-      senderId: botId,
-      senderName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
-      message: botResponse,
-      timestamp,
-      isDelivered: true
-    };
-    
-    console.log(`[BOT] Sending message to user ${userId}`);
-    socket.emit('match:message', messageObject);
-    
-    // Store in match history
-    botMatch.messages.push({
-      senderId: botId,
-      message: botResponse,
-      timestamp,
-      id: messageId
-    });
-    
-    botMatches.set(matchId, botMatch);
-    console.log(`[BOT] Message added to history, now ${botMatch.messages.length} messages total`);
-    
-    // Send delivery status
-    socket.emit('match:messageDeliveryStatus', {
-      messageId,
       matchId,
-      deliveryStatus: 'delivered',
-      deliveredAt: timestamp
+      senderId: botId,
+      senderName: botName,
+      message: botResponse,
+      timestamp
     });
     
-    // Send read status after a delay
-    setTimeout(() => {
-      socket.emit('match:messageRead', {
-        messageId,
-        matchId,
-        readAt: new Date().toISOString()
+    // Add to in-memory history
+    if (botMatch.messages) {
+      botMatch.messages.push({
+        senderId: botId,
+        message: botResponse,
+        timestamp,
+        id: messageId
       });
-    }, 1000);
-    
-    // STEP 6: SAVE TO DATABASE (best effort)
-    try {
-      const { storeBotMessage } = require('../services/ai/botProfileService');
-      storeBotMessage(botId, userId, botResponse)
-        .then(() => console.log(`[BOT] Message saved to database`))
-        .catch(err => console.log(`[BOT] Database save error: ${err.message}`));
-    } catch (dbError) {
-      console.log(`[BOT] Database operation error: ${dbError.message}`);
+      botMatches.set(matchId, botMatch);
     }
     
-    console.log(`===== BOT RESPONSE COMPLETE =====`);
+    // Save to database in one operation
+    try {
+      await supabase.from('messages').insert({
+        id: messageId,
+        sender_id: botId,
+        receiver_id: userId,
+        content: botResponse,
+        is_read: false,
+        created_at: timestamp,
+        updated_at: timestamp,
+        is_bot_message: true
+      });
+      console.log(`Bot message saved to database`);
+    } catch (dbError) {
+      console.log(`Database error: ${dbError.message}`);
+    }
   } catch (error) {
-    console.log(`[BOT CRITICAL ERROR]: ${error.message}`);
-    console.log(error.stack);
+    console.log(`Bot response error: ${error.message}`);
   }
 };
 

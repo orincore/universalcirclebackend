@@ -27,3 +27,4 @@ Thumbs.db
 /coverage circle-notify-d06e1-firebase-adminsdk-fbsvc-2404360830.json
 *.json.key
 firebase-*.json
+.env

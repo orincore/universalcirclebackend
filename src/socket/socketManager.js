@@ -414,8 +414,28 @@ const initializeSocket = (io) => {
       next(new Error('Authentication error'));
     }
   });
+  
+  // Log important client events for developers
+  console.log(`
+=== SOCKET.IO SERVER INITIALIZED ===
+Important socket events for client integration:
 
-  // Connection handler
+1. 'chat:open' - Clients MUST emit this event when a user opens a chat
+   - Required data: { matchId: 'match-uuid' }
+   - This ensures bots respond when chats are opened, even if no message is sent
+   - Example: socket.emit('chat:open', { matchId: matchId });
+
+2. 'match:message' - Used for sending messages in a match
+   - Required data: { matchId: 'match-uuid', message: 'user message' }
+
+3. 'match:typing' - Used for typing indicators
+   - Required data: { matchId: 'match-uuid', typing: true/false }
+
+Bot chat interactions require 'chat:open' to be emitted when a user opens a chat.
+===========================================
+`);
+  
+  // Initialize socket handlers
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.user.id} (${socket.user.username})`);
     
@@ -2595,6 +2615,174 @@ const initializeSocket = (io) => {
         });
       }
     });
+    
+    // Handle chat opened event - sends a bot message when user opens a chat
+    socket.on('chat:open', (data) => {
+      try {
+        if (!socket.user) {
+          socket.emit('error', { source: 'chat', message: 'Not authenticated' });
+          return;
+        }
+        
+        const { matchId } = data;
+        
+        if (!matchId) {
+          socket.emit('error', { source: 'chat', message: 'Match ID is required' });
+          return;
+        }
+        
+        // Check if this is a bot match
+        if (!botMatches.has(matchId)) {
+          // Not a bot match, just join the room silently
+          if (!socket.rooms.has(matchId)) {
+            socket.join(matchId);
+            info(`User ${socket.user.id} joined match room ${matchId} via chat:open`);
+          }
+          return;
+        }
+        
+        // Get bot match data
+        const botMatch = botMatches.get(matchId);
+        
+        // Verify this user is part of this match
+        if (botMatch.userId !== socket.user.id) {
+          socket.emit('error', { source: 'chat', message: 'You are not part of this match' });
+          return;
+        }
+        
+        // Join the match room if not already in it
+        if (!socket.rooms.has(matchId)) {
+          socket.join(matchId);
+          info(`User ${socket.user.id} joined bot match room ${matchId} via chat:open`);
+        }
+        
+        // Check if bot has sent any messages to this user
+        if (botMatch.messages.length === 0) {
+          // No messages yet, send an initial greeting after a slight delay
+          setTimeout(() => {
+            // Show bot typing
+            socket.emit('match:typing', {
+              matchId: matchId,
+              senderId: botMatch.botProfile.id,
+              typing: true
+            });
+            
+            // Generate greeting after typing delay
+            setTimeout(async () => {
+              try {
+                // Stop typing
+                socket.emit('match:typing', {
+                  matchId: matchId,
+                  senderId: botMatch.botProfile.id,
+                  typing: false
+                });
+                
+                // Generate greeting messages based on preference
+                const greetings = botMatch.preference === 'Dating' ? [
+                  `Hi there! I'm ${botMatch.botProfile.firstName || botMatch.botProfile.first_name}. I noticed you opened our chat. How's your day going?`,
+                  `Hey! I've been hoping to chat with you. What made you interested in my profile?`,
+                  `Hello! Nice to connect with you. What are you looking for on this app?`
+                ] : [
+                  `Hi there! I'm ${botMatch.botProfile.firstName || botMatch.botProfile.first_name}. Thanks for starting a chat. What's been keeping you busy lately?`,
+                  `Hey! Nice to meet you. I see we both like ${botMatch.botProfile.interests[0] || 'meeting new people'}. What other interests do you have?`,
+                  `Hello! I'm always excited to make new friends. What do you enjoy doing in your free time?`
+                ];
+                
+                const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+                const messageId = uuidv4();
+                const timestamp = new Date().toISOString();
+                
+                // Create message object
+                const messageObject = {
+                  id: messageId,
+                  matchId: matchId,
+                  senderId: botMatch.botProfile.id,
+                  senderName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
+                  message: greeting,
+                  timestamp,
+                  isDelivered: true
+                };
+                
+                // Store message in bot match history
+                botMatch.messages.push({
+                  senderId: botMatch.botProfile.id,
+                  message: greeting,
+                  timestamp
+                });
+                
+                // Send the greeting to the user
+                socket.emit('match:message', messageObject);
+                
+                // Send delivery status
+                socket.emit('match:messageDeliveryStatus', {
+                  messageId: messageId,
+                  matchId: matchId,
+                  deliveryStatus: 'delivered',
+                  deliveredAt: timestamp
+                });
+                
+                // Try to store the message in database
+                try {
+                  const { storeBotMessage } = require('../services/ai/botProfileService');
+                  storeBotMessage(botMatch.botProfile.id, socket.user.id, greeting)
+                    .then(() => console.log(`Stored bot greeting on chat open for match ${matchId}`))
+                    .catch(err => console.error(`Failed to store bot greeting: ${err.message}`));
+                } catch (msgError) {
+                  console.error(`Error storing bot greeting: ${msgError.message}`);
+                }
+              } catch (greetingError) {
+                console.error(`Error generating bot greeting: ${greetingError.message}`);
+              }
+            }, 1000 + Math.random() * 1500); // 1-2.5 second typing delay
+          }, 500 + Math.random() * 1000); // 0.5-1.5 second initial delay
+        } else if (botMatch.messages.length > 0) {
+          // Has previous messages, check if the last one was from the user and needs a response
+          const lastMessage = botMatch.messages[botMatch.messages.length - 1];
+          if (lastMessage && lastMessage.senderId === socket.user.id) {
+            // Last message was from user, bot should respond
+            console.log(`User opened chat with bot ${matchId} and has an unanswered message. Generating response...`);
+            handleBotResponse(matchId, lastMessage.message, socket);
+          }
+        }
+        
+        // Mark bot's messages as read
+        // Find messages from bot that need to be marked as read
+        const botId = botMatch.botProfile.id;
+        const unreadBotMessages = botMatch.messages.filter(msg => 
+          msg.senderId === botId && (!msg.isRead || msg.isRead === false)
+        );
+        
+        if (unreadBotMessages.length > 0) {
+          // Mark messages as read in the bot match data
+          botMatch.messages = botMatch.messages.map(msg => {
+            if (msg.senderId === botId) {
+              return { ...msg, isRead: true };
+            }
+            return msg;
+          });
+          
+          // Update bot match in memory
+          botMatches.set(matchId, botMatch);
+          
+          // Send read receipts to the client for all unread bot messages
+          unreadBotMessages.forEach(msg => {
+            if (msg.id) {
+              socket.emit('match:messageRead', {
+                messageId: msg.id,
+                matchId: matchId,
+                readAt: new Date().toISOString()
+              });
+            }
+          });
+        }
+      } catch (err) {
+        error(`Error in chat:open handler: ${err.message}`);
+        socket.emit('error', {
+          source: 'chat',
+          message: 'Server error processing chat open event'
+        });
+      }
+    });
 
     // Handle match acceptance
     socket.on('match:accept', async (data) => {
@@ -4064,8 +4252,10 @@ module.exports = {
  * @param {string} matchId - Match ID
  * @param {string} userMessage - Message from user
  * @param {object} socket - User's socket
+ * @param {boolean} isRetry - Whether this is a retry attempt
+ * @param {number} retryCount - Number of retry attempts so far
  */
-const handleBotResponse = async (matchId, userMessage, socket) => {
+const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, retryCount = 0) => {
   try {
     // Get bot match data
     const botMatch = botMatches.get(matchId);
@@ -4075,17 +4265,19 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     }
     
     // Log the bot match details
-    console.log(`Processing bot response for match ${matchId} - Bot ID: ${botMatch.botProfile.id}, User ID: ${socket.user.id}`);
+    console.log(`Processing ${isRetry ? 'RETRY ' : ''}bot response for match ${matchId} - Bot ID: ${botMatch.botProfile.id}, User ID: ${socket.user.id}`);
     
     // Import directly here to avoid circular dependencies
     const { generateBotResponse, storeBotMessage, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
     
-    // Add user message to match history
-    botMatch.messages.push({
-      senderId: socket.user.id,
-      message: userMessage,
-      timestamp: new Date().toISOString()
-    });
+    // Add user message to match history if this is not a retry
+    if (!isRetry) {
+      botMatch.messages.push({
+        senderId: socket.user.id,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     // IMPORTANT: Verify and recover bot user before attempting any database operations
     let botVerified = false;
@@ -4099,8 +4291,8 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
       // Even with verification error, continue with the response, but note it in logs
     }
     
-    // Store user's message in database if bot is verified
-    if (botVerified) {
+    // Store user's message in database if bot is verified and this is not a retry
+    if (botVerified && !isRetry) {
       try {
         await storeBotMessage(socket.user.id, botMatch.botProfile.id, userMessage);
         console.log(`Successfully stored user message from ${socket.user.id} to bot ${botMatch.botProfile.id}`);
@@ -4122,128 +4314,215 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     }
     
     // Add a realistic random delay to make the response feel more natural
-    // Longer messages take longer to type
-    const baseTypingDelay = 1000 + Math.floor(Math.random() * 2000); // 1-3 seconds base
-    const characterTypingTime = userMessage.length * 25; // ~25ms per character
-    const maxTypingTime = 7000; // Cap at 7 seconds
+    // Shorter delay for retries
+    const baseTypingDelay = isRetry ? 500 : (1000 + Math.floor(Math.random() * 2000)); // 1-3 seconds base
+    const characterTypingTime = isRetry ? 200 : (userMessage.length * 25); // ~25ms per character
+    const maxTypingTime = isRetry ? 1000 : 7000; // Cap at 7 seconds
     const responseDelay = Math.min(baseTypingDelay + characterTypingTime, maxTypingTime);
     
-    console.log(`Bot will respond in ${responseDelay}ms with a realistic typing delay`);
+    console.log(`Bot will respond in ${responseDelay}ms with a${isRetry ? ' retry' : ''} realistic typing delay`);
     
-    setTimeout(async () => {
-      try {
-        // Generate bot response - pass userId to enable database storage
-        console.log(`Generating AI response to user message: "${userMessage}"`);
-        
-        let botResponse = "";
+    // Set a timeout for the response to ensure it eventually happens
+    let responseTimeout;
+    let isResponseSent = false;
+    
+    // Create a promise to track response completion
+    const responsePromise = new Promise((resolve, reject) => {
+      setTimeout(async () => {
         try {
-          // Try to generate bot response with AI
-          botResponse = await generateBotResponse(
-            userMessage,
-            botMatch.botProfile,
-            botMatch.preference,
-            socket.user.id // Pass user ID for database storage
-          );
-          console.log(`Successfully generated AI response: "${botResponse}"`);
-        } catch (aiError) {
-          console.error(`Failed to generate AI response: ${aiError.message}`);
+          // Generate bot response - pass userId to enable database storage
+          console.log(`Generating AI response to user message: "${userMessage}"`);
           
-          // Fallback response if AI generation fails
-          const fallbackResponses = [
-            "That sounds interesting! Tell me more about yourself.",
-            "I'd like to know more about that. What else do you enjoy?",
-            "I'm curious about your interests. What do you like to do?",
-            "That's fascinating. Have you always been interested in that?",
-            "I've been thinking about trying something new. Any suggestions?",
-            "I really enjoy talking with you. What are your plans for this weekend?",
-            "That's a great point! I hadn't thought of it that way before.",
-            "I've been wanting to try that too! How did you get started with it?",
-            "Your perspective on this is refreshing. I'd love to hear more.",
-            "That reminds me of something similar I experienced recently."
-          ];
-          
-          botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-          console.log(`Using fallback response: "${botResponse}"`);
-          
-          // Manually store the bot response message since generateBotResponse couldn't do it
-          if (botVerified) {
-            try {
-              await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
-              console.log(`Successfully stored fallback bot response in database`);
-            } catch (storageError) {
-              console.error(`Error manually storing bot response: ${storageError.message}`);
+          let botResponse = "";
+          try {
+            // Try to generate bot response with AI
+            botResponse = await generateBotResponse(
+              userMessage,
+              botMatch.botProfile,
+              botMatch.preference,
+              socket.user.id // Pass user ID for database storage
+            );
+            console.log(`Successfully generated AI response: "${botResponse}"`);
+          } catch (aiError) {
+            console.error(`Failed to generate AI response: ${aiError.message}`);
+            
+            // Fallback response if AI generation fails
+            const fallbackResponses = [
+              "That sounds interesting! Tell me more about yourself.",
+              "I'd like to know more about that. What else do you enjoy?",
+              "I'm curious about your interests. What do you like to do?",
+              "That's fascinating. Have you always been interested in that?",
+              "I've been thinking about trying something new. Any suggestions?",
+              "I really enjoy talking with you. What are your plans for this weekend?",
+              "That's a great point! I hadn't thought of it that way before.",
+              "I've been wanting to try that too! How did you get started with it?",
+              "Your perspective on this is refreshing. I'd love to hear more.",
+              "That reminds me of something similar I experienced recently."
+            ];
+            
+            botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+            console.log(`Using fallback response: "${botResponse}"`);
+            
+            // Manually store the bot response message since generateBotResponse couldn't do it
+            if (botVerified) {
+              try {
+                await storeBotMessage(botMatch.botProfile.id, socket.user.id, botResponse);
+                console.log(`Successfully stored fallback bot response in database`);
+              } catch (storageError) {
+                console.error(`Error manually storing bot response: ${storageError.message}`);
+              }
             }
           }
-        }
-        
-        // Remove any "AI-like" phrases from the response
-        botResponse = botResponse
-          .replace(/As an AI|As a bot|As a virtual|I'm an AI|I'm a bot|I'm not a real person|I don't have|I cannot|I'm unable to|I'm here to help|I'm here to assist|I'm designed to|I was created|I was made|I was programmed|How can I assist you|How can I help you/gi, '')
-          .replace(/\s{2,}/g, ' ').trim();
           
-        // If botResponse is empty after filtering, use a fallback
-        if (!botResponse) {
-          botResponse = "I'm curious to know more about you! What do you enjoy doing in your free time?";
+          // Remove any "AI-like" phrases from the response
+          botResponse = botResponse
+            .replace(/As an AI|As a bot|As a virtual|I'm an AI|I'm a bot|I'm not a real person|I don't have|I cannot|I'm unable to|I'm here to help|I'm here to assist|I'm designed to|I was created|I was made|I was programmed|How can I assist you|How can I help you/gi, '')
+            .replace(/\s{2,}/g, ' ').trim();
+            
+          // If botResponse is empty after filtering, use a fallback
+          if (!botResponse) {
+            botResponse = "I'm curious to know more about you! What do you enjoy doing in your free time?";
+          }
+          
+          // Generate a message ID for the bot's response
+          const botMessageId = uuidv4();
+          const timestamp = new Date().toISOString();
+          
+          // Prepare the message object
+          const messageObject = {
+            id: botMessageId,
+            matchId: matchId, // Include matchId for client processing
+            senderId: botMatch.botProfile.id,
+            senderName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
+            message: botResponse,
+            timestamp,
+            isDelivered: true
+          };
+          
+          // Add bot message to match history
+          botMatch.messages.push({
+            senderId: botMatch.botProfile.id,
+            message: botResponse,
+            timestamp,
+            id: botMessageId
+          });
+          
+          // Stop typing indicator before sending the message
+          if (userSocketId) {
+            ioInstance.to(userSocketId).emit('match:typing', {
+              matchId: matchId,
+              senderId: botMatch.botProfile.id,
+              typing: false
+            });
+            
+            // Small delay after typing stops before message appears (realistic)
+            setTimeout(() => {
+              try {
+                // Send bot message directly to user's socket
+                ioInstance.to(userSocketId).emit('match:message', messageObject);
+                console.log(`Successfully sent bot message to user ${botMatch.userId}`);
+                
+                // Also store delivery status information for consistency with real messages
+                ioInstance.to(userSocketId).emit('match:messageDeliveryStatus', {
+                  messageId: botMessageId,
+                  matchId: matchId,
+                  deliveryStatus: 'delivered',
+                  deliveredAt: new Date().toISOString()
+                });
+                
+                // After a short delay, mark the message as read (looks more realistic)
+                setTimeout(() => {
+                  ioInstance.to(userSocketId).emit('match:messageRead', {
+                    messageId: botMessageId,
+                    matchId: matchId,
+                    readAt: new Date().toISOString()
+                  });
+                }, 800 + Math.random() * 1200); // 800-2000ms delay
+                
+                // Mark response as sent
+                isResponseSent = true;
+                
+                // Clear the timeout
+                if (responseTimeout) {
+                  clearTimeout(responseTimeout);
+                }
+                
+                // Resolve the promise
+                resolve(true);
+              } catch (sendError) {
+                console.error(`Error sending bot message: ${sendError.message}`);
+                reject(sendError);
+              }
+            }, 200 + Math.random() * 300); // 200-500ms delay
+          } else {
+            console.error(`User socket ID not found for user ${botMatch.userId}`);
+            reject(new Error('User socket not found'));
+          }
+        } catch (err) {
+          console.error(`Error sending bot response: ${err.message}`);
+          reject(err);
         }
+      }, responseDelay);
+      
+      // Set a timeout to detect if response doesn't get sent
+      responseTimeout = setTimeout(() => {
+        if (!isResponseSent) {
+          console.error(`Bot response timed out for match ${matchId}`);
+          reject(new Error('Bot response timed out'));
+        }
+      }, responseDelay + 15000); // Wait for response delay + 15 seconds
+    });
+    
+    try {
+      await responsePromise;
+    } catch (responseError) {
+      console.error(`Error in bot response promise: ${responseError.message}`);
+      
+      // Retry logic - if response fails and this is not already a retry
+      if (!isRetry && retryCount < 2) {
+        console.log(`Retrying bot response for match ${matchId} (attempt ${retryCount + 1})`);
         
-        // Generate a message ID for the bot's response
-        const botMessageId = uuidv4();
-        const timestamp = new Date().toISOString();
+        // Wait a bit before retrying
+        setTimeout(() => {
+          handleBotResponse(matchId, userMessage, socket, true, retryCount + 1);
+        }, 2000);
+      } else if (isRetry && retryCount >= 2) {
+        console.error(`Max retries reached for bot response in match ${matchId}`);
         
-        // Prepare the message object
-        const messageObject = {
-          id: botMessageId,
-          matchId: matchId, // Include matchId for client processing
-          senderId: botMatch.botProfile.id,
-          senderName: `${botMatch.botProfile.firstName} ${botMatch.botProfile.lastName}`,
-          message: botResponse,
-          timestamp,
-          isDelivered: true
-        };
-        
-        // Add bot message to match history
-        botMatch.messages.push({
-          senderId: botMatch.botProfile.id,
-          message: botResponse,
-          timestamp
-        });
-        
-        // Stop typing indicator before sending the message
+        // Send an emergency message as last resort
         if (userSocketId) {
+          // Stop typing first
           ioInstance.to(userSocketId).emit('match:typing', {
             matchId: matchId,
             senderId: botMatch.botProfile.id,
             typing: false
           });
           
-          // Small delay after typing stops before message appears (realistic)
-          setTimeout(() => {
-            // Send bot message directly to user's socket
-            ioInstance.to(userSocketId).emit('match:message', messageObject);
-            console.log(`Successfully sent bot message to user ${botMatch.userId}`);
-            
-            // Also store delivery status information for consistency with real messages
-            ioInstance.to(userSocketId).emit('match:messageDeliveryStatus', {
-              messageId: botMessageId,
-              matchId: matchId,
-              deliveryStatus: 'delivered',
-              deliveredAt: new Date().toISOString()
-            });
-            
-            // After a short delay, mark the message as read (looks more realistic)
-            setTimeout(() => {
-              ioInstance.to(userSocketId).emit('match:messageRead', {
-                messageId: botMessageId,
-                matchId: matchId,
-                readAt: new Date().toISOString()
-              });
-            }, 800 + Math.random() * 1200); // 800-2000ms delay
-          }, 200 + Math.random() * 300); // 200-500ms delay
+          // Send emergency message
+          const emergencyMessageId = uuidv4();
+          const emergencyMessage = {
+            id: emergencyMessageId,
+            matchId: matchId,
+            senderId: botMatch.botProfile.id,
+            senderName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
+            message: "I'd love to hear more about your interests! What do you enjoy doing in your free time?",
+            timestamp: new Date().toISOString(),
+            isDelivered: true
+          };
+          
+          ioInstance.to(userSocketId).emit('match:message', emergencyMessage);
+          console.log(`Sent emergency fallback message to user ${botMatch.userId}`);
+          
+          // Add to match history
+          botMatch.messages.push({
+            senderId: botMatch.botProfile.id,
+            message: emergencyMessage.message,
+            timestamp: emergencyMessage.timestamp,
+            id: emergencyMessageId
+          });
         }
-      } catch (err) {
-        console.error(`Error sending bot response: ${err.message}`);
       }
-    }, responseDelay);
+    }
   } catch (err) {
     console.error(`Unexpected error in handleBotResponse: ${err.message}`);
   }

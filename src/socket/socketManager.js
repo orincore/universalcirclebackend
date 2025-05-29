@@ -1084,12 +1084,21 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             console.log(`User ${userId} already correctly mapped to socket ID ${socket.id}`);
           }
           
-          // Trigger bot response (use a slight delay to feel more natural)
-          console.log(`Scheduling bot response in 300ms`);
-          setTimeout(() => {
-            console.log(`Calling handleBotResponse for match ${matchId}`);
-            handleBotResponse(matchId, message, socket);
-          }, 300);
+          // Get the bot ID to verify the message is from the user
+          const botMatch = botMatches.get(matchId);
+          const botId = botMatch?.botProfile?.id;
+          
+          // Only trigger bot response if this is a message from the user (not the bot)
+          if (userId !== botId) {
+            console.log(`Message is from user ${userId}, not bot ${botId}. Triggering bot response.`);
+            // Trigger bot response (use a slight delay to feel more natural)
+            setTimeout(() => {
+              console.log(`Calling handleBotResponse for match ${matchId}`);
+              handleBotResponse(matchId, message, socket);
+            }, 300);
+          } else {
+            console.log(`Message is from bot ${botId}, not triggering another bot response.`);
+          }
         }
         
         // Execute callback if provided
@@ -2892,8 +2901,9 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           const lastMessage = botMatch.messages[botMatch.messages.length - 1];
           console.log(`Chat already has ${botMatch.messages.length} messages. Last message from: ${lastMessage?.senderId}`);
           
-          if (lastMessage && lastMessage.senderId === userId) {
-            console.log(`Last message was from user ${userId}. Generating bot response.`);
+          // Instead of checking if the message is from the user, check if it's NOT from the bot
+          if (lastMessage && lastMessage.senderId !== botMatch.botProfile.id) {
+            console.log(`Last message was from user. Generating bot response.`);
             info(`User ${userId} opened chat with unanswered message. Generating bot response.`);
             handleBotResponse(matchId, lastMessage.message, socket);
           } else {
@@ -4349,7 +4359,18 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     
     // Get the user ID from the socket
     const userId = socket.user.id;
-    console.log(`Processing for user ID: ${userId}`);
+    const botId = botMatch.botProfile.id;
+    console.log(`Processing for user ID: ${userId}, Bot ID: ${botId}`);
+    
+    // CRITICAL: Make sure this is actually a user-to-bot message, not bot-to-user
+    // Check the last message in botMatch to verify
+    if (botMatch.messages.length > 0) {
+      const lastMessage = botMatch.messages[botMatch.messages.length - 1];
+      if (lastMessage.senderId === botId) {
+        console.log(`WARNING: Last message was already from bot ${botId}. Not sending another bot response to prevent loops.`);
+        return;
+      }
+    }
     
     // Log the request
     info(`User ${userId} sent message to bot ${botMatch.botProfile.id}: "${userMessage}"`);

@@ -4,8 +4,19 @@ const logger = require('../../utils/logger');
 const { info, error, warn } = logger;
 const supabase = require('../../config/database');
 
+// Conversation history storage
+const botConversationHistory = new Map();
+const MAX_CONVERSATION_HISTORY = 10;
+
 // Initialize Google Generative AI client
 const API_KEY = process.env.GEMINI_API_KEY;
+if (!API_KEY) {
+  console.error('CRITICAL ERROR: GEMINI_API_KEY environment variable is not set!');
+  error('Missing GEMINI_API_KEY environment variable. Bot responses will use fallbacks only.');
+} else {
+  console.log('GEMINI_API_KEY is configured properly');
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Create model with fallback to ensure we don't crash
@@ -1277,12 +1288,6 @@ const generateFallbackBotProfile = async (gender = 'male', preference = 'Friends
   }
 };
 
-// Create a map to store conversation history for bot chats
-const botConversationHistory = new Map();
-
-// Maximum number of messages to keep in history
-const MAX_CONVERSATION_HISTORY = 10;
-
 /**
  * Generate a bot response to a user message with direct Gemini AI integration
  * @param {string} userMessage - User's message
@@ -1417,14 +1422,22 @@ IMPORTANT INSTRUCTIONS:
         };
         
         // Generate response with Gemini using chat mode for more natural conversation
-        const result = await model.generateContent({
-          contents: fullConversation,
-          safetySettings,
-          generationConfig
-        });
-        
-        const response = await result.response;
-        botResponse = response.text().trim();
+        console.log(`Sending request to Gemini AI for user message: "${userMessage.substring(0, 30)}..."`);
+        try {
+          const result = await model.generateContent({
+            contents: fullConversation,
+            safetySettings,
+            generationConfig
+          });
+          
+          const response = await result.response;
+          botResponse = response.text().trim();
+          console.log(`Successfully received response from Gemini AI: "${botResponse.substring(0, 30)}..."`);
+        } catch (geminiError) {
+          console.error(`Gemini API error details:`, geminiError);
+          error(`Failed to generate content from Gemini: ${geminiError.message}`);
+          throw geminiError; // Re-throw to be caught by the outer catch
+        }
         
         // Add bot response to conversation history
         conversationHistory.push({

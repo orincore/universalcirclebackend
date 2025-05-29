@@ -86,9 +86,8 @@ const cleanMatchmakingPool = () => {
 
 /**
  * Find matches for all users in the matchmaking pool
- * @param {boolean} shouldForceBotMatches - Whether to force bot matches for users without matches
  */
-const findMatchesForAllUsers = (shouldForceBotMatches = false) => {
+const findMatchesForAllUsers = () => {
   // Clean up the pool first to ensure all users are valid
   cleanMatchmakingPool();
   
@@ -141,7 +140,7 @@ const findMatchesForAllUsers = (shouldForceBotMatches = false) => {
     }
     
     // Find a match
-    findMatchForUser(socket, false);
+    findMatchForUser(socket);
     
     // Mark as processed
     processedUsers.add(userId);
@@ -159,24 +158,9 @@ const startGlobalMatchmaking = () => {
   
   info('Starting global matchmaking system');
   
-  // Initialize a counter to track iterations
-  let iterationCount = 0;
-  
   matchmakingIntervalId = setInterval(() => {
-    // Increment counter each time matchmaking runs
-    iterationCount++;
-    
-    // Every 12 iterations (approximately every minute), check if we should force bot matches
-    const shouldForceBotMatches = iterationCount >= 12;
-    
-    // Run matchmaking with option to force bot matches
-    findMatchesForAllUsers(shouldForceBotMatches);
-    
-    // Reset counter after forcing bot matches
-    if (shouldForceBotMatches) {
-      info('Running forced bot matches after one minute of matchmaking');
-      iterationCount = 0;
-    }
+    // Run matchmaking for real users
+    findMatchesForAllUsers();
   }, MATCHMAKING_INTERVAL);
   
   // Also start the pool cleanup interval
@@ -959,178 +943,70 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           socket.join(matchId);
         }
         
-        // Check if this is a bot match
-        let isBot = botMatches.has(matchId);
-        let botMatch = null;
-        let recipientId = null;
-        
-        // If not in memory, try to recover from database
-        if (!isBot) {
-          console.log(`Match ${matchId} not found in botMatches Map. Checking database...`);
-          
-          try {
-            // Check if this matchId exists in the matches table with a bot
-            const { data: matchData, error: matchError } = await supabase
-              .from('matches')
-              .select('*')
-              .eq('id', matchId)
-              .single();
-            
-            if (!matchError && matchData) {
-              // Check if one of the users is a bot
-              const user1Id = matchData.user1_id;
-              const user2Id = matchData.user2_id;
-              
-              // See if either user has is_bot=true in the users table
-              const { data: usersData, error: usersError } = await supabase
-                .from('users')
-                .select('id, is_bot, first_name, last_name, username, bio, interests, gender, profile_picture_url, preference')
-                .or(`id.eq.${user1Id},id.eq.${user2Id}`)
-                .eq('is_bot', true);
-              
-              if (!usersError && usersData && usersData.length > 0) {
-                // Found a bot user - this is a bot match
-                const botUser = usersData[0];
-                const botId = botUser.id;
-                
-                console.log(`Recovered bot match! Bot ID: ${botId}`);
-                
-                // Get messages for this match
-                const { data: messagesData } = await supabase
-                  .from('messages')
-                  .select('*')
-                  .or(`and(sender_id.eq.${userId},receiver_id.eq.${botId}),and(sender_id.eq.${botId},receiver_id.eq.${userId})`)
-                  .order('created_at', { ascending: true });
-                
-                // Recreate the bot match object
-                const formattedMessages = messagesData && messagesData.length > 0 ? messagesData.map(msg => ({
-                  senderId: msg.sender_id,
-                  message: msg.content,
-                  timestamp: msg.created_at,
-                  id: msg.id
-                })) : [];
-                
-                // Create a bot profile
-                const botProfile = {
-                  id: botId,
-                  first_name: botUser.first_name,
-                  last_name: botUser.last_name,
-                  firstName: botUser.first_name,
-                  lastName: botUser.last_name,
-                  username: botUser.username,
-                  profile_picture_url: botUser.profile_picture_url,
-                  bio: botUser.bio,
-                  interests: botUser.interests || [],
-                  gender: botUser.gender,
-                  is_bot: true
-                };
-                
-                // Re-create bot match in memory
-                botMatches.set(matchId, {
-                  matchId,
-                  userId,
-                  botProfile,
-                  preference: botUser.preference || 'Friendship',
-                  messages: formattedMessages,
-                  createdAt: matchData.created_at || new Date()
-                });
-                
-                console.log(`Successfully recovered bot match ${matchId} from database!`);
-                console.log(`Restored ${formattedMessages.length} messages`);
-                
-                // Update isBot flag and get botMatch object
-                isBot = true;
-                botMatch = botMatches.get(matchId);
-                recipientId = botId;
-              }
-            }
-          } catch (recoveryError) {
-            console.log(`Error attempting to recover bot match: ${recoveryError.message}`);
-            // Continue with normal match processing
-          }
-        }
-        
-        // Re-check if this is a bot match (either it was already or we recovered it)
-        if (isBot || botMatches.has(matchId)) {
-          isBot = true;
-          if (!botMatch) {
-            botMatch = botMatches.get(matchId);
-          }
-          recipientId = botMatch.botProfile.id;
-          
-          console.log(`This is a bot match ${matchId}`);
-          
-          // Store message in history
-          botMatch.messages.push({
-            senderId: userId,
-            message,
-            timestamp,
-            id: messageId
-          });
-          
-          // Update botMatch with current user ID if needed
-          if (botMatch.userId !== userId) {
-            botMatch.userId = userId;
-          }
-          
-          // Save updated match data
-          botMatches.set(matchId, botMatch);
-        } else if (activeMatches.has(matchId)) {
-          // Regular user match
-          const matchData = activeMatches.get(matchId);
-          recipientId = matchData.users.find(id => id !== userId);
-        } else {
-          throw new Error(`Match ${matchId} not found in activeMatches or botMatches`);
-        }
-        
-        // Save message to database
+        // Get matching information from the database to find the recipient
         try {
-          await supabase
-            .from('messages')
-            .insert({
-              id: messageId,
-              sender_id: userId,
-              receiver_id: recipientId,
-              content: message,
-              is_read: false,
-              created_at: timestamp,
-              updated_at: timestamp
-            });
-        } catch (dbError) {
-          console.log(`Error saving message to database: ${dbError.message}`);
-          // Continue anyway
-        }
-        
-        // Emit message to other users in the room
-        socket.to(matchId).emit('match:message', messageObject);
-        
-        // Send confirmation to sender
-        socket.emit('match:messageSent', {
-          ...messageObject,
-          matchId,
-          deliveryStatus: 'sent'
-        });
-        
-        // Handle bot responses
-        if (isBot && botMatch) {
-          console.log(`Triggering bot response for user ${userId} in match ${matchId}`);
+          // First check if match exists and get the recipient ID
+          const { data: matchData, error: matchError } = await supabase
+            .from('matches')
+            .select('user1_id, user2_id')
+            .eq('id', matchId)
+            .single();
           
-          // Add slight delay
-          setTimeout(() => {
-            handleBotResponse(matchId, message, socket);
-          }, 500);
-        }
-        
-        // Execute callback if provided
-        if (typeof callback === 'function') {
-          callback({ 
-            success: true, 
-            messageId,
-            timestamp
+          if (matchError) {
+            console.error('Error finding match:', matchError);
+            throw new Error(`Match ${matchId} not found`);
+          }
+          
+          // Determine recipient ID
+          const recipientId = matchData.user1_id === userId ? 
+            matchData.user2_id : matchData.user1_id;
+          
+          console.log(`Found valid match ${matchId} between ${userId} and ${recipientId}`);
+          
+          // Save message to database
+          try {
+            await supabase
+              .from('messages')
+              .insert({
+                id: messageId,
+                sender_id: userId,
+                receiver_id: recipientId,
+                content: message,
+                is_read: false,
+                created_at: timestamp,
+                updated_at: timestamp
+              });
+            
+            console.log(`Message ${messageId} saved to database`);
+          } catch (dbError) {
+            console.log(`Error saving message to database: ${dbError.message}`);
+            // Continue anyway to at least deliver the message in real-time
+          }
+          
+          // Emit message to other users in the room
+          socket.to(matchId).emit('match:message', messageObject);
+          
+          // Send confirmation to sender
+          socket.emit('match:messageSent', {
+            ...messageObject,
+            matchId,
+            deliveryStatus: 'sent'
           });
+          
+          // Execute callback if provided
+          if (typeof callback === 'function') {
+            callback({ 
+              success: true, 
+              messageId,
+              timestamp
+            });
+          }
+          
+          console.log(`===== MATCH:MESSAGE COMPLETED =====`);
+        } catch (dbError) {
+          console.log(`Database error in match:message: ${dbError.message}`);
+          throw dbError;
         }
-        
-        console.log(`===== MATCH:MESSAGE COMPLETED =====`);
       } catch (error) {
         console.log(`ERROR in match:message: ${error.message}`);
         socket.emit('error', {
@@ -1278,17 +1154,47 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           return;
         }
         
+        // First check if there are any unread messages
+        const { data: unreadMessages, error: checkError } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('receiver_id', userId)
+          .eq('sender_id', otherUserId)
+          .eq('is_read', false);
+          
+        if (checkError) {
+          console.error('Error checking unread messages:', checkError);
+          socket.emit('error', {
+            source: 'message:markAllRead',
+            message: 'Failed to check unread messages'
+          });
+          return;
+        }
+        
+        // If no unread messages, just return success
+        if (!unreadMessages || unreadMessages.length === 0) {
+          socket.emit('message:allReadConfirmed', {
+            conversationId,
+            messageIds: [],
+            readAt: new Date().toISOString()
+          });
+          return;
+        }
+        
+        // Extract message IDs before updating
+        const messageIds = unreadMessages.map(msg => msg.id);
+        const readAt = new Date().toISOString();
+        
         // Update all unread messages in database
-        const { data: updatedMessages, error } = await supabase
+        const { error } = await supabase
           .from('messages')
           .update({
             is_read: true,
-            updated_at: new Date()
+            updated_at: readAt
           })
           .eq('receiver_id', userId)
           .eq('sender_id', otherUserId)
-          .eq('is_read', false)
-          .select('id');
+          .eq('is_read', false);
           
         if (error) {
           console.error('Error marking all messages as read:', error);
@@ -1299,26 +1205,23 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           return;
         }
         
-        const messageIds = updatedMessages.map(msg => msg.id);
-        
         // Emit read receipt to sender
         const senderSocketId = connectedUsers.get(otherUserId);
         if (senderSocketId && messageIds.length > 0) {
           io.to(senderSocketId).emit('message:allRead', {
             messageIds,
             conversationId,
-            readAt: new Date().toISOString(),
+            readAt,
             readBy: userId
           });
         }
         
         // Confirm to the reader
         socket.emit('message:allReadConfirmed', {
-          count: messageIds.length,
           conversationId,
-          readAt: new Date().toISOString()
+          messageIds,
+          readAt
         });
-          
       } catch (error) {
         console.error('Error in message:markAllRead:', error);
         socket.emit('error', {
@@ -2028,9 +1931,8 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
       try {
         const { messageId } = data;
         
-        // Skip if messageId is not provided or has incorrect format
         if (!messageId) {
-          console.error('Missing messageId in message:read event');
+          console.log('Invalid message ID received');
           return;
         }
         
@@ -2042,16 +1944,33 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         
         // Update message as read in database
         try {
-          const { data: message, error } = await supabase
+          // First check if the message exists and belongs to this receiver
+          const { data: messageExists, error: checkError } = await supabase
+            .from('messages')
+            .select('id, sender_id')
+            .eq('id', messageId)
+            .eq('receiver_id', socket.user.id);
+          
+          if (checkError) {
+            console.error('Error checking message exists:', checkError);
+            return;
+          }
+          
+          // If no message found or not for this user, skip update
+          if (!messageExists || messageExists.length === 0) {
+            console.log(`Message ${messageId} not found for user ${socket.user.id}`);
+            return;
+          }
+
+          // Now update the message without using .single()
+          const { data: updatedMessage, error } = await supabase
             .from('messages')
             .update({
               is_read: true,
               updated_at: new Date()
             })
             .eq('id', messageId)
-            .eq('receiver_id', socket.user.id)
-            .select()
-            .single();
+            .eq('receiver_id', socket.user.id);
           
           if (error) {
             console.error('Error marking message as read:', error);
@@ -2059,11 +1978,11 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           }
           
           // Emit read receipt to sender if online
-          const senderSocketId = connectedUsers.get(message.sender_id);
+          const senderSocketId = connectedUsers.get(messageExists[0].sender_id);
           if (senderSocketId) {
             io.to(senderSocketId).emit('message:read', {
               messageId,
-              readAt: message.updated_at
+              readAt: new Date().toISOString()
             });
           }
         } catch (dbError) {
@@ -3537,10 +3456,10 @@ const createMatchData = (otherUser, sharedInterests, matchId, preference) => {
 
 /**
  * Find a match for a specific user
- * @param {object} socket - User's socket connection
- * @param {boolean} forceBotMatch - Whether to force a bot match if no user match is found
+ * @param {object} socket - User's socket
+ * @returns {Promise<void>}
  */
-const findMatchForUser = async (socket, forceBotMatch = false) => {
+const findMatchForUser = async (socket) => {
   try {
     const userId = socket.user.id;
     

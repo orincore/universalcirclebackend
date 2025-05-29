@@ -241,8 +241,70 @@ const clearMatchmakingTimeouts = (userId) => {
  * @param {object} io - Socket.IO server instance
  */
 const initializeSocket = (io) => {
-  // Store io instance for global access
+  // Store IO instance for global access
   ioInstance = io;
+  
+  // Set up rate limiting for connections
+  io.use((socket, next) => {
+    try {
+      const address = socket.handshake.address;
+      const now = Date.now();
+      
+      // Track connections per IP address
+      if (!connectionRateLimit.has(address)) {
+        connectionRateLimit.set(address, {
+          count: 1,
+          firstConnection: now,
+          lastConnection: now
+        });
+      } else {
+        const rateData = connectionRateLimit.get(address);
+        rateData.count++;
+        rateData.lastConnection = now;
+        
+        // Check rate limit: max 10 connections per minute per IP
+        const timeWindow = 60 * 1000; // 1 minute
+        if (rateData.count > 10 && (now - rateData.firstConnection) < timeWindow) {
+          error(`Rate limit exceeded for ${address}: ${rateData.count} connections in less than a minute`);
+          return next(new Error('Connection rate limit exceeded. Please try again later.'));
+        }
+        
+        // Reset counter if time window has passed
+        if (now - rateData.firstConnection > timeWindow) {
+          rateData.count = 1;
+          rateData.firstConnection = now;
+        }
+        
+        connectionRateLimit.set(address, rateData);
+      }
+      
+      next();
+    } catch (err) {
+      error(`Error in connection limiter: ${err.message}`);
+      next(); // Continue despite error
+    }
+  });
+  
+  // Start the global matchmaking system
+  startGlobalMatchmaking();
+  
+  // Global socket activity middleware to prevent connection staleness
+  io.use((socket, next) => {
+    const originalEmit = socket.emit;
+    
+    // Override the emit method to track activity
+    socket.emit = function() {
+      // Call the original emit method
+      originalEmit.apply(socket, arguments);
+      
+      // Update activity timestamp for any socket communication
+      if (socket.connectionStability) {
+        socket.connectionStability.lastActivityTime = Date.now();
+      }
+    };
+    
+    next();
+  });
   
   // Configure Socket.IO for better performance and reliability with optimal settings
   io.engine.pingTimeout = 60000; // Increased to 60 seconds
@@ -355,27 +417,6 @@ const initializeSocket = (io) => {
       error(`Error in connection limiter: ${err.message}`);
       next(); // Continue despite error
     }
-  });
-  
-  // Start the global matchmaking system
-  startGlobalMatchmaking();
-  
-  // Global socket activity middleware to prevent connection staleness
-  io.use((socket, next) => {
-    const originalEmit = socket.emit;
-    
-    // Override the emit method to track activity
-    socket.emit = function() {
-      // Call the original emit method
-      originalEmit.apply(socket, arguments);
-      
-      // Update activity timestamp for any socket communication
-      if (socket.connectionStability) {
-        socket.connectionStability.lastActivityTime = Date.now();
-      }
-    };
-    
-    next();
   });
   
   // Socket.IO middleware for authentication
@@ -946,6 +987,7 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           if (botMatches.has(matchId)) {
             const botMatch = botMatches.get(matchId);
             recipientId = botMatch.botProfile.id;
+            info(`This is a bot match. Bot ID: ${recipientId}, User ID: ${userId}`);
           } else if (activeMatches.has(matchId)) {
             // Regular user match
             const matchData = activeMatches.get(matchId);
@@ -990,7 +1032,36 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         
         // Check if this is a bot match and handle bot response
         if (botMatches.has(matchId)) {
-          handleBotResponse(matchId, message, socket);
+          info(`Triggering bot response for match ${matchId} from user ${userId} with message: "${message}"`);
+          
+          // Update botMatch data to ensure it has the latest user ID
+          const botMatch = botMatches.get(matchId);
+          if (botMatch.userId !== userId) {
+            info(`Updating bot match ${matchId} user ID from ${botMatch.userId} to ${userId}`);
+            botMatch.userId = userId;
+            botMatches.set(matchId, botMatch);
+          }
+          
+          // Make sure user's socket ID is correctly mapped
+          if (!connectedUsers.has(userId) || connectedUsers.get(userId) !== socket.id) {
+            info(`Updating connectedUsers map for user ${userId} with socket ID ${socket.id}`);
+            connectedUsers.set(userId, socket.id);
+          }
+          
+          // Wait a moment before triggering the bot response (feels more natural)
+          setTimeout(() => {
+            handleBotResponse(matchId, message, socket);
+          }, 500);
+        }
+        
+        // Execute callback if provided
+        if (typeof callback === 'function') {
+          callback({ 
+            success: true, 
+            messageId,
+            timestamp,
+            deliveryStatus: wasDelivered ? 'delivered' : 'sent'
+          });
         }
       } catch (error) {
         error(`Error handling match message: ${error.message}`);
@@ -4202,31 +4273,92 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
       return;
     }
     
+    // Get the user ID from the socket
+    const userId = socket.user.id;
+    
     // Log the bot match details
-    console.log(`Processing ${isRetry ? 'RETRY ' : ''}bot response for match ${matchId} - Bot ID: ${botMatch.botProfile.id}, User ID: ${socket.user.id}`);
+    info(`Processing ${isRetry ? 'RETRY ' : ''}bot response for match ${matchId} - Bot ID: ${botMatch.botProfile.id}, User ID: ${userId}`);
+    
+    // Ensure the bot match has the correct user ID
+    if (botMatch.userId !== userId) {
+      info(`Updating bot match ${matchId} with correct user ID from ${botMatch.userId} to ${userId}`);
+      botMatch.userId = userId;
+      botMatches.set(matchId, botMatch);
+    }
     
     // Import directly here to avoid circular dependencies
     const { generateBotResponse, storeBotMessage, verifyAndRecoverBotUser } = require('../services/ai/botProfileService');
     
+    // Verify bot user exists in database
+    try {
+      await verifyAndRecoverBotUser(botMatch.botProfile);
+      info(`Verified bot ${botMatch.botProfile.id} exists for match ${matchId}`);
+    } catch (verifyError) {
+      error(`Error verifying bot user: ${verifyError.message}. Will try to continue anyway.`);
+      // Continue despite error - the bot might still work in memory
+    }
+    
     // Add user message to match history if this is not a retry
     if (!isRetry) {
-    botMatch.messages.push({
-      senderId: socket.user.id,
-      message: userMessage,
-      timestamp: new Date().toISOString()
-    });
+      botMatch.messages.push({
+        senderId: userId,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+      // Save updated messages
+      botMatches.set(matchId, botMatch);
+    }
+    
+    // Make sure the socket ID mapping is correct
+    if (!connectedUsers.has(userId)) {
+      info(`User ${userId} not found in connectedUsers map. Adding socket ID ${socket.id}`);
+      connectedUsers.set(userId, socket.id);
+    } else if (connectedUsers.get(userId) !== socket.id) {
+      info(`Updating socket ID for user ${userId} from ${connectedUsers.get(userId)} to ${socket.id}`);
+      connectedUsers.set(userId, socket.id);
+    }
+    
+    // Get the socket ID for this user
+    const userSocketId = connectedUsers.get(userId);
+    info(`User socket ID for ${userId}: ${userSocketId}`);
+    
+    if (!userSocketId) {
+      error(`Could not find socket ID for user ${userId}. Falling back to socket.id: ${socket.id}`);
+      // If no socket ID in map, use the current socket ID as fallback
+      connectedUsers.set(userId, socket.id);
+    }
+    
+    // Double-check that we have a valid socket
+    const targetSocketId = userSocketId || socket.id;
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    
+    if (!targetSocket) {
+      error(`Socket ${targetSocketId} not found in io.sockets.sockets map. Will use direct socket object.`);
+      // We'll use socket parameter directly as fallback
     }
     
     // Send typing indicator to user for better UX
-    // FIXED: Use socket.user.id to get the correct socket ID, rather than botMatch.userId
-    const userSocketId = connectedUsers.get(socket.user.id);
-    if (userSocketId) {
-      // Send typing indicator through socket
-      ioInstance.to(userSocketId).emit('match:typing', {
+    try {
+      // Try sending to socket directly first
+      socket.emit('match:typing', {
         matchId: matchId,
         senderId: botMatch.botProfile.id,
         typing: true
       });
+      
+      // Also try with global socket instance if different
+      if (targetSocket && targetSocket.id !== socket.id) {
+        targetSocket.emit('match:typing', {
+          matchId: matchId,
+          senderId: botMatch.botProfile.id,
+          typing: true
+        });
+      }
+      
+      info(`Sent typing indicator to user ${userId} for bot ${botMatch.botProfile.id}`);
+    } catch (typingError) {
+      error(`Error sending typing indicator: ${typingError.message}`);
+      // Continue despite error
     }
     
     // Generate a "thinking time" delay based on message complexity
@@ -4236,16 +4368,16 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     // For retries, use much shorter delays
     const responseDelay = isRetry ? 300 : thinkingDelay;
     
-    console.log(`Bot will respond in ${responseDelay}ms with a${isRetry ? ' retry' : ''} realistic typing delay`);
+    info(`Bot will respond in ${responseDelay}ms with a${isRetry ? ' retry' : ''} realistic typing delay`);
     
     try {
       // Start AI response generation immediately (don't wait for typing animation)
       const botResponsePromise = generateBotResponse(
-            userMessage,
-            botMatch.botProfile,
-            botMatch.preference,
-            socket.user.id // Pass user ID for database storage
-          );
+        userMessage,
+        botMatch.botProfile,
+        botMatch.preference,
+        userId // Pass user ID for database storage
+      );
       
       // Calculate a realistic typing time based on typical human typing speed
       // Average person types 40 WPM, or about 200 characters per minute (3.33 chars/sec)
@@ -4257,7 +4389,9 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
       await new Promise(resolve => setTimeout(resolve, responseDelay));
       
       // Get bot response from AI - will execute in parallel with typing animation
+      info(`Generating AI response for user ${userId} from bot ${botMatch.botProfile.id}`);
       const botResponse = await botResponsePromise;
+      info(`Generated bot response: "${botResponse}"`);
       
       // Calculate actual typing time based on real response length
       const actualTypingTime = Math.min(500 + (botResponse.length * 30), 4000);
@@ -4265,104 +4399,171 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
       // Send typing indicator for the calculated duration
       const typingEndTime = Date.now() + actualTypingTime;
         
-        // Generate a message ID for the bot's response
-        const botMessageId = uuidv4();
-        const timestamp = new Date().toISOString();
+      // Generate a message ID for the bot's response
+      const botMessageId = uuidv4();
+      const timestamp = new Date().toISOString();
         
-        // Prepare the message object
-        const messageObject = {
-          id: botMessageId,
+      // Prepare the message object
+      const messageObject = {
+        id: botMessageId,
         matchId: matchId,
-          senderId: botMatch.botProfile.id,
+        senderId: botMatch.botProfile.id,
         senderName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
-          message: botResponse,
+        message: botResponse,
         timestamp,
         isDelivered: true
-        };
+      };
         
-        // Add bot message to match history
-        botMatch.messages.push({
-          senderId: botMatch.botProfile.id,
-          message: botResponse,
+      // Add bot message to match history
+      botMatch.messages.push({
+        senderId: botMatch.botProfile.id,
+        message: botResponse,
         timestamp,
         id: botMessageId
       });
+      
+      // Save updated messages
+      botMatches.set(matchId, botMatch);
       
       // Wait for typing animation to complete
       const remainingTypingTime = typingEndTime - Date.now();
       if (remainingTypingTime > 0) {
         await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
       }
+      
+      // Stop typing indicator
+      try {
+        // Try multiple ways to ensure the typing indicator stops
+        socket.emit('match:typing', {
+          matchId: matchId,
+          senderId: botMatch.botProfile.id,
+          typing: false
+        });
         
-        // Stop typing indicator before sending the message
-        if (userSocketId) {
-          ioInstance.to(userSocketId).emit('match:typing', {
+        if (targetSocket && targetSocket.id !== socket.id) {
+          targetSocket.emit('match:typing', {
             matchId: matchId,
             senderId: botMatch.botProfile.id,
             typing: false
           });
+        }
         
-        // Small delay after typing stops before message appears (realistic)
-        setTimeout(() => {
-          try {
-          // Send bot message directly to user's socket
-          ioInstance.to(userSocketId).emit('match:message', messageObject);
-          // FIXED: Use socket.user.id for logging
-          console.log(`Successfully sent bot message to user ${socket.user.id}`);
+        if (ioInstance) {
+          ioInstance.to(targetSocketId).emit('match:typing', {
+            matchId: matchId,
+            senderId: botMatch.botProfile.id,
+            typing: false
+          });
+        }
+        
+        info(`Stopped typing indicator for bot ${botMatch.botProfile.id}`);
+      } catch (stopTypingError) {
+        error(`Error stopping typing indicator: ${stopTypingError.message}`);
+        // Continue despite error
+      }
+      
+      // Small delay after typing stops before message appears (realistic)
+      setTimeout(() => {
+        try {
+          // Try multiple ways to ensure the message is delivered
+          info(`Sending bot message to user ${userId} through socket ${targetSocketId}`);
+          
+          // Method 1: Direct socket emit
+          socket.emit('match:message', messageObject);
+          
+          // Method 2: Target socket if different
+          if (targetSocket && targetSocket.id !== socket.id) {
+            targetSocket.emit('match:message', messageObject);
+          }
+          
+          // Method 3: Global io instance
+          if (ioInstance) {
+            ioInstance.to(targetSocketId).emit('match:message', messageObject);
+          }
+          
+          info(`Successfully sent bot message to user ${userId}`);
             
-            // Also store delivery status information for consistency with real messages
-            ioInstance.to(userSocketId).emit('match:messageDeliveryStatus', {
+          // Also store delivery status information for consistency with real messages
+          const deliveryStatusObject = {
+            messageId: botMessageId,
+            matchId: matchId,
+            deliveryStatus: 'delivered',
+            deliveredAt: new Date().toISOString()
+          };
+          
+          // Send delivery status using all methods
+          socket.emit('match:messageDeliveryStatus', deliveryStatusObject);
+          
+          if (targetSocket && targetSocket.id !== socket.id) {
+            targetSocket.emit('match:messageDeliveryStatus', deliveryStatusObject);
+          }
+          
+          if (ioInstance) {
+            ioInstance.to(targetSocketId).emit('match:messageDeliveryStatus', deliveryStatusObject);
+          }
+            
+          // After a short delay, mark the message as read (looks more realistic)
+          setTimeout(() => {
+            const readStatusObject = {
               messageId: botMessageId,
               matchId: matchId,
-              deliveryStatus: 'delivered',
-              deliveredAt: new Date().toISOString()
-            });
+              readAt: new Date().toISOString()
+            };
             
-            // After a short delay, mark the message as read (looks more realistic)
-            setTimeout(() => {
-              ioInstance.to(userSocketId).emit('match:messageRead', {
-                messageId: botMessageId,
-                matchId: matchId,
-                readAt: new Date().toISOString()
-              });
-            }, 800 + Math.random() * 1200); // 800-2000ms delay
+            // Send read status using all methods
+            socket.emit('match:messageRead', readStatusObject);
             
-            // Mark response as sent successfully
-            console.log(`Bot response successfully delivered for match ${matchId}`);
-          } catch (sendError) {
-            console.error(`Error sending bot message: ${sendError.message}`);
-            
-            // Retry if error occurs during sending
-            if (!isRetry && retryCount < 2) {
-              setTimeout(() => {
-                handleBotResponse(matchId, userMessage, socket, true, retryCount + 1);
-              }, 1000);
+            if (targetSocket && targetSocket.id !== socket.id) {
+              targetSocket.emit('match:messageRead', readStatusObject);
             }
+            
+            if (ioInstance) {
+              ioInstance.to(targetSocketId).emit('match:messageRead', readStatusObject);
+            }
+          }, 800 + Math.random() * 1200); // 800-2000ms delay
+            
+          // Mark response as sent successfully
+          info(`Bot response successfully delivered for match ${matchId}`);
+          
+          // Store message in database for persistence
+          try {
+            storeBotMessage(botMatch.botProfile.id, userId, botResponse)
+              .then(() => info(`Successfully stored bot message in database`))
+              .catch(dbError => error(`Failed to store bot message in database: ${dbError.message}`));
+          } catch (storeError) {
+            error(`Error storing bot message: ${storeError.message}`);
+            // Continue despite error
           }
-        }, 200 + Math.random() * 300); // 200-500ms delay
-        } else {
-          // FIXED: Log the correct user ID when socket ID is not found
-          console.error(`User socket ID not found for user ${socket.user.id}`);
-        throw new Error('User socket not found');
-      }
+        } catch (sendError) {
+          error(`Error sending bot message: ${sendError.message}`);
+            
+          // Retry if error occurs during sending
+          if (!isRetry && retryCount < 2) {
+            info(`Will retry sending bot message (attempt ${retryCount + 1})`);
+            setTimeout(() => {
+              handleBotResponse(matchId, userMessage, socket, true, retryCount + 1);
+            }, 1000);
+          }
+        }
+      }, 200 + Math.random() * 300); // 200-500ms delay
     } catch (responseError) {
-      console.error(`Error in bot response: ${responseError.message}`);
+      error(`Error in bot response: ${responseError.message}`);
       
       // Retry logic - if response fails and this is not already a retry
       if (!isRetry && retryCount < 2) {
-        console.log(`Retrying bot response for match ${matchId} (attempt ${retryCount + 1})`);
+        info(`Retrying bot response for match ${matchId} (attempt ${retryCount + 1})`);
         
         // Wait a bit before retrying
         setTimeout(() => {
           handleBotResponse(matchId, userMessage, socket, true, retryCount + 1);
         }, 2000);
       } else if (isRetry && retryCount >= 2) {
-        console.error(`Max retries reached for bot response in match ${matchId}`);
+        error(`Max retries reached for bot response in match ${matchId}`);
         
         // Send an emergency message as last resort
-        if (userSocketId) {
+        try {
           // Stop typing first
-          ioInstance.to(userSocketId).emit('match:typing', {
+          socket.emit('match:typing', {
             matchId: matchId,
             senderId: botMatch.botProfile.id,
             typing: false
@@ -4380,9 +4581,8 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
             isDelivered: true
           };
           
-          ioInstance.to(userSocketId).emit('match:message', emergencyMessage);
-          // FIXED: Use socket.user.id for logging
-          console.log(`Sent emergency fallback message to user ${socket.user.id}`);
+          socket.emit('match:message', emergencyMessage);
+          info(`Sent emergency fallback message to user ${userId}`);
           
           // Add to match history
           botMatch.messages.push({
@@ -4391,11 +4591,16 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
             timestamp: emergencyMessage.timestamp,
             id: emergencyMessageId
           });
+          
+          // Save updated messages
+          botMatches.set(matchId, botMatch);
+        } catch (emergencyError) {
+          error(`Error sending emergency message: ${emergencyError.message}`);
         }
       }
     }
   } catch (err) {
-    console.error(`Unexpected error in handleBotResponse: ${err.message}`);
+    error(`Unexpected error in handleBotResponse: ${err.message}`);
   }
 };
 

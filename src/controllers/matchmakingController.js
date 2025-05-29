@@ -56,6 +56,12 @@ const calculateAge = (dateOfBirth) => {
  * @returns {number} Compatibility score (0 or 100)
  */
 const calculateCompatibility = (user1, user2, criteria) => {
+  // Skip bot users completely (if any still exist in the system)
+  if (user2.is_bot) {
+    console.log(`Skipping bot user ${user2.id}`);
+    return 0;
+  }
+
   // Only check if preferences match (optional)
   if (criteria.preference && criteria.preference !== user2.preference) {
     console.log(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
@@ -265,22 +271,15 @@ const startMatchmaking = async (req, res) => {
       });
     }
 
-    // Add AI-specific criteria
-    const aiCriteria = {
-      ...value,
-      useAI: true, // Flag to use AI-powered matching
-      minCompatibilityScore: value.minCompatibilityScore || 60, // Minimum compatibility score threshold
-    };
-
-    // Add user to waiting queue
+    // Add user to waiting queue with standard criteria
     waitingQueue.set(userId, {
       userId,
       user,
-      criteria: aiCriteria,
+      criteria: value,
       joinedAt: new Date()
     });
     
-    console.log(`Added user ${userId} to AI matchmaking queue. Queue size: ${waitingQueue.size}`);
+    console.log(`Added user ${userId} to matchmaking queue. Queue size: ${waitingQueue.size}`);
     
     // Start queue processing if not already running
     if (!isProcessingQueue) {
@@ -289,10 +288,9 @@ const startMatchmaking = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Added to AI matchmaking queue',
+      message: 'Added to matchmaking queue',
       data: {
-        queuePosition: waitingQueue.size,
-        useAI: true
+        queuePosition: waitingQueue.size
       }
     });
   } catch (error) {
@@ -717,51 +715,6 @@ const getMatchmakingStats = async (req, res) => {
       console.error('Error counting recent matches:', matchCountError);
     }
     
-    // Get AI match statistics
-    const { data: aiMatches, error: aiMatchError } = await supabase
-      .from('matches')
-      .select('compatibility_score')
-      .gte('created_at', oneDayAgo.toISOString())
-      .gt('compatibility_score', 0)
-      .order('compatibility_score', { ascending: false });
-      
-    let aiMatchStats = {
-      count: 0,
-      averageScore: 0,
-      highestScore: 0,
-      scoreDistribution: {
-        low: 0,    // 1-40
-        medium: 0, // 41-70
-        high: 0,   // 71-90
-        perfect: 0 // 91-100
-      }
-    };
-    
-    if (!aiMatchError && aiMatches && aiMatches.length > 0) {
-      aiMatchStats.count = aiMatches.length;
-      
-      // Calculate average score
-      const totalScore = aiMatches.reduce((sum, match) => sum + match.compatibility_score, 0);
-      aiMatchStats.averageScore = Math.round(totalScore / aiMatches.length);
-      
-      // Get highest score
-      aiMatchStats.highestScore = Math.max(...aiMatches.map(match => match.compatibility_score));
-      
-      // Calculate score distribution
-      aiMatches.forEach(match => {
-        const score = match.compatibility_score;
-        if (score >= 91) {
-          aiMatchStats.scoreDistribution.perfect++;
-        } else if (score >= 71) {
-          aiMatchStats.scoreDistribution.high++;
-        } else if (score >= 41) {
-          aiMatchStats.scoreDistribution.medium++;
-        } else {
-          aiMatchStats.scoreDistribution.low++;
-        }
-      });
-    }
-    
     return res.status(200).json({
       success: true,
       data: {
@@ -770,11 +723,10 @@ const getMatchmakingStats = async (req, res) => {
         timeInQueueDistribution: timeInQueueStats,
         topInterests,
         matchesLast24Hours: recentMatchCount || 0,
-        aiMatchingStats: aiMatchStats,
         systemLimits: {
           batchSize: BATCH_SIZE,
           matchLimitPerCycle: MATCH_LIMIT_PER_CYCLE,
-          estimatedCapacity: '10k+ concurrent users with AI matchmaking'
+          estimatedCapacity: '10k+ concurrent users'
         },
         lastProcessingTime: new Date().toISOString()
       }

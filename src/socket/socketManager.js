@@ -31,20 +31,6 @@ const POOL_CLEANUP_INTERVAL = 30000; // Clean the pool every 30 seconds
 let matchmakingIntervalId = null;
 let poolCleanupIntervalId = null;
 
-// Import AI services
-const {
-  generateMessageSuggestions,
-  generateProfileBio,
-  generateIcebreakers,
-  detectConversationMood
-} = require('../services/ai/aiCopilotService');
-
-// Import AI bot profile service
-const { generateBotProfile, generateBotResponse, storeBotMessage, verifyAndRecoverBotUser, createBotUserRecord } = require('../services/ai/botProfileService');
-
-// Track bot matches and their data
-const botMatches = new Map();
-
 /**
  * Clean up the matchmaking pool by removing disconnected users
  */
@@ -113,8 +99,8 @@ const findMatchesForAllUsers = (shouldForceBotMatches = false) => {
     return;
   }
   
-  // For normal (non-forced) matching, require at least 2 users
-  if (poolSize < 2 && !shouldForceBotMatches) {
+  // For normal matching, require at least 2 users
+  if (poolSize < 2) {
     // Only log this once every 12 checks (once per minute) to reduce spam
     // Using a timestamp-based approach to avoid needing to store state
     const now = Date.now();
@@ -124,12 +110,7 @@ const findMatchesForAllUsers = (shouldForceBotMatches = false) => {
     return;
   }
   
-  // If we should force bot matches and have at least one user, log this
-  if (shouldForceBotMatches && poolSize > 0) {
-    info(`Running matchmaking with forced bot matches for ${poolSize} users in pool`);
-  } else {
-    info(`Running global matchmaking for ${poolSize} users in pool`);
-  }
+  info(`Running global matchmaking for ${poolSize} users in pool`);
   
   // Convert the map to array for easier processing
   const usersInPool = Array.from(matchmakingPool.values());
@@ -159,8 +140,8 @@ const findMatchesForAllUsers = (shouldForceBotMatches = false) => {
       continue;
     }
     
-    // Find a match or create a bot match if forced
-    findMatchForUser(socket, shouldForceBotMatches);
+    // Find a match
+    findMatchForUser(socket, false);
     
     // Mark as processed
     processedUsers.add(userId);
@@ -3563,52 +3544,17 @@ const findMatchForUser = async (socket, forceBotMatch = false) => {
   try {
     const userId = socket.user.id;
     
-    // If we're forcing a bot match or there are no suitable users, create a bot match
-    if (forceBotMatch || matchmakingPool.size < 2) {
-      console.log(`Creating bot match for user ${userId} ${forceBotMatch ? '(forced)' : '(no suitable users)'}`);
+    // If there are not enough users, just notify the user and return
+    if (matchmakingPool.size < 2) {
+      console.log(`Not enough users in pool for user ${userId}`);
       
-      try {
-        // Create bot match for user
-        const success = await createBotMatchForUser(socket);
-        
-        if (success) {
-          // Bot match created successfully, remove user from matchmaking pool
-          matchmakingPool.delete(userId);
-          return;
-        }
-        
-        // If bot match creation failed, notify user (only if forcing bot match)
-        if (forceBotMatch) {
-          socket.emit('match:notFound', {
-            message: 'Sorry, no matches found. Please try again later.'
-          });
-          
-          // Remove user from matchmaking pool
-          matchmakingPool.delete(userId);
-          return;
-        }
-        
-        // If not forcing bot match, keep user in pool and wait for human match
-        console.log(`Bot match creation failed, keeping user ${userId} in matchmaking pool`);
-        // Reset processing flag
-        if (matchmakingPool.has(userId)) {
-          const userPoolData = matchmakingPool.get(userId);
-          userPoolData.isBeingProcessed = false;
-          matchmakingPool.set(userId, userPoolData);
-        }
-        return;
-      } catch (botError) {
-        console.error('Error creating bot match:', botError);
-        
-        // Notify user
-        socket.emit('match:notFound', {
-          message: 'Sorry, no matches found. Please try again later.'
-        });
-        
-        // Remove user from matchmaking pool
-        matchmakingPool.delete(userId);
-        return;
-      }
+      socket.emit('match:notFound', {
+        message: 'Sorry, no matches found. Please try again later.'
+      });
+      
+      // Remove user from matchmaking pool
+      matchmakingPool.delete(userId);
+      return;
     }
     
     // Skip if user not in matchmaking pool or is already being processed
@@ -4563,20 +4509,5 @@ module.exports = {
   startGlobalMatchmaking,
   stopGlobalMatchmaking,
   cleanMatchmakingPool,
-  clearMatchmakingTimeouts,
-  clearBotChat: (userId, botId) => {
-    try {
-      // Import function to clear bot conversation history
-      const { clearBotConversationHistory } = require('../services/ai/botProfileService');
-      
-      // Clear the conversation history
-      clearBotConversationHistory(userId, botId);
-      
-      // Return success status
-      return { success: true, message: 'Bot chat history cleared' };
-    } catch (error) {
-      console.error(`Error clearing bot chat: ${error.message}`);
-      return { success: false, error: error.message };
-    }
-  }
+  clearMatchmakingTimeouts
 }; 

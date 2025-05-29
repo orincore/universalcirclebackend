@@ -61,7 +61,6 @@ const gameRoutes = require('./routes/gameRoutes');
 const memeRoutes = require('./routes/memeRoutes');
 const apiKeyRoutes = require('./routes/apiKeyRoutes');
 const adminApiKeyRoutes = require('./routes/adminApiKeyRoutes');
-const botChatRoutes = require('./routes/botChatRoutes');
 
 // Initialize Express app
 const app = express();
@@ -183,7 +182,6 @@ app.use('/api/wheel', wheelRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/memes', memeRoutes);
 app.use('/api/keys', apiKeyRoutes);
-app.use('/api/botchat', botChatRoutes);
 
 // Add route for creating conversation between matched users
 app.post('/api/messages/conversations', authenticate, async (req, res) => {

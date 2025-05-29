@@ -2,12 +2,7 @@ const supabase = require('../config/database');
 const { matchmakingRequestSchema, matchResponseSchema } = require('../models/matchmaking');
 const { validateInterests } = require('../utils/interests');
 const { notifyMatchFound } = require('../socket/socketManager');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const logger = require('../utils/logger');
-
-// Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 // In-memory waiting queue for matchmaking
 // Use a Map for O(1) lookups by userId
@@ -82,109 +77,7 @@ const calculateCompatibility = (user1, user2, criteria) => {
 };
 
 /**
- * Calculate compatibility score between two users using Gemini AI
- * @param {object} user1 - First user
- * @param {object} user2 - Second user
- * @param {object} criteria - Matchmaking criteria
- * @returns {Promise<number>} Compatibility score (0-100)
- */
-const calculateCompatibilityWithAI = async (user1, user2, criteria) => {
-  try {
-    // Basic compatibility check first - for efficiency, filter out obvious non-matches
-    // Only check if preferences match (optional)
-    if (criteria.preference && criteria.preference !== user2.preference) {
-      logger.info(`Preference mismatch: ${criteria.preference} vs ${user2.preference}`);
-      return 0;
-    }
-
-    // Check for at least 1 shared interest - quick filter before calling AI
-    const user1Interests = user1.interests || [];
-    const user2Interests = user2.interests || [];
-    
-    // Use Set for efficient intersection calculation
-    const user1InterestsSet = new Set(user1Interests);
-    const sharedInterests = user2Interests.filter(interest => user1InterestsSet.has(interest));
-    
-    if (sharedInterests.length === 0) {
-      logger.info(`No shared interests between ${user1.id} and ${user2.id}`);
-      return 0;
-    }
-
-    // Create user profiles to send to Gemini
-    const user1Profile = {
-      age: calculateAge(user1.date_of_birth),
-      gender: user1.gender,
-      interests: user1.interests,
-      preference: user1.preference,
-      bio: user1.bio || ''
-    };
-    
-    const user2Profile = {
-      age: calculateAge(user2.date_of_birth),
-      gender: user2.gender,
-      interests: user2.interests,
-      preference: user2.preference,
-      bio: user2.bio || ''
-    };
-    
-    // Prepare prompt for Gemini
-    const prompt = `
-      As a matchmaking AI, analyze the compatibility between these two users.
-      
-      User 1: ${JSON.stringify(user1Profile)}
-      User 2: ${JSON.stringify(user2Profile)}
-      
-      Shared interests: ${sharedInterests.join(', ')}
-      
-      Evaluate their compatibility on a scale of 0-100 based on:
-      1. Shared interests and how they complement each other
-      2. Age proximity and preferences
-      3. Personality compatibility based on their bio text
-      4. Gender and preferences alignment
-      
-      Return only a numeric score between 0-100.
-    `;
-    
-    logger.info(`Requesting compatibility score from Gemini AI for users ${user1.id} and ${user2.id}`);
-    
-    try {
-      // Call Gemini API
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const responseText = response.text();
-      
-      // Parse the compatibility score
-      const score = parseInt(responseText.trim(), 10);
-      
-      // Validate the score is within range
-      if (isNaN(score) || score < 0 || score > 100) {
-        logger.warn(`Invalid score from Gemini API: ${responseText}, defaulting to legacy calculation`);
-        // Fallback to basic scoring
-        return sharedInterests.length > 0 ? 80 : 0;
-      }
-      
-      logger.info(`AI compatibility score between ${user1.id} and ${user2.id}: ${score}`);
-      return score;
-    } catch (aiError) {
-      logger.error(`Gemini AI API error: ${aiError.message}`);
-      // Fallback to basic scoring in case of AI error
-      logger.info('Using fallback scoring method due to AI error');
-      return sharedInterests.length > 0 ? 80 : 0;
-    }
-    
-  } catch (error) {
-    logger.error('Error in compatibility calculation:', error);
-    // Fallback to basic scoring in case of any other error
-    const user1Interests = user1.interests || [];
-    const user2Interests = user2.interests || [];
-    const user1InterestsSet = new Set(user1Interests);
-    const sharedInterests = user2Interests.filter(interest => user1InterestsSet.has(interest));
-    return sharedInterests.length > 0 ? 80 : 0;
-  }
-};
-
-/**
- * Process the matchmaking queue in batches with AI-powered matching
+ * Process the matchmaking queue in batches with simple interest-based matching
  * This helps handle high load situations (10k+ users)
  */
 const processMatchmakingQueue = async () => {
@@ -209,114 +102,114 @@ const processMatchmakingQueue = async () => {
       
       const user = queueEntries[i];
       
-      // Find all potential matches and calculate AI compatibility scores
+      // Find all potential matches and calculate compatibility scores
       const potentialMatchesWithScores = [];
       
-      // First batch processing to filter candidates
-      const candidates = queueEntries.filter((entry, index) => {
+      // Calculate compatibility with all other users in queue
+      for (let j = 0; j < queueEntries.length; j++) {
         // Don't match with self or already processed entries
-        if (entry.userId === user.userId || index <= i) {
-          return false;
+        if (i === j || !waitingQueue.has(queueEntries[j].userId)) {
+          continue;
         }
         
-        // Don't consider users who have been matched already
-        if (!waitingQueue.has(entry.userId)) {
-          return false;
+        const candidate = queueEntries[j];
+        
+        // Calculate compatibility score
+        const score = calculateCompatibility(user.user, candidate.user, user.criteria);
+        
+        // Only consider good matches (score > 0)
+        if (score > 0) {
+          potentialMatchesWithScores.push({ candidate, score });
         }
-        
-        // Quick pre-filter for basic compatibility before AI processing
-        const user1Interests = user.user.interests || [];
-        const user2Interests = entry.user.interests || [];
-        const user1InterestsSet = new Set(user1Interests);
-        const sharedInterests = user2Interests.filter(interest => user1InterestsSet.has(interest));
-        
-        return sharedInterests.length > 0;
-      });
-      
-      // Process candidates in parallel with rate limiting
-      const MAX_PARALLEL_REQUESTS = 5;
-      for (let j = 0; j < candidates.length; j += MAX_PARALLEL_REQUESTS) {
-        const batch = candidates.slice(j, j + MAX_PARALLEL_REQUESTS);
-        const scorePromises = batch.map(async (candidate) => {
-          try {
-            const score = await calculateCompatibilityWithAI(user.user, candidate.user, user.criteria);
-            if (score > 60) { // Set minimum threshold for a good match
-              return { candidate, score };
-            }
-            return null;
-          } catch (error) {
-            console.error(`Error calculating score for ${user.userId} and ${candidate.userId}:`, error);
-            return null;
-          }
-        });
-        
-        const results = await Promise.all(scorePromises);
-        results.forEach(result => {
-          if (result) {
-            potentialMatchesWithScores.push(result);
-          }
-        });
       }
       
-      // Sort by compatibility score (highest first)
+      // Sort by score (higher is better)
       potentialMatchesWithScores.sort((a, b) => b.score - a.score);
       
-      // If matches found, create the best match
-      if (potentialMatchesWithScores.length > 0) {
-        const bestMatch = potentialMatchesWithScores[0];
+      // Try to create matches with the highest scoring candidates
+      for (const { candidate, score } of potentialMatchesWithScores) {
+        // Check if both users are still available
+        if (!waitingQueue.has(user.userId) || !waitingQueue.has(candidate.userId)) {
+          continue;
+        }
+        
+        // Generate match ID
+        const matchId = `match_${generateMatchId()}`;
         
         try {
-          // Create match in database
-          const { data: newMatch, error: matchError } = await supabase
-            .from('matches')
-            .insert({
-              user1_id: user.userId,
-              user2_id: bestMatch.candidate.userId,
-              status: 'pending',
-              compatibility_score: bestMatch.score,
-              created_at: new Date(),
-              updated_at: new Date()
-            })
-            .select()
-            .single();
-            
+          // Create match record
+          const { error: matchError } = await createMatchRecord(
+            matchId, 
+            user.userId, 
+            candidate.userId, 
+            score
+          );
+          
           if (matchError) {
-            console.error('Error creating match:', matchError);
-            continue;
+            console.error(`Error creating match record: ${matchError.message}`);
+            continue; // Try next candidate
           }
           
-          // Remove both users from waiting queue
+          // Remove both users from queue
           waitingQueue.delete(user.userId);
-          waitingQueue.delete(bestMatch.candidate.userId);
+          waitingQueue.delete(candidate.userId);
           
           // Notify both users
-          await notifyMatchFound(newMatch, user.user, bestMatch.candidate.user);
+          notifyMatchFound(user.userId, matchId, candidate.user);
+          notifyMatchFound(candidate.userId, matchId, user.user);
           
+          console.log(`Created match ${matchId} between users ${user.userId} and ${candidate.userId} with score ${score}`);
+          
+          // Track stats
           matchesCreated++;
-          console.log(`AI Match created between ${user.userId} and ${bestMatch.candidate.userId} with score ${bestMatch.score}`);
+          break; // Successfully matched this user, move to next
         } catch (error) {
-          console.error('Error during match creation:', error);
+          console.error(`Error while creating match: ${error.message}`);
         }
       }
       
-      // If we've reached our batch limit, break to prevent timeout
+      // Check if we've reached match limit for this cycle
       if (matchesCreated >= MATCH_LIMIT_PER_CYCLE) {
         console.log(`Reached match limit of ${MATCH_LIMIT_PER_CYCLE} for this cycle`);
         break;
       }
     }
     
-    console.log(`Completed processing cycle. Created ${matchesCreated} matches. ${waitingQueue.size} users still waiting.`);
+    console.log(`Matchmaking cycle completed. Created ${matchesCreated} matches. ${waitingQueue.size} users still waiting.`);
   } catch (error) {
-    console.error('Error processing matchmaking queue:', error);
+    console.error('Error in matchmaking process:', error);
   } finally {
     isProcessingQueue = false;
-    
-    // If there are still users waiting, schedule another processing cycle
-    if (waitingQueue.size > 0) {
-      setTimeout(processMatchmakingQueue, 1000); // Process again in 1 second
-    }
   }
+};
+
+/**
+ * Generate a unique match ID
+ * @returns {string} Unique match ID
+ */
+const generateMatchId = () => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
+/**
+ * Create a match record in the database
+ * @param {string} matchId - Match ID
+ * @param {string} user1Id - First user ID
+ * @param {string} user2Id - Second user ID
+ * @param {number} score - Compatibility score
+ */
+const createMatchRecord = async (matchId, user1Id, user2Id, score) => {
+  return await supabase
+    .from('matches')
+    .insert({
+      id: matchId,
+      user1_id: user1Id,
+      user2_id: user2Id,
+      status: 'pending',
+      compatibility_score: score,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
 };
 
 /**
@@ -901,5 +794,5 @@ module.exports = {
   respondToMatch,
   getPendingMatches,
   getMatchmakingStats,
-  calculateCompatibilityWithAI  // Export for testing
+  calculateCompatibility
 }; 

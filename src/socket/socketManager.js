@@ -2047,30 +2047,46 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
       try {
         const { messageId } = data;
         
-        // Update message as read in database
-        const { data: message, error } = await supabase
-          .from('messages')
-          .update({
-            is_read: true,
-            updated_at: new Date()
-          })
-          .eq('id', messageId)
-          .eq('receiver_id', socket.user.id)
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('Error marking message as read:', error);
+        // Skip if messageId is not provided or has incorrect format
+        if (!messageId) {
+          console.error('Missing messageId in message:read event');
           return;
         }
         
-        // Emit read receipt to sender if online
-        const senderSocketId = connectedUsers.get(message.sender_id);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('message:read', {
-            messageId,
-            readAt: message.updated_at
-          });
+        // Check if messageId is a non-UUID format (like bot_msg_TIMESTAMP)
+        if (typeof messageId === 'string' && messageId.startsWith('bot_msg_')) {
+          console.log(`Skipping read receipt for non-UUID format message ID: ${messageId}`);
+          return; // Skip database update for non-UUID format IDs
+        }
+        
+        // Update message as read in database
+        try {
+          const { data: message, error } = await supabase
+            .from('messages')
+            .update({
+              is_read: true,
+              updated_at: new Date()
+            })
+            .eq('id', messageId)
+            .eq('receiver_id', socket.user.id)
+            .select()
+            .single();
+          
+          if (error) {
+            console.error('Error marking message as read:', error);
+            return;
+          }
+          
+          // Emit read receipt to sender if online
+          const senderSocketId = connectedUsers.get(message.sender_id);
+          if (senderSocketId) {
+            io.to(senderSocketId).emit('message:read', {
+              messageId,
+              readAt: message.updated_at
+            });
+          }
+        } catch (dbError) {
+          console.error(`Database error in message:read: ${dbError.message}`);
         }
       } catch (error) {
         console.error('Message read error:', error);

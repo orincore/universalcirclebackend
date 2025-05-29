@@ -942,12 +942,18 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
     
     // Handle messages in match rooms
     socket.on('match:message', async (data, callback) => {
+      console.log(`===== MATCH:MESSAGE EVENT DEBUG =====`);
+      console.log(`Received match:message event with data: ${JSON.stringify(data)}`);
+      console.log(`Socket ID: ${socket.id}`);
+      console.log(`User ID: ${socket.user?.id || 'MISSING'}`);
+      
       try {
         const { matchId, message } = data;
         const userId = socket.user.id;
         
         if (!matchId || !message) {
           const error = { message: 'Match ID and message content are required' };
+          console.log(`ERROR: Missing required data - matchId: ${matchId}, message: ${!!message}`);
           socket.emit('error', { source: 'match:message', ...error });
           if (typeof callback === 'function') callback({ success: false, error });
           return;
@@ -966,17 +972,24 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           timestamp
         };
         
+        console.log(`Created message object with ID ${messageId}`);
+        
         // Check if socket is in the room
         if (!socket.rooms.has(matchId)) {
           // Auto-join the room if not already in it
+          console.log(`User ${userId} not in match room ${matchId}, auto-joining`);
           socket.join(matchId);
           info(`User ${userId} auto-joined match room ${matchId}`);
+        } else {
+          console.log(`User ${userId} already in match room ${matchId}`);
         }
         
         // Get room members count for delivery status
         const room = io.sockets.adapter.rooms.get(matchId);
         const roomSize = room ? room.size : 1; // Count includes the sender
         const wasDelivered = roomSize > 1; // Delivered if more than just the sender
+        
+        console.log(`Room ${matchId} has ${roomSize} members. Message delivery status: ${wasDelivered ? 'delivered' : 'sent'}`);
         
         // Check if this is a bot match
         const isBot = botMatches.has(matchId);
@@ -985,7 +998,7 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         if (isBot) {
           const botMatch = botMatches.get(matchId);
           recipientId = botMatch.botProfile.id;
-          info(`This is a bot match. Bot ID: ${recipientId}, User ID: ${userId}`);
+          console.log(`This is a bot match. Bot ID: ${recipientId}, User ID: ${userId}`);
           
           // Store user message in bot match history
           botMatch.messages.push({
@@ -994,25 +1007,31 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             timestamp: timestamp,
             id: messageId
           });
+          console.log(`Added user message to bot match history. Total messages: ${botMatch.messages.length}`);
           
           // Update botMatch with correct user ID
           if (botMatch.userId !== userId) {
-            info(`Updating bot match ${matchId} user ID from ${botMatch.userId} to ${userId}`);
+            console.log(`Updating bot match ${matchId} user ID from ${botMatch.userId} to ${userId}`);
             botMatch.userId = userId;
           }
           
           // Save updated match data
           botMatches.set(matchId, botMatch);
+          console.log(`Updated botMatches map with latest message data`);
         } else if (activeMatches.has(matchId)) {
           // Regular user match
           const matchData = activeMatches.get(matchId);
           recipientId = matchData.users.find(id => id !== userId);
+          console.log(`This is a regular match. Recipient ID: ${recipientId}`);
         } else {
-          throw new Error(`Match ${matchId} not found in activeMatches or botMatches`);
+          const errMsg = `Match ${matchId} not found in activeMatches or botMatches`;
+          console.log(`ERROR: ${errMsg}`);
+          throw new Error(errMsg);
         }
         
         // Save message to database
         try {
+          console.log(`Saving message to database...`);
           // Insert message into database
           const { data: savedMessage, error: dbError } = await supabase
             .from('messages')
@@ -1027,19 +1046,24 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             });
           
           if (dbError) {
+            console.log(`ERROR saving message to database: ${dbError.message}`);
             throw new Error(`Database error: ${dbError.message}`);
           }
           
+          console.log(`Successfully saved message from ${userId} to ${recipientId} in database`);
           info(`Saved message from ${userId} to ${recipientId} in database`);
         } catch (dbError) {
+          console.log(`ERROR saving message to database: ${dbError.message}`);
           error(`Error saving message to database: ${dbError.message}`);
           // Don't fail the operation, continue sending the message
         }
         
         // Emit the message to the match room
+        console.log(`Emitting message to other users in room ${matchId}`);
         socket.to(matchId).emit('match:message', messageObject);
         
         // Send confirmation to sender with delivery info
+        console.log(`Sending confirmation to sender with delivery status: ${wasDelivered ? 'delivered' : 'sent'}`);
         socket.emit('match:messageSent', {
           ...messageObject,
           matchId,
@@ -1049,22 +1073,28 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         
         // If this is a bot match, trigger the bot response
         if (isBot) {
-          info(`Triggering bot response for match ${matchId} from user ${userId}`);
+          console.log(`Preparing to trigger bot response for match ${matchId}`);
           
           // Make sure user's socket ID is correctly mapped
           if (!connectedUsers.has(userId) || connectedUsers.get(userId) !== socket.id) {
+            console.log(`Updating connectedUsers map for user ${userId} with socket ID ${socket.id}`);
             info(`Updating connectedUsers map for user ${userId} with socket ID ${socket.id}`);
             connectedUsers.set(userId, socket.id);
+          } else {
+            console.log(`User ${userId} already correctly mapped to socket ID ${socket.id}`);
           }
           
           // Trigger bot response (use a slight delay to feel more natural)
+          console.log(`Scheduling bot response in 300ms`);
           setTimeout(() => {
+            console.log(`Calling handleBotResponse for match ${matchId}`);
             handleBotResponse(matchId, message, socket);
           }, 300);
         }
         
         // Execute callback if provided
         if (typeof callback === 'function') {
+          console.log(`Executing callback with success status`);
           callback({ 
             success: true, 
             messageId,
@@ -1072,7 +1102,11 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             deliveryStatus: wasDelivered ? 'delivered' : 'sent'
           });
         }
+        
+        console.log(`===== MATCH:MESSAGE EVENT COMPLETED =====`);
       } catch (error) {
+        console.log(`CRITICAL ERROR in match:message handler: ${error.message}`);
+        console.log(`Stack trace: ${error.stack}`);
         error(`Error handling match message: ${error.message}`);
         socket.emit('error', {
           source: 'match:message',
@@ -2698,8 +2732,14 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
     
     // Handle chat opened event - sends a bot message when user opens a chat
     socket.on('chat:open', (data) => {
+      console.log(`===== CHAT:OPEN EVENT DEBUG =====`);
+      console.log(`Received chat:open event with data: ${JSON.stringify(data)}`);
+      console.log(`Socket ID: ${socket.id}`);
+      console.log(`User ID: ${socket.user?.id || 'MISSING'}`);
+      
       try {
         if (!socket.user) {
+          console.log(`ERROR: User not authenticated`);
           socket.emit('error', { source: 'chat', message: 'Not authenticated' });
           return;
         }
@@ -2707,49 +2747,67 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         const { matchId } = data;
         
         if (!matchId) {
+          console.log(`ERROR: Missing match ID in chat:open event`);
           socket.emit('error', { source: 'chat', message: 'Match ID is required' });
           return;
         }
         
         const userId = socket.user.id;
+        console.log(`Processing chat:open for user ${userId} and match ${matchId}`);
         
         // Check if this is a bot match
         if (!botMatches.has(matchId)) {
+          console.log(`This is NOT a bot match, just joining room silently`);
           // Not a bot match, just join the room silently
           if (!socket.rooms.has(matchId)) {
             socket.join(matchId);
+            console.log(`User ${userId} joined match room ${matchId} via chat:open`);
             info(`User ${userId} joined match room ${matchId} via chat:open`);
+          } else {
+            console.log(`User ${userId} already in match room ${matchId}`);
           }
           return;
         }
         
         // Get bot match data
         const botMatch = botMatches.get(matchId);
+        console.log(`This IS a bot match. Bot ID: ${botMatch.botProfile.id}, Current user ID in match: ${botMatch.userId}`);
         
         // Update the bot match with the current user ID
         if (botMatch.userId !== userId) {
+          console.log(`Updating bot match ${matchId} user ID from ${botMatch.userId} to ${userId}`);
           info(`Updating bot match ${matchId} user ID from ${botMatch.userId} to ${userId}`);
           botMatch.userId = userId;
           botMatches.set(matchId, botMatch);
+        } else {
+          console.log(`Bot match already has correct user ID: ${userId}`);
         }
         
         // Join the match room if not already in it
         if (!socket.rooms.has(matchId)) {
           socket.join(matchId);
+          console.log(`User ${userId} joined bot match room ${matchId} via chat:open`);
           info(`User ${userId} joined bot match room ${matchId} via chat:open`);
+        } else {
+          console.log(`User ${userId} already in bot match room ${matchId}`);
         }
         
         // Update the connected users map
         if (!connectedUsers.has(userId) || connectedUsers.get(userId) !== socket.id) {
+          console.log(`Updating connectedUsers map for user ${userId} with socket ID ${socket.id}`);
           info(`Updating connectedUsers map for user ${userId} with socket ID ${socket.id}`);
           connectedUsers.set(userId, socket.id);
+        } else {
+          console.log(`User ${userId} already correctly mapped to socket ID ${socket.id}`);
         }
         
         // Send a welcome message if this is the first interaction
         if (botMatch.messages.length === 0) {
+          console.log(`First interaction with bot ${botMatch.botProfile.id}. Sending welcome message.`);
           info(`First interaction with bot ${botMatch.botProfile.id}. Sending welcome message.`);
           
           // Show typing indicator
+          console.log(`Sending typing indicator for welcome message`);
           socket.emit('match:typing', {
             matchId: matchId,
             senderId: botMatch.botProfile.id,
@@ -2757,6 +2815,7 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
           });
           
           // Wait a moment before sending the welcome message
+          console.log(`Scheduling welcome message delivery in 1 second`);
           setTimeout(() => {
             // Generate an appropriate greeting
             const greetings = [
@@ -2769,7 +2828,10 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             const messageId = uuidv4();
             const timestamp = new Date().toISOString();
             
+            console.log(`Selected greeting: "${greeting}"`);
+            
             // Stop typing
+            console.log(`Stopping typing indicator`);
             socket.emit('match:typing', {
               matchId: matchId,
               senderId: botMatch.botProfile.id,
@@ -2788,7 +2850,9 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
             };
             
             // Send the message
+            console.log(`Sending welcome message to socket ${socket.id}`);
             socket.emit('match:message', messageObject);
+            console.log(`Sent welcome message: ${JSON.stringify(messageObject)}`);
             info(`Sent welcome message to user ${userId}: "${greeting}"`);
             
             // Add to match history
@@ -2798,17 +2862,27 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
               timestamp,
               id: messageId
             });
+            console.log(`Added welcome message to bot match history. Total messages: ${botMatch.messages.length}`);
             
             // Save updated match data
             botMatches.set(matchId, botMatch);
+            console.log(`Updated botMatches map with welcome message`);
             
             // Also store in database
             try {
+              console.log(`Saving welcome message to database`);
               const { storeBotMessage } = require('../services/ai/botProfileService');
               storeBotMessage(botMatch.botProfile.id, userId, greeting)
-                .then(() => info(`Stored bot welcome message in database`))
-                .catch(dbError => error(`Failed to store bot welcome message: ${dbError.message}`));
+                .then(() => {
+                  console.log(`Successfully stored bot welcome message in database`);
+                  info(`Stored bot welcome message in database`);
+                })
+                .catch(dbError => {
+                  console.log(`ERROR storing bot welcome message: ${dbError.message}`);
+                  error(`Failed to store bot welcome message: ${dbError.message}`);
+                });
             } catch (storeError) {
+              console.log(`ERROR importing or calling storeBotMessage: ${storeError.message}`);
               error(`Error storing bot welcome message: ${storeError.message}`);
             }
           }, 1000);
@@ -2816,15 +2890,22 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         // If there are previous messages and the last one was from the user, generate a response
         else if (botMatch.messages.length > 0) {
           const lastMessage = botMatch.messages[botMatch.messages.length - 1];
+          console.log(`Chat already has ${botMatch.messages.length} messages. Last message from: ${lastMessage?.senderId}`);
           
           if (lastMessage && lastMessage.senderId === userId) {
+            console.log(`Last message was from user ${userId}. Generating bot response.`);
             info(`User ${userId} opened chat with unanswered message. Generating bot response.`);
             handleBotResponse(matchId, lastMessage.message, socket);
           } else {
+            console.log(`Last message was from bot. No response needed.`);
             info(`User ${userId} opened chat but last message was from bot. No response needed.`);
           }
         }
+        
+        console.log(`===== CHAT:OPEN EVENT COMPLETED =====`);
       } catch (err) {
+        console.log(`CRITICAL ERROR in chat:open handler: ${err.message}`);
+        console.log(`Stack trace: ${err.stack}`);
         error(`Error in chat:open handler: ${err.message}`);
         socket.emit('error', {
           source: 'chat',
@@ -4240,31 +4321,53 @@ const cleanupUserMatches = (userId) => {
  * @param {number} retryCount - Number of retry attempts so far
  */
 const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, retryCount = 0) => {
+  console.log(`===== BOT RESPONSE DEBUG =====`);
+  console.log(`Starting handleBotResponse for matchId: ${matchId}`);
+  console.log(`User message: "${userMessage}"`);
+  console.log(`Socket ID: ${socket.id}`);
+  console.log(`Socket user ID: ${socket.user?.id || 'MISSING'}`);
+  console.log(`Is retry: ${isRetry}, Retry count: ${retryCount}`);
+  
   try {
     // Get bot match data
     const botMatch = botMatches.get(matchId);
     if (!botMatch) {
       error(`Bot match ${matchId} not found`);
+      console.log(`ERROR: Bot match ${matchId} not found in botMatches map`);
+      // List all matches for debugging
+      console.log(`Available bot matches: ${Array.from(botMatches.keys()).join(', ')}`);
       return;
     }
     
+    console.log(`Found bot match data: ${JSON.stringify({
+      matchId: botMatch.matchId,
+      userId: botMatch.userId,
+      botId: botMatch.botProfile.id,
+      botName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
+      messageCount: botMatch.messages.length
+    })}`);
+    
     // Get the user ID from the socket
     const userId = socket.user.id;
+    console.log(`Processing for user ID: ${userId}`);
     
     // Log the request
     info(`User ${userId} sent message to bot ${botMatch.botProfile.id}: "${userMessage}"`);
     
     // Update the botMatch userId if needed
     if (botMatch.userId !== userId) {
+      console.log(`MISMATCH: Bot match user ID (${botMatch.userId}) doesn't match socket user ID (${userId}). Updating.`);
       botMatch.userId = userId;
       botMatches.set(matchId, botMatch);
       info(`Updated bot match ${matchId} with user ID: ${userId}`);
     }
     
     // Import required functions
+    console.log(`Importing AI service functions`);
     const { generateBotResponse } = require('../services/ai/botProfileService');
     
     // Send typing indicator
+    console.log(`Sending typing indicator to user`);
     socket.emit('match:typing', {
       matchId: matchId,
       senderId: botMatch.botProfile.id,
@@ -4272,7 +4375,7 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     });
     
     // STEP 1: SEND MESSAGE TO GEMINI AI AND GET RESPONSE
-    info(`Sending message to Gemini AI: "${userMessage}"`);
+    console.log(`STEP 1: Sending message to Gemini AI: "${userMessage}"`);
     let botResponse;
     try {
       botResponse = await generateBotResponse(
@@ -4281,24 +4384,29 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
         botMatch.preference,
         userId
       );
+      console.log(`Successfully received response from Gemini AI: "${botResponse}"`);
       info(`Received response from Gemini AI: "${botResponse}"`);
     } catch (aiError) {
+      console.log(`ERROR getting response from Gemini AI: ${aiError.message}`);
       error(`Error getting response from Gemini AI: ${aiError.message}`);
       botResponse = "I'm sorry, I couldn't process that. Could you try asking something else?";
     }
     
     // Wait a moment to simulate thinking time (500-1500ms based on message length)
     const thinkingTime = Math.min(500 + userMessage.length * 10, 1500);
+    console.log(`Waiting ${thinkingTime}ms for thinking time`);
     await new Promise(resolve => setTimeout(resolve, thinkingTime));
     
     // STEP 2: SIMULATE TYPING
     const messageLength = botResponse.length;
     const typingTime = Math.min(500 + messageLength * 25, 3000); // ~25ms per character, max 3 seconds
     
+    console.log(`STEP 2: Simulating typing for ${typingTime}ms (message length: ${messageLength})`);
     // Wait for typing time
     await new Promise(resolve => setTimeout(resolve, typingTime));
     
     // Stop typing indicator
+    console.log(`Stopping typing indicator`);
     socket.emit('match:typing', {
       matchId: matchId,
       senderId: botMatch.botProfile.id,
@@ -4306,6 +4414,7 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     });
     
     // STEP 3: SEND BOT RESPONSE TO USER
+    console.log(`STEP 3: Preparing to send bot response to user`);
     // Generate a message ID
     const botMessageId = uuidv4();
     const timestamp = new Date().toISOString();
@@ -4322,10 +4431,13 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     };
     
     // Send the message
+    console.log(`Emitting match:message event to socket ${socket.id}`);
     socket.emit('match:message', messageObject);
+    console.log(`Message object sent: ${JSON.stringify(messageObject)}`);
     info(`Sent bot response to user ${userId}: "${botResponse}"`);
     
     // Add bot message to match history
+    console.log(`Adding message to bot match history`);
     botMatch.messages.push({
       senderId: botMatch.botProfile.id,
       message: botResponse,
@@ -4334,9 +4446,11 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     });
     
     // Save updated messages
+    console.log(`Saving updated match data with ${botMatch.messages.length} messages`);
     botMatches.set(matchId, botMatch);
     
     // Also send delivery status
+    console.log(`Sending delivery status`);
     socket.emit('match:messageDeliveryStatus', {
       messageId: botMessageId,
       matchId: matchId,
@@ -4345,32 +4459,49 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     });
     
     // After a short delay, mark as read
+    console.log(`Scheduling read receipt in 1 second`);
     setTimeout(() => {
       socket.emit('match:messageRead', {
         messageId: botMessageId,
         matchId: matchId,
         readAt: new Date().toISOString()
       });
+      console.log(`Sent read receipt for message ${botMessageId}`);
     }, 1000);
     
     // STEP 4: SAVE TO DATABASE FOR PERSISTENCE
+    console.log(`STEP 4: Saving message to database`);
     try {
       const { storeBotMessage } = require('../services/ai/botProfileService');
       storeBotMessage(botMatch.botProfile.id, userId, botResponse)
-        .then(() => info(`Stored bot message in database`))
-        .catch(dbError => error(`Failed to store bot message in database: ${dbError.message}`));
+        .then(() => {
+          console.log(`Successfully stored bot message in database`);
+          info(`Stored bot message in database`);
+        })
+        .catch(dbError => {
+          console.log(`ERROR storing bot message in database: ${dbError.message}`);
+          error(`Failed to store bot message in database: ${dbError.message}`);
+        });
     } catch (storeError) {
+      console.log(`ERROR importing or calling storeBotMessage: ${storeError.message}`);
       error(`Error storing bot message: ${storeError.message}`);
     }
+    
+    console.log(`===== BOT RESPONSE COMPLETE =====`);
   } catch (err) {
+    console.log(`CRITICAL ERROR in handleBotResponse: ${err.message}`);
+    console.log(`Stack trace: ${err.stack}`);
     error(`Error in handleBotResponse: ${err.message}`);
     
     // Simple retry logic
     if (!isRetry && retryCount < 2) {
+      console.log(`Will retry bot response for match ${matchId} in 1 second (attempt ${retryCount + 1})`);
       info(`Retrying bot response for match ${matchId}`);
       setTimeout(() => {
         handleBotResponse(matchId, userMessage, socket, true, retryCount + 1);
       }, 1000);
+    } else {
+      console.log(`Maximum retry attempts reached, giving up`);
     }
   }
 };

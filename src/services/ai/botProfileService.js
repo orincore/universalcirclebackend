@@ -8,6 +8,17 @@ const supabase = require('../../config/database');
 const botConversationHistory = new Map();
 const MAX_CONVERSATION_HISTORY = 10;
 
+// Rate limiting support
+const apiRateLimiter = {
+  lastRequestTime: 0,
+  rateLimited: false,
+  rateLimitExpiry: 0,
+  consecutiveErrors: 0,
+  cooldownPeriod: 60000, // 1 minute default cooldown
+  requestsPerMinute: 20,  // Conservative limit for free tier
+  requestTimestamps: []
+};
+
 // Initialize Google Generative AI client
 const API_KEY = process.env.GEMINI_API_KEY;
 if (!API_KEY) {
@@ -25,11 +36,42 @@ try {
   if (!API_KEY) {
     console.error('GEMINI_API_KEY is not set in environment variables');
   } else {
-    model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    model = genAI.getGenerativeModel({ 
+      model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+      generationConfig: {
+        temperature: 0.85,
+        topP: 0.85,
+        topK: 40
+      }
+    });
     console.log('Successfully initialized Gemini AI model');
+    
+    // Test the model to ensure it's working properly
+    (async () => {
+      try {
+        const result = await model.generateContent('Hello, are you working?');
+        const response = await result.response;
+        const text = response.text();
+        console.log('Model test successful. Response: ' + text.substring(0, 30) + '...');
+        info('Gemini model initialized and tested successfully');
+      } catch (testError) {
+        console.error('Model test failed: ' + testError.message);
+        error('Gemini model initialization test failed: ' + testError.message);
+        
+        // Check for rate limit errors
+        if (testError.message && testError.message.includes("429") && testError.message.includes("quota")) {
+          info('Setting rate limit flag due to quota exceeded during test');
+          apiRateLimiter.rateLimited = true;
+          apiRateLimiter.rateLimitExpiry = Date.now() + 60000; // 1 minute cooldown
+        }
+        
+        model = null; // Clear model to use fallbacks
+      }
+    })();
   }
 } catch (err) {
   console.error('Failed to initialize Gemini AI model:', err);
+  model = null; // Ensure model is null to trigger fallbacks
 }
 
 // Lists of common Indian first names
@@ -1070,6 +1112,8 @@ const generateBotProfile = async (gender = 'male', preference = 'Friendship', us
     // Create AI-generated detailed bot profile if AI available
     if (model) {
       try {
+        info(`Using AI model to generate response. API key exists: ${!!API_KEY}`);
+        
         // ... existing AI profile generation code ...
         
         // Existing code for generating bot profile with AI
@@ -1306,9 +1350,18 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
       // Continue anyway - we'll try to generate a response even if the bot user doesn't exist
     }
     
-    // Detect the language of the user message (simplified approach)
-    const hasNonEnglishChars = /[^\x00-\x7F]/.test(userMessage);
-    const probableLanguage = hasNonEnglishChars ? 'non-english' : 'english';
+    // Detect the language of the user message (improved approach)
+    const hindiPattern = /[\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F]/; // Unicode ranges for Hindi and related scripts
+    const hindiWords = /(namaste|kaise ho|kya hal|kya chal|aap|tum|kaise|theek|accha|haan|nahi|bilkul|kyun|kab|kahan|kaun|matlab|samajh|dhanyavaad|shukriya)/i;
+    
+    // Check if message contains Hindi script or common Hindi words
+    const hasHindiScript = hindiPattern.test(userMessage);
+    const hasHindiWords = hindiWords.test(userMessage);
+    const hasNonEnglishChars = /[^\u0000-\u007F]/.test(userMessage);
+    
+    // Determine the probable language
+    const probableLanguage = hasHindiScript || hasHindiWords ? 'hindi' : 
+                            hasNonEnglishChars ? 'non-english' : 'english';
     
     // Create a unique conversation ID for this user-bot pair
     const conversationId = `${userId}-${botProfile.id}`;
@@ -1337,9 +1390,35 @@ const generateBotResponse = async (userMessage, botProfile, preference = 'Friend
     
     let botResponse = '';
     
-    // Check if AI model is available
-    if (model) {
+    // Check if AI model is available and we're not rate limited
+    const now = Date.now();
+    
+    // Remove timestamps older than 1 minute
+    apiRateLimiter.requestTimestamps = apiRateLimiter.requestTimestamps.filter(
+      time => now - time < 60000
+    );
+    
+    // Check if we're still in a rate limit cooldown period
+    if (apiRateLimiter.rateLimited && now < apiRateLimiter.rateLimitExpiry) {
+      info(`Skipping AI request due to active rate limit. Cooldown expires in ${Math.round((apiRateLimiter.rateLimitExpiry - now)/1000)}s`);
+      botResponse = ''; // Will use fallbacks
+    }
+    // Check if we would exceed rate limits with this request
+    else if (apiRateLimiter.requestTimestamps.length >= apiRateLimiter.requestsPerMinute) {
+      info(`Rate limit preventive cooldown triggered: ${apiRateLimiter.requestTimestamps.length}/${apiRateLimiter.requestsPerMinute} requests in last minute`);
+      apiRateLimiter.rateLimited = true;
+      apiRateLimiter.rateLimitExpiry = now + apiRateLimiter.cooldownPeriod;
+      botResponse = ''; // Will use fallbacks
+    }
+    // We have model and are not rate limited
+    else if (model) {
       try {
+        info(`Using AI model to generate response. API key exists: ${!!API_KEY}`);
+        
+        // Add this timestamp to our rate tracking
+        apiRateLimiter.requestTimestamps.push(now);
+        apiRateLimiter.lastRequestTime = now;
+        
         // Personality traits based on gender and preference
         let personalityTraits = '';
         
@@ -1446,9 +1525,46 @@ RESPONSE GUIDELINES:
         const response = await result.response;
         botResponse = response.text().trim();
           console.log(`Successfully received response from Gemini AI: "${botResponse.substring(0, 30)}..."`);
+          
+          // Reset error count on successful call
+          apiRateLimiter.consecutiveErrors = 0;
+          
+          // If we were previously rate limited but now succeeded, clear the flag
+          if (apiRateLimiter.rateLimited) {
+            info('Successfully called API after rate limit. Clearing rate limit flag.');
+            apiRateLimiter.rateLimited = false;
+          }
         } catch (geminiError) {
           console.error(`Gemini API error details:`, geminiError);
           error(`Failed to generate content from Gemini: ${geminiError.message}`);
+          
+          // Check for rate limit or quota errors
+          if (geminiError.message && 
+             (geminiError.message.includes("429") || 
+              geminiError.message.includes("quota") ||
+              geminiError.message.toLowerCase().includes("rate limit"))) {
+            
+            info('Rate limit detected. Setting cooldown period.');
+            apiRateLimiter.rateLimited = true;
+            
+            // Extract retry delay if specified in the error
+            let retryDelay = 60000; // Default 1 minute
+            const retryMatch = geminiError.message.match(/retryDelay":"(\d+)s"/);
+            if (retryMatch && retryMatch[1]) {
+              retryDelay = parseInt(retryMatch[1]) * 1000; // Convert seconds to ms
+              info(`Using retry delay from error: ${retryDelay}ms`);
+            }
+            
+            apiRateLimiter.rateLimitExpiry = Date.now() + retryDelay;
+            apiRateLimiter.consecutiveErrors++;
+            
+            // Increase cooldown period exponentially for consecutive errors
+            if (apiRateLimiter.consecutiveErrors > 1) {
+              apiRateLimiter.cooldownPeriod = Math.min(300000, apiRateLimiter.cooldownPeriod * 2); // Max 5 minutes
+              info(`Increased cooldown period to ${apiRateLimiter.cooldownPeriod}ms due to consecutive errors`);
+            }
+          }
+          
           throw geminiError; // Re-throw to be caught by the outer catch
         }
         
@@ -1505,12 +1621,40 @@ RESPONSE GUIDELINES:
     
     // If no response was generated (due to error or no model), use fallback
     if (!botResponse) {
-      // Use language-appropriate fallback responses
-      const fallbackResponses = hasNonEnglishChars ? 
-        getHindiFallbackResponses(botProfile) : 
-        getEnglishFallbackResponses(botProfile);
+      // First check if the message is a common greeting that needs a specific response
+      const lowerCaseMessage = userMessage.toLowerCase().trim();
       
-      botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      // Handle common greetings with specific responses rather than random fallbacks
+      if (/^(hi|hello|hey|namaste|hola|wassup|what'?s? up|hii+|hii+ there|hi there|hello there|howdy|greetings)[\s!.?]*$/i.test(lowerCaseMessage)) {
+        const greetings = [
+          `Hey there! How's it going?`,
+          `Hi! What's up?`,
+          `Hello! How are you today?`,
+          `Hey! Nice to hear from you. How's your day?`,
+          `Hii! What have you been up to?`
+        ];
+        botResponse = greetings[Math.floor(Math.random() * greetings.length)];
+      } 
+      else if (/^how are you[?.!]*$|^how('s| is) it going[?.!]*$|^how have you been[?.!]*$|^what'?s? up[?.!]*$|^sup[?.!]*$/i.test(lowerCaseMessage)) {
+        const howAreYouResponses = [
+          `I'm doing pretty good, thanks for asking! How about you?`,
+          `I'm good yaar! Just finished some work. What about you?`,
+          `Not bad at all! Just chilling. How's your day going?`,
+          `I'm great! Been a busy day though. How are things with you?`,
+          `Doing well! Was actually just thinking about grabbing some chai. How are you?`,
+          `Pretty good! Was just listening to some music. How's your day been?`
+        ];
+        botResponse = howAreYouResponses[Math.floor(Math.random() * howAreYouResponses.length)];
+      }
+      // If not a common greeting, use language-appropriate fallback responses
+      else {
+        const fallbackResponses = (hasHindiScript || hasHindiWords) ? 
+          getHindiFallbackResponses(botProfile) : 
+          getEnglishFallbackResponses(botProfile);
+        
+        botResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      }
+      
       info(`Using fallback response for bot ${botProfile.id}: "${botResponse}"`);
       
       // Add fallback response to conversation history

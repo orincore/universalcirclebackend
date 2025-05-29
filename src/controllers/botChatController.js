@@ -77,10 +77,41 @@ const sendMessageToBot = async (req, res) => {
     
     // Generate bot response
     info(`Generating bot response...`);
-    const botResponse = await generateBotResponse(message, bot, bot.preference || 'Friendship', userId);
-    info(`Bot response generated: "${botResponse.substring(0, 100)}${botResponse.length > 100 ? '...' : ''}"`);
+    let botResponse;
+    let isRateLimited = false;
     
-    // Return both messages
+    try {
+      botResponse = await generateBotResponse(message, bot, bot.preference || 'Friendship', userId);
+      info(`Bot response generated: "${botResponse.substring(0, 100)}${botResponse.length > 100 ? '...' : ''}"`);
+    } catch (botError) {
+      error(`Error generating bot response: ${botError.message}`);
+      
+      // Check if this is a rate limit error
+      if (botError.message && 
+          (botError.message.includes("429") || 
+           botError.message.includes("quota") ||
+           botError.message.toLowerCase().includes("rate limit"))) {
+        
+        isRateLimited = true;
+        warn(`Rate limit detected for bot ${botId}. Using friendly response.`);
+        
+        // Use appropriate rate limit response
+        const rateLimitResponses = [
+          "Our chat server is a bit busy right now. Can we continue in a few minutes?",
+          "Just got a notification that I need to wait a moment before responding further. Let's chat again in a bit!",
+          "Sorry yaar, too many messages coming in right now. Can we continue this conversation in a few minutes?",
+          "I need to step away for a quick break. Let's continue this interesting conversation shortly!",
+          "My phone is going crazy with notifications right now. Let me get back to you in a few minutes?"
+        ];
+        
+        botResponse = rateLimitResponses[Math.floor(Math.random() * rateLimitResponses.length)];
+      } else {
+        // For non-rate limit errors, use a generic response
+        botResponse = "Sorry, I couldn't process that message. Can you try again?";
+      }
+    }
+    
+    // Return both messages with rate limit flag if applicable
     return res.status(200).json({
       success: true,
       data: {
@@ -100,7 +131,8 @@ const sendMessageToBot = async (req, res) => {
           message: botResponse,
           timestamp: new Date().toISOString(),
           isRead: false
-        }
+        },
+        isRateLimited: isRateLimited
       }
     });
   } catch (error) {

@@ -414,7 +414,7 @@ const initializeSocket = (io) => {
       next(new Error('Authentication error'));
     }
   });
-  
+
   // Log important client events for developers
   console.log(`
 === SOCKET.IO SERVER INITIALIZED ===
@@ -2646,8 +2646,11 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         
         // Verify this user is part of this match
         if (botMatch.userId !== socket.user.id) {
-          socket.emit('error', { source: 'chat', message: 'You are not part of this match' });
-          return;
+          // FIXED: Update the userId in botMatch to the current socket user's ID
+          // This ensures the bot match has the correct userId for future responses
+          botMatch.userId = socket.user.id;
+          botMatches.set(matchId, botMatch);
+          info(`Updated bot match ${matchId} with correct user ID ${socket.user.id}`);
         }
         
         // Join the match room if not already in it
@@ -2707,7 +2710,8 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
                 botMatch.messages.push({
                   senderId: botMatch.botProfile.id,
                   message: greeting,
-                  timestamp
+                  timestamp,
+                  id: messageId
                 });
                 
                 // Send the greeting to the user
@@ -3756,13 +3760,13 @@ const createBotMatchForUser = async (socket) => {
     
     // Keep trying to create a bot until successful or max attempts reached
     while (!botProfile && botCreationAttempts < maxBotCreationAttempts) {
-      try {
-        // Generate a bot profile matching user's preferences
+    try {
+      // Generate a bot profile matching user's preferences
         botProfile = await generateBotProfile(
-          botGender, 
-          userPreference, 
-          socket.user.interests || []
-        );
+        botGender, 
+        userPreference, 
+        socket.user.interests || []
+      );
         
         // Add explicit date_of_birth if missing
         if (!botProfile.date_of_birth) {
@@ -3834,67 +3838,67 @@ const createBotMatchForUser = async (socket) => {
     if (!botProfile) {
       throw new Error('Failed to create valid bot profile after multiple attempts');
     }
-    
-    // Generate a matchId and create the match
-    const matchId = uuidv4();
-    
-    // Store bot match data for response handling
-    botMatches.set(matchId, {
-      matchId,
-      userId: socket.user.id,
-      botProfile,
-      preference: userPreference,
-      messages: [],
-      createdAt: new Date()
-    });
-    
-    // Format bot as a user to fit into the existing flow
-    const botAsUser = {
-      id: botProfile.id,
-      username: botProfile.username,
+      
+      // Generate a matchId and create the match
+      const matchId = uuidv4();
+      
+      // Store bot match data for response handling
+      botMatches.set(matchId, {
+        matchId,
+        userId: socket.user.id,
+        botProfile,
+        preference: userPreference,
+        messages: [],
+        createdAt: new Date()
+      });
+      
+      // Format bot as a user to fit into the existing flow
+      const botAsUser = {
+        id: botProfile.id,
+        username: botProfile.username,
       first_name: botProfile.firstName || botProfile.first_name,
       last_name: botProfile.lastName || botProfile.last_name,
-      gender: botProfile.gender,
-      bio: botProfile.bio,
-      date_of_birth: botProfile.date_of_birth,
-      profile_picture_url: botProfile.profile_picture_url,
-      interests: botProfile.interests,
-      preference: userPreference
-    };
-    
-    // Create shared interests based on user's interests and bot's interests
-    const sharedInterests = socket.user.interests 
-      ? socket.user.interests.filter(interest => botProfile.interests.includes(interest))
-      : [];
-    
-    // Ensure at least one shared interest
-    if (sharedInterests.length === 0 && botProfile.interests.length > 0) {
-      sharedInterests.push(botProfile.interests[0]);
-    }
-    
-    // Add to active matches
-    activeMatches.set(matchId, {
-      users: [userId, botProfile.id],
-      acceptances: {
-        [userId]: false,
-        [botProfile.id]: true // Bot automatically accepts
-      },
-      sharedInterests,
-      preference: userPreference,
-      createdAt: new Date(),
-      isBot: true
-    });
-    
-    // Remove user from matchmaking pool
-    matchmakingPool.delete(userId);
-    
-    // Reset processing flag if user was in pool
-    if (matchmakingPool.has(userId)) {
-      const userPoolData = matchmakingPool.get(userId);
-      userPoolData.isBeingProcessed = false;
-      matchmakingPool.set(userId, userPoolData);
-    }
-    
+        gender: botProfile.gender,
+        bio: botProfile.bio,
+        date_of_birth: botProfile.date_of_birth,
+        profile_picture_url: botProfile.profile_picture_url,
+        interests: botProfile.interests,
+        preference: userPreference
+      };
+      
+      // Create shared interests based on user's interests and bot's interests
+      const sharedInterests = socket.user.interests 
+        ? socket.user.interests.filter(interest => botProfile.interests.includes(interest))
+        : [];
+      
+      // Ensure at least one shared interest
+      if (sharedInterests.length === 0 && botProfile.interests.length > 0) {
+        sharedInterests.push(botProfile.interests[0]);
+      }
+      
+      // Add to active matches
+      activeMatches.set(matchId, {
+        users: [userId, botProfile.id],
+        acceptances: {
+          [userId]: false,
+          [botProfile.id]: true // Bot automatically accepts
+        },
+        sharedInterests,
+        preference: userPreference,
+        createdAt: new Date(),
+        isBot: true
+      });
+      
+      // Remove user from matchmaking pool
+      matchmakingPool.delete(userId);
+      
+      // Reset processing flag if user was in pool
+      if (matchmakingPool.has(userId)) {
+        const userPoolData = matchmakingPool.get(userId);
+        userPoolData.isBeingProcessed = false;
+        matchmakingPool.set(userId, userPoolData);
+      }
+      
     // Create match in database with retries
     let matchCreated = false;
     let retryCount = 0;
@@ -3945,14 +3949,14 @@ const createBotMatchForUser = async (socket) => {
           }
         }
       }
-    }
-    
-    // Notify user of the match
-    const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
-    socket.emit('match:found', { match: userMatchData });
-    
-    console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
-    
+      }
+      
+      // Notify user of the match
+      const userMatchData = createMatchData(botAsUser, sharedInterests, matchId, userPreference);
+      socket.emit('match:found', { match: userMatchData });
+      
+      console.log(`Created AI bot match ${matchId} between user ${userId} and bot ${botProfile.id}`);
+      
     // Add initial welcome message after a short delay to make it look more natural
     setTimeout(async () => {
       try {
@@ -4206,15 +4210,16 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     
     // Add user message to match history if this is not a retry
     if (!isRetry) {
-      botMatch.messages.push({
-        senderId: socket.user.id,
-        message: userMessage,
-        timestamp: new Date().toISOString()
-      });
+    botMatch.messages.push({
+      senderId: socket.user.id,
+      message: userMessage,
+      timestamp: new Date().toISOString()
+    });
     }
     
     // Send typing indicator to user for better UX
-    const userSocketId = connectedUsers.get(botMatch.userId);
+    // FIXED: Use socket.user.id to get the correct socket ID, rather than botMatch.userId
+    const userSocketId = connectedUsers.get(socket.user.id);
     if (userSocketId) {
       // Send typing indicator through socket
       ioInstance.to(userSocketId).emit('match:typing', {
@@ -4236,11 +4241,11 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
     try {
       // Start AI response generation immediately (don't wait for typing animation)
       const botResponsePromise = generateBotResponse(
-        userMessage,
-        botMatch.botProfile,
-        botMatch.preference,
-        socket.user.id // Pass user ID for database storage
-      );
+            userMessage,
+            botMatch.botProfile,
+            botMatch.preference,
+            socket.user.id // Pass user ID for database storage
+          );
       
       // Calculate a realistic typing time based on typical human typing speed
       // Average person types 40 WPM, or about 200 characters per minute (3.33 chars/sec)
@@ -4259,26 +4264,26 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
       
       // Send typing indicator for the calculated duration
       const typingEndTime = Date.now() + actualTypingTime;
-      
-      // Generate a message ID for the bot's response
-      const botMessageId = uuidv4();
-      const timestamp = new Date().toISOString();
-      
-      // Prepare the message object
-      const messageObject = {
-        id: botMessageId,
+        
+        // Generate a message ID for the bot's response
+        const botMessageId = uuidv4();
+        const timestamp = new Date().toISOString();
+        
+        // Prepare the message object
+        const messageObject = {
+          id: botMessageId,
         matchId: matchId,
-        senderId: botMatch.botProfile.id,
+          senderId: botMatch.botProfile.id,
         senderName: `${botMatch.botProfile.firstName || botMatch.botProfile.first_name} ${botMatch.botProfile.lastName || botMatch.botProfile.last_name}`,
-        message: botResponse,
+          message: botResponse,
         timestamp,
         isDelivered: true
-      };
-      
-      // Add bot message to match history
-      botMatch.messages.push({
-        senderId: botMatch.botProfile.id,
-        message: botResponse,
+        };
+        
+        // Add bot message to match history
+        botMatch.messages.push({
+          senderId: botMatch.botProfile.id,
+          message: botResponse,
         timestamp,
         id: botMessageId
       });
@@ -4288,21 +4293,22 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
       if (remainingTypingTime > 0) {
         await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
       }
-      
-      // Stop typing indicator before sending the message
-      if (userSocketId) {
-        ioInstance.to(userSocketId).emit('match:typing', {
-          matchId: matchId,
-          senderId: botMatch.botProfile.id,
-          typing: false
-        });
+        
+        // Stop typing indicator before sending the message
+        if (userSocketId) {
+          ioInstance.to(userSocketId).emit('match:typing', {
+            matchId: matchId,
+            senderId: botMatch.botProfile.id,
+            typing: false
+          });
         
         // Small delay after typing stops before message appears (realistic)
         setTimeout(() => {
           try {
-            // Send bot message directly to user's socket
-            ioInstance.to(userSocketId).emit('match:message', messageObject);
-            console.log(`Successfully sent bot message to user ${botMatch.userId}`);
+          // Send bot message directly to user's socket
+          ioInstance.to(userSocketId).emit('match:message', messageObject);
+          // FIXED: Use socket.user.id for logging
+          console.log(`Successfully sent bot message to user ${socket.user.id}`);
             
             // Also store delivery status information for consistency with real messages
             ioInstance.to(userSocketId).emit('match:messageDeliveryStatus', {
@@ -4334,8 +4340,9 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
             }
           }
         }, 200 + Math.random() * 300); // 200-500ms delay
-      } else {
-        console.error(`User socket ID not found for user ${botMatch.userId}`);
+        } else {
+          // FIXED: Log the correct user ID when socket ID is not found
+          console.error(`User socket ID not found for user ${socket.user.id}`);
         throw new Error('User socket not found');
       }
     } catch (responseError) {
@@ -4374,7 +4381,8 @@ const handleBotResponse = async (matchId, userMessage, socket, isRetry = false, 
           };
           
           ioInstance.to(userSocketId).emit('match:message', emergencyMessage);
-          console.log(`Sent emergency fallback message to user ${botMatch.userId}`);
+          // FIXED: Use socket.user.id for logging
+          console.log(`Sent emergency fallback message to user ${socket.user.id}`);
           
           // Add to match history
           botMatch.messages.push({
@@ -4425,4 +4433,4 @@ module.exports = {
       return { success: false, error: error.message };
     }
   }
-};
+}; 

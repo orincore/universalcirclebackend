@@ -1266,17 +1266,35 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
     // Mark all messages in a conversation as read
     socket.on('message:markAllRead', async (data) => {
       try {
+        if (!data || !data.conversationId) {
+          console.log(`Invalid data received for message:markAllRead: ${JSON.stringify(data)}`);
+          socket.emit('error', {
+            source: 'message:markAllRead',
+            message: 'Invalid data: conversationId is required'
+          });
+          return;
+        }
+        
         const { conversationId } = data;
         const userId = socket.user.id;
         
         // Find the other user ID from the conversation
         let otherUserId;
-        if (conversationId.startsWith('conv_')) {
+        
+        // Check if conversationId exists and is a string
+        if (typeof conversationId === 'string' && conversationId.startsWith('conv_')) {
           // If using conversation IDs in format conv_user1_user2
           const userIds = conversationId.substring(5).split('_');
           otherUserId = userIds[0] === userId ? userIds[1] : userIds[0];
-        } else {
+        } else if (typeof conversationId === 'string') {
           otherUserId = conversationId; // Direct using user ID
+        } else {
+          console.log(`Invalid conversationId format: ${conversationId}`);
+          socket.emit('error', {
+            source: 'message:markAllRead',
+            message: 'Invalid conversation ID format'
+          });
+          return;
         }
         
         // Update all unread messages in database
@@ -4491,7 +4509,8 @@ const handleBotResponse = async (matchId, userMessage, socket) => {
     });
     
     // STEP 5: SEND MESSAGE
-    const messageId = require('uuid').v4();
+    // Always use a proper UUID for the messageId to ensure database compatibility
+    const messageId = uuidv4();
     const timestamp = new Date().toISOString();
     
     const messageObject = {

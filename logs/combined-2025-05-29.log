@@ -367,3 +367,77 @@
 {"timestamp":"2025-05-29T07:47:39.084Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
 {"timestamp":"2025-05-29T07:47:39.084Z","level":"info","message":"Database migrations completed."}
 {"timestamp":"2025-05-29T07:47:40.160Z","level":"info","message":"Health check recorded successfully","cpuUsage":36,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1.463597708},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-29T07:58:41.864Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-29T07:58:41.867Z","level":"info","message":"Successfully initialized Gemini AI model"}
+{"timestamp":"2025-05-29T07:58:42.204Z","level":"info","message":"Meme API running in LOCAL environment on darwin"}
+{"timestamp":"2025-05-29T07:58:42.205Z","level":"info","message":"Loaded 50 random memes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.206Z","level":"info","message":"Loaded 29 memes for r/BollyBlindsNGossip from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.207Z","level":"info","message":"Loaded 49 memes for r/IndianDankMemes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.209Z","level":"info","message":"Loaded 46 memes for r/IndianMeyMeys from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.211Z","level":"info","message":"Loaded 40 memes for r/PoliticalIndianMemes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.212Z","level":"info","message":"Loaded 56 memes for r/SaimanSays from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.214Z","level":"info","message":"Loaded 26 memes for r/cricket from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.215Z","level":"info","message":"Loaded 46 memes for r/dankindianmemes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.216Z","level":"info","message":"Loaded 39 memes for r/delhi from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.217Z","level":"info","message":"Loaded 24 memes for r/desimemes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.218Z","level":"info","message":"Loaded 58 memes for r/indiameme from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.220Z","level":"info","message":"Loaded 92 memes for r/memes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.221Z","level":"info","message":"Loaded 21 memes for r/mumbai from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.223Z","level":"info","message":"Loaded 96 memes for r/wholesomememes from disk cache"}
+{"timestamp":"2025-05-29T07:58:42.227Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-29T07:58:42.227Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-29T07:58:42.227Z","level":"info","message":"\n=== SOCKET.IO SERVER INITIALIZED ===\nImportant socket events for client integration:\n\n1. 'chat:open' - Clients MUST emit this event when a user opens a chat\n   - Required data: { matchId: 'match-uuid' }\n   - This ensures bots respond when chats are opened, even if no message is sent\n   - Example: socket.emit('chat:open', { matchId: matchId });\n\n2. 'match:message' - Used for sending messages in a match\n   - Required data: { matchId: 'match-uuid', message: 'user message' }\n\n3. 'match:typing' - Used for typing indicators\n   - Required data: { matchId: 'match-uuid', typing: true/false }\n\nBot chat interactions require 'chat:open' to be emitted when a user opens a chat.\n===========================================\n"}
+{"timestamp":"2025-05-29T07:58:42.227Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-29T07:58:42.268Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-29T07:58:42.269Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-29T07:58:42.270Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-29T07:58:42.270Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-29T07:58:42.274Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-29T07:58:42.275Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-29T07:58:42.277Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-29T07:58:42.277Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-29T07:58:42.277Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-29T07:58:42.299Z","level":"error","message":"(node:31807) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-29T07:58:42.301Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-29T07:58:42.427Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-29T07:58:42.427Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-29T07:58:42.427Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-29T07:58:42.427Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-29T07:58:43.537Z","level":"info","message":"Health check recorded successfully","cpuUsage":26,"memoryUsage":98,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":1.785927875},"databaseStatus":"healthy"}
+{"timestamp":"2025-05-29T07:59:38.897Z","level":"info","message":"Gemini AI service initialized successfully"}
+{"timestamp":"2025-05-29T07:59:38.899Z","level":"info","message":"Successfully initialized Gemini AI model"}
+{"timestamp":"2025-05-29T07:59:39.194Z","level":"info","message":"Meme API running in LOCAL environment on darwin"}
+{"timestamp":"2025-05-29T07:59:39.195Z","level":"info","message":"Loaded 50 random memes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.196Z","level":"info","message":"Loaded 29 memes for r/BollyBlindsNGossip from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.197Z","level":"info","message":"Loaded 49 memes for r/IndianDankMemes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.198Z","level":"info","message":"Loaded 46 memes for r/IndianMeyMeys from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.200Z","level":"info","message":"Loaded 40 memes for r/PoliticalIndianMemes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.201Z","level":"info","message":"Loaded 56 memes for r/SaimanSays from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.203Z","level":"info","message":"Loaded 26 memes for r/cricket from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.204Z","level":"info","message":"Loaded 46 memes for r/dankindianmemes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.205Z","level":"info","message":"Loaded 39 memes for r/delhi from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.206Z","level":"info","message":"Loaded 24 memes for r/desimemes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.207Z","level":"info","message":"Loaded 58 memes for r/indiameme from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.209Z","level":"info","message":"Loaded 92 memes for r/memes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.209Z","level":"info","message":"Loaded 21 memes for r/mumbai from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.211Z","level":"info","message":"Loaded 96 memes for r/wholesomememes from disk cache"}
+{"timestamp":"2025-05-29T07:59:39.214Z","level":"info","message":"Starting global matchmaking system"}
+{"timestamp":"2025-05-29T07:59:39.214Z","level":"info","message":"Starting matchmaking pool cleanup system"}
+{"timestamp":"2025-05-29T07:59:39.214Z","level":"info","message":"\n=== SOCKET.IO SERVER INITIALIZED ===\nImportant socket events for client integration:\n\n1. 'chat:open' - Clients MUST emit this event when a user opens a chat\n   - Required data: { matchId: 'match-uuid' }\n   - This ensures bots respond when chats are opened, even if no message is sent\n   - Example: socket.emit('chat:open', { matchId: matchId });\n\n2. 'match:message' - Used for sending messages in a match\n   - Required data: { matchId: 'match-uuid', message: 'user message' }\n\n3. 'match:typing' - Used for typing indicators\n   - Required data: { matchId: 'match-uuid', typing: true/false }\n\nBot chat interactions require 'chat:open' to be emitted when a user opens a chat.\n===========================================\n"}
+{"timestamp":"2025-05-29T07:59:39.214Z","level":"info","message":"Starting scheduled notification system..."}
+{"timestamp":"2025-05-29T07:59:39.239Z","level":"info","message":"Scheduled notification system initialized"}
+{"timestamp":"2025-05-29T07:59:39.240Z","level":"info","message":"Scheduled re-engagement notifications at 5:00 PM daily"}
+{"timestamp":"2025-05-29T07:59:39.241Z","level":"info","message":"Scheduled weekly matches digest for Sundays at noon"}
+{"timestamp":"2025-05-29T07:59:39.241Z","level":"info","message":"All scheduled notifications have been initialized"}
+{"timestamp":"2025-05-29T07:59:39.245Z","level":"info","message":"Streak notification jobs initialized"}
+{"timestamp":"2025-05-29T07:59:39.246Z","level":"info","message":"Wheel notification jobs initialized"}
+{"timestamp":"2025-05-29T07:59:39.248Z","level":"info","message":"Server running on port 5001"}
+{"timestamp":"2025-05-29T07:59:39.248Z","level":"info","message":"Starting database migrations..."}
+{"timestamp":"2025-05-29T07:59:39.248Z","level":"info","message":"Starting reports table migration..."}
+{"timestamp":"2025-05-29T07:59:39.276Z","level":"error","message":"(node:31969) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.\n SDK releases are limited to address critical bug fixes and security issues only.\n\nPlease migrate your code to use AWS SDK for JavaScript (v3).\nFor more information, check the blog post at https://a.co/cUPnyil\n(Use `node --trace-warnings ...` to show where the warning was created)"}
+{"timestamp":"2025-05-29T07:59:39.280Z","level":"error","message":"Error connecting to PostgreSQL database:","code":"ECONNREFUSED"}
+{"timestamp":"2025-05-29T07:59:39.749Z","level":"info","message":"Reports table already exists. Migration skipped."}
+{"timestamp":"2025-05-29T07:59:39.749Z","level":"error","message":"Migration createUserInterestsTable.sql failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-29T07:59:39.749Z","level":"error","message":"Migration process failed:","errno":-2,"code":"ENOENT","syscall":"open","path":"/Users/adarshsuradkar/Documents/new/universalcirclebackend/src/database/migrations/createUserInterestsTable.sql"}
+{"timestamp":"2025-05-29T07:59:39.749Z","level":"info","message":"Database migrations completed."}
+{"timestamp":"2025-05-29T07:59:40.850Z","level":"info","message":"Health check recorded successfully","cpuUsage":38,"memoryUsage":97,"apiStatus":"healthy","websocketStatus":{"status":"online","connections":0,"rooms":0,"uptime":2.029060792},"databaseStatus":"healthy"}

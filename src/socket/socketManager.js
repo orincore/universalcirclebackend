@@ -6,6 +6,9 @@ const { info, error, warn } = require('../utils/logger');
 // Track connected users and their socket IDs
 const connectedUsers = new Map();
 
+// Track connection rate limiting
+const connectionRateLimit = new Map();
+
 // Reference to Socket.IO instance
 let ioInstance;
 

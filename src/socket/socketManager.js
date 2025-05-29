@@ -979,14 +979,105 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         }
         
         // Check if this is a bot match
-        const isBot = botMatches.has(matchId);
+        let isBot = botMatches.has(matchId);
         let botMatch = null;
         let recipientId = null;
         
-        if (isBot) {
-          console.log(`This is a bot match ${matchId}`);
-          botMatch = botMatches.get(matchId);
+        // If not in memory, try to recover from database
+        if (!isBot) {
+          console.log(`Match ${matchId} not found in botMatches Map. Checking database...`);
+          
+          try {
+            // Check if this matchId exists in the matches table with a bot
+            const { data: matchData, error: matchError } = await supabase
+              .from('matches')
+              .select('*')
+              .eq('id', matchId)
+              .single();
+            
+            if (!matchError && matchData) {
+              // Check if one of the users is a bot
+              const user1Id = matchData.user1_id;
+              const user2Id = matchData.user2_id;
+              
+              // See if either user has is_bot=true in the users table
+              const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('id, is_bot, first_name, last_name, username, bio, interests, gender, profile_picture_url, preference')
+                .or(`id.eq.${user1Id},id.eq.${user2Id}`)
+                .eq('is_bot', true);
+              
+              if (!usersError && usersData && usersData.length > 0) {
+                // Found a bot user - this is a bot match
+                const botUser = usersData[0];
+                const botId = botUser.id;
+                
+                console.log(`Recovered bot match! Bot ID: ${botId}`);
+                
+                // Get messages for this match
+                const { data: messagesData } = await supabase
+                  .from('messages')
+                  .select('*')
+                  .or(`and(sender_id.eq.${userId},receiver_id.eq.${botId}),and(sender_id.eq.${botId},receiver_id.eq.${userId})`)
+                  .order('created_at', { ascending: true });
+                
+                // Recreate the bot match object
+                const formattedMessages = messagesData && messagesData.length > 0 ? messagesData.map(msg => ({
+                  senderId: msg.sender_id,
+                  message: msg.content,
+                  timestamp: msg.created_at,
+                  id: msg.id
+                })) : [];
+                
+                // Create a bot profile
+                const botProfile = {
+                  id: botId,
+                  first_name: botUser.first_name,
+                  last_name: botUser.last_name,
+                  firstName: botUser.first_name,
+                  lastName: botUser.last_name,
+                  username: botUser.username,
+                  profile_picture_url: botUser.profile_picture_url,
+                  bio: botUser.bio,
+                  interests: botUser.interests || [],
+                  gender: botUser.gender,
+                  is_bot: true
+                };
+                
+                // Re-create bot match in memory
+                botMatches.set(matchId, {
+                  matchId,
+                  userId,
+                  botProfile,
+                  preference: botUser.preference || 'Friendship',
+                  messages: formattedMessages,
+                  createdAt: matchData.created_at || new Date()
+                });
+                
+                console.log(`Successfully recovered bot match ${matchId} from database!`);
+                console.log(`Restored ${formattedMessages.length} messages`);
+                
+                // Update isBot flag and get botMatch object
+                isBot = true;
+                botMatch = botMatches.get(matchId);
+                recipientId = botId;
+              }
+            }
+          } catch (recoveryError) {
+            console.log(`Error attempting to recover bot match: ${recoveryError.message}`);
+            // Continue with normal match processing
+          }
+        }
+        
+        // Re-check if this is a bot match (either it was already or we recovered it)
+        if (isBot || botMatches.has(matchId)) {
+          isBot = true;
+          if (!botMatch) {
+            botMatch = botMatches.get(matchId);
+          }
           recipientId = botMatch.botProfile.id;
+          
+          console.log(`This is a bot match ${matchId}`);
           
           // Store message in history
           botMatch.messages.push({
@@ -2684,7 +2775,7 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
     });
     
     // Handle chat opened event - sends a bot message when user opens a chat
-    socket.on('chat:open', (data) => {
+    socket.on('chat:open', async (data) => {
       console.log(`===== CHAT:OPEN EVENT =====`);
       console.log(`User ${socket.user?.id} opened chat ${data?.matchId}`);
       
@@ -2712,7 +2803,99 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         // Update connection mapping for reliability
         connectedUsers.set(userId, socket.id);
         
-        // Check if this is a bot match
+        // Check if this is a bot match in memory
+        if (!botMatches.has(matchId)) {
+          console.log(`Match ${matchId} not found in botMatches Map. Checking database...`);
+          
+          // Try to recover bot match from database
+          try {
+            // Check if this matchId exists in the matches table with a bot
+            const { data: matchData, error: matchError } = await supabase
+              .from('matches')
+              .select('*')
+              .eq('id', matchId)
+              .single();
+            
+            if (matchError || !matchData) {
+              console.log(`No match found in database for ID ${matchId}`);
+              console.log(`Not a bot match, nothing more to do`);
+              return; // Not a bot match, nothing to do
+            }
+            
+            // Check if one of the users is a bot
+            const user1Id = matchData.user1_id;
+            const user2Id = matchData.user2_id;
+            
+            // See if either user has is_bot=true in the users table
+            const { data: usersData, error: usersError } = await supabase
+              .from('users')
+              .select('id, is_bot, first_name, last_name, username, bio, interests, gender, profile_picture_url, preference')
+              .or(`id.eq.${user1Id},id.eq.${user2Id}`)
+              .eq('is_bot', true);
+            
+            if (usersError || !usersData || usersData.length === 0) {
+              console.log(`No bot user found for match ${matchId}`);
+              console.log(`Not a bot match, nothing more to do`);
+              return; // Not a bot chat
+            }
+            
+            // Found a bot user - this is a bot match
+            const botUser = usersData[0];
+            const botId = botUser.id;
+            
+            console.log(`Recovered bot match! Bot ID: ${botId}`);
+            
+            // Get messages for this match
+            const { data: messagesData, error: messagesError } = await supabase
+              .from('messages')
+              .select('*')
+              .or(`and(sender_id.eq.${userId},receiver_id.eq.${botId}),and(sender_id.eq.${botId},receiver_id.eq.${userId})`)
+              .order('created_at', { ascending: true });
+            
+            // Recreate the bot match object
+            const formattedMessages = messagesData && messagesData.length > 0 ? messagesData.map(msg => ({
+              senderId: msg.sender_id,
+              message: msg.content,
+              timestamp: msg.created_at,
+              id: msg.id
+            })) : [];
+            
+            // Create a bot profile
+            const botProfile = {
+              id: botId,
+              first_name: botUser.first_name,
+              last_name: botUser.last_name,
+              firstName: botUser.first_name,
+              lastName: botUser.last_name,
+              username: botUser.username,
+              profile_picture_url: botUser.profile_picture_url,
+              bio: botUser.bio,
+              interests: botUser.interests || [],
+              gender: botUser.gender,
+              is_bot: true
+            };
+            
+            // Re-create bot match in memory
+            botMatches.set(matchId, {
+              matchId,
+              userId,
+              botProfile,
+              preference: botUser.preference || 'Friendship',
+              messages: formattedMessages,
+              createdAt: matchData.created_at || new Date()
+            });
+            
+            console.log(`Successfully recovered bot match ${matchId} from database!`);
+            console.log(`Restored ${formattedMessages.length} messages`);
+            
+          } catch (recoveryError) {
+            console.log(`Error attempting to recover bot match: ${recoveryError.message}`);
+            console.log(`Not a bot match, nothing more to do`);
+            return; // Treat as not a bot match
+          }
+        }
+        
+        // Re-check if this is a bot match (either it was already or we recovered it)
         if (!botMatches.has(matchId)) {
           console.log(`Not a bot match, nothing more to do`);
           return; // Not a bot match, nothing to do
@@ -2811,10 +2994,9 @@ Bot chat interactions require 'chat:open' to be emitted when a user opens a chat
         }
         
         console.log(`===== CHAT:OPEN EVENT COMPLETED =====`);
-      } catch (err) {
-        console.log(`CRITICAL ERROR in chat:open handler: ${err.message}`);
-        console.log(`Stack trace: ${err.stack}`);
-        error(`Error in chat:open handler: ${err.message}`);
+      } catch (error) {
+        console.log(`ERROR in chat:open handler: ${error.message}`);
+        console.log(error.stack);
         socket.emit('error', {
           source: 'chat',
           message: 'Server error processing chat open event'

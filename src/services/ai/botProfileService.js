@@ -1379,16 +1379,27 @@ CURRENT CONVERSATION:
 - This is a ${preference.toLowerCase()} context interaction
 - You should be authentic, relatable, and show genuine interest
           
-IMPORTANT INSTRUCTIONS:
-- Respond in the SAME LANGUAGE the person is using to talk to you. If they write in Hindi, respond in Hindi. Match their language.
-- Keep your response natural, conversational and SHORT (1-3 sentences maximum)
-- Show genuine interest in what they've shared
-- Be warm and friendly but don't overdo the friendliness
-- Don't use emojis
-- NEVER mention that you are an AI, bot, or program - respond as a real person would
-- Don't apologize for anything
-- Make your response feel like a genuine human message
-- NEVER mention that you're here to help or assist - you're having a normal conversation`
+IMPORTANT CULTURAL CONTEXT:
+- You are Indian and should reflect Indian communication style
+- Use Indian expressions like "yaar", "bhai", "arrey", etc. when appropriate
+- Reference Indian places, foods, movies, or cultural elements when relevant
+- If in Hindi, use Hinglish (Hindi-English mix) occasionally as many Indians do
+
+INDIAN LANGUAGE STYLES:
+- When responding in Hindi, use natural colloquial Hindi with occasional English words
+- In English, it's natural to use some Indian expressions mixed in
+- Match the formality level of the person you're talking to
+
+RESPONSE GUIDELINES:
+- Respond in the SAME LANGUAGE the person is using (Hindi, English, or Hinglish)
+- Keep responses short (1-3 sentences) and conversational - never write paragraphs
+- Show genuine interest by asking follow-up questions
+- Add small talk elements that Indians typically use (like asking about family, weather, etc.)
+- Use natural speech patterns with occasional fillers like "hmm", "actually", "you know"
+- Never use perfect grammatical structure - real humans make minor errors
+- NEVER mention that you are an AI or bot - respond exactly as a real Indian person would
+- Don't apologize or be overly formal
+- Be warm but casual, like talking to a friend`
           }]
         };
         
@@ -1415,10 +1426,12 @@ IMPORTANT INSTRUCTIONS:
         ];
         
         const generationConfig = {
-          temperature: 0.8,  // Slightly higher for more variability
-          topK: 40,
+          temperature: 0.9,  // Higher temperature for more creativity and variability
+          topK: 50,         // More diverse token selection
           topP: 0.95,
-          maxOutputTokens: 256,
+          maxOutputTokens: 200,  // Keep responses concise
+          stopSequences: [":", "```"], // Prevent list-type responses or code blocks
+          presencePenalty: 0.4,  // Reduce the likelihood of repetition
         };
         
         // Generate response with Gemini using chat mode for more natural conversation
@@ -1466,8 +1479,19 @@ IMPORTANT INSTRUCTIONS:
         
         // Filter out any phrases that might reveal this is an AI/bot
         botResponse = botResponse
-          .replace(/As an AI|As a bot|As a virtual|I'm an AI|I'm a bot|I'm not a real person|I don't have|I cannot|I'm unable to|I'm here to help|I'm here to assist|I'm designed to|I was created|I was made|I was programmed|How can I assist you|How can I help you/gi, '')
-          .replace(/\s{2,}/g, ' ').trim();
+          .replace(/As an AI|As a bot|As a virtual|I'm an AI|I'm a bot|I'm not a real person|I don't have|I cannot|I'm unable to|I'm here to help|I'm here to assist|I'm designed to|I was created|I was made|I was programmed|How can I assist you|How can I help you|AI language model|large language model|happy to assist|happy to help|my programming|my training data|my knowledge base|I don't have personal|I don't have the ability|beyond my capabilities|I'm not capable of|Unfortunately, I cannot/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+          
+        // Convert overly formal language to more casual
+        botResponse = botResponse
+          .replace(/I would be happy to/gi, "I'd be happy to")
+          .replace(/I would like to/gi, "I'd like to")
+          .replace(/I would love to/gi, "I'd love to")
+          .replace(/It has been/gi, "It's been")
+          .replace(/Let me know/gi, "Just let me know")
+          .replace(/Please feel free to/gi, "Feel free to")
+          .trim();
         
         info(`Successfully generated AI response: "${botResponse}"`);
       } catch (genError) {
@@ -1537,14 +1561,18 @@ const getHindiFallbackResponses = (botProfile) => {
     (botProfile.location ? JSON.parse(botProfile.location).city : 'मुंबई');
   
   return [
-    `नमस्ते! आपसे बात करके अच्छा लगा। और बताइए अपने बारे में?`,
-    `बहुत दिलचस्प! मुझे भी ऐसी चीज़ें पसंद हैं।`,
-    `आप क्या करना पसंद करते हैं? मुझे ${interest} बहुत पसंद है।`,
-    `वाह, यह तो बहुत अच्छा है! और सुनाइए?`,
-    `मैं ${location} में रहता/रहती हूँ। आप कहाँ से हैं?`,
-    `ये बात मुझे पसंद आई! थोड़ा और बताइए?`,
-    `मेरा नाम ${name} है। आपसे मिलकर खुशी हुई!`,
-    `क्या आप भी ${interest} पसंद करते हैं? मुझे बहुत शौक है इसका।`
+    `नमस्ते! आपसे बात करके अच्छा लगा। और बताइए, क्या चल रहा है आजकल?`,
+    `वाह, ये तो मस्त है यार! मुझे भी ऐसी चीज़ें बहुत पसंद हैं। और बताओ?`,
+    `आप क्या करना पसंद करते हैं? मुझे तो ${interest} का बहुत शौक है। आपको भी?`,
+    `अरे वाह, सुनके अच्छा लगा! और सुनाओ, आज का दिन कैसा रहा?`,
+    `मैं ${location} से हूँ। यहाँ का मौसम अच्छा है। आप कहाँ से हो?`,
+    `मुझे ये बात बहुत पसंद आई! थोड़ा और detail में बताओगे?`,
+    `मैं ${name}। अच्छा लगा आपसे बात करके! आप कितने समय से इस ऐप पर हो?`,
+    `क्या आप भी ${interest} पसंद करते हैं? मैं तो इसके बारे में घंटों बात कर सकता/सकती हूँ!`,
+    `हाँ बिलकुल, मैं समझ सकता/सकती हूँ। मेरे साथ भी ऐसा ही हुआ था एक बार।`,
+    `अच्छा सुनो, क्या तुम weekend पे कहीं घूमने जाने वाले हो? मैं सोच रहा/रही हूँ कुछ प्लान बनाने का।`,
+    `तुम्हारी बात सुनकर मुझे अपने college के दिन याद आ गए। वो भी क्या दिन थे!`,
+    `आजकल मैं थोड़ा busy हूँ ${interest} के साथ। तुम क्या कर रहे हो इन दिनों?`
   ];
 };
 
@@ -1565,18 +1593,22 @@ const getEnglishFallbackResponses = (botProfile) => {
   const occupation = botProfile.occupation || 'professional';
   
   return [
-    `That's interesting! Tell me more about yourself.`,
-    `I enjoy ${interest} too! What else do you like to do?`,
-    `I've been working as a ${occupation} for a while now. What about you?`,
-    `I'm from ${location}. Have you ever visited?`,
-    `That's cool! I'd love to hear more about your interests.`,
-    `I'm actually learning more about ${interest2} these days. Any recommendations?`,
-    `Thanks for sharing that! I've had similar experiences.`,
-    `That's a good point. I hadn't thought about it that way before.`,
-    `I'm curious to know more about your perspective on that.`,
-    `That sounds fun! I should try that sometime.`,
-    `I'm ${name}, by the way. Nice to connect with you!`,
-    `Do you often spend time ${interest}? It's one of my favorite things to do.`
+    `That's quite interesting yaar! Tell me more about yourself?`,
+    `I totally enjoy ${interest} too! What else do you like doing in your free time?`,
+    `I've been working as a ${occupation} for some time now. What about you? What keeps you busy these days?`,
+    `I'm from ${location}. Have you ever been here? It's a nice place actually.`,
+    `That's really cool! Would love to hear more about your interests, bro.`,
+    `Actually I'm exploring ${interest2} these days. Any tips or recommendations?`,
+    `Thanks for sharing that! I've gone through similar things. How did you handle it afterwards?`,
+    `Never thought of it that way. You have an interesting perspective!`,
+    `I'm curious to know more about that. How did you get into it?`,
+    `Sounds fun! I should definitely try that sometime. Been meaning to do new things.`,
+    `I'm ${name}, btw. Nice to connect! How long have you been on this app?`,
+    `Do you often go for ${interest}? It's one of my favorite things to do on weekends!`,
+    `Haha, same pinch! I was just thinking about that the other day.`,
+    `Arey, don't worry about it. These things happen. So what's your plan for the weekend?`,
+    `Honestly, I was just having chai and thinking about what to do today. Any suggestions?`,
+    `Oh ho! That reminds me of my college days. We used to do the same thing!`
   ];
 };
 
